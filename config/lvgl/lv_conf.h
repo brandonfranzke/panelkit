@@ -6,6 +6,12 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
+/* Define a custom attribute to register the code for Clang */
+#define LV_ATTRIBUTE_LARGE_CONST
+
+/* Type of coordinates. Should be `int16_t` (or `int32_t` for extreme cases) */
+typedef int16_t lv_coord_t;
+
 #include <stdint.h>
 
 /* Color depth: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888) */
