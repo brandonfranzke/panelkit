@@ -55,13 +55,13 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Initialize logger
-    spdlog_rs::default_logger_name("panelkit");
-    spdlog_rs::set_level_filter(match args.log_level {
-        LogLevel::Trace => spdlog_rs::LevelFilter::Trace,
-        LogLevel::Debug => spdlog_rs::LevelFilter::Debug,
-        LogLevel::Info => spdlog_rs::LevelFilter::Info,
-        LogLevel::Warn => spdlog_rs::LevelFilter::Warn,
-        LogLevel::Error => spdlog_rs::LevelFilter::Error,
+    spdlog::default_logger_name("panelkit");
+    spdlog::set_level_filter(match args.log_level {
+        LogLevel::Trace => spdlog::LevelFilter::Trace,
+        LogLevel::Debug => spdlog::LevelFilter::Debug,
+        LogLevel::Info => spdlog::LevelFilter::Info,
+        LogLevel::Warn => spdlog::LevelFilter::Warn,
+        LogLevel::Error => spdlog::LevelFilter::Error,
     });
     log::info!("PanelKit starting up...");
 
