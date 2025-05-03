@@ -60,26 +60,26 @@ impl StateManager {
         
         // Then check persistent storage
         if let Some(db) = &self.persistent_db {
-            // Create a block to ensure proper lifetime scoping
-            let result = {
-                let read_txn = db.begin_read()?;
-                let table = read_txn.open_table(STATE_TABLE)?;
-                
-                if let Ok(value) = table.get(key) {
-                    if let Some(data) = value {
-                        // Clone the data to a Vec to avoid lifetime issues
-                        let data_vec = data.value().to_vec();
-                        Some(bincode::deserialize(&data_vec)?)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            };
+            let read_txn = db.begin_read()?;
+            let table = read_txn.open_table(STATE_TABLE)?;
             
-            if result.is_some() {
-                return Ok(result);
+            // Following the compiler's suggestion, process data without temporaries
+            let value_result = table.get(key);
+            
+            if let Ok(value_opt) = value_result {
+                if let Some(data) = value_opt {
+                    // Clone the data into a new vector that's not tied to the transaction
+                    let bytes = data.value().to_vec();
+                    
+                    // Drop the transaction-related values early
+                    drop(data);
+                    drop(value_opt);
+                    drop(table);
+                    drop(read_txn);
+                    
+                    // Now deserialize from our cloned data
+                    return Ok(Some(bincode::deserialize(&bytes)?));
+                }
             }
         }
         
@@ -89,21 +89,29 @@ impl StateManager {
     /// Load all persistent state into memory
     pub fn load_all(&self) -> anyhow::Result<()> {
         if let Some(db) = &self.persistent_db {
-            // Create a scope to ensure proper lifetime handling
+            let read_txn = db.begin_read()?;
+            let table = read_txn.open_table(STATE_TABLE)?;
+            
+            // First collect all data into memory without holding references
+            let mut collected_data = Vec::new();
             {
-                let read_txn = db.begin_read()?;
-                let table = read_txn.open_table(STATE_TABLE)?;
-                
-                let mut memory_state = self.memory_state.lock().unwrap();
                 let iter = table.iter()?;
-                
                 for item in iter {
                     let (key, value) = item?;
                     let key_str = key.value().to_string();
                     let value_bytes = value.value().to_vec();
-                    memory_state.insert(key_str, value_bytes);
+                    collected_data.push((key_str, value_bytes));
                 }
-                // The transaction will be dropped at the end of this scope
+            }
+            
+            // Explicitly drop the table and transaction before using the collected data
+            drop(table);
+            drop(read_txn);
+            
+            // Now update our memory state with the collected data
+            let mut memory_state = self.memory_state.lock().unwrap();
+            for (key, value) in collected_data {
+                memory_state.insert(key, value);
             }
         }
         
