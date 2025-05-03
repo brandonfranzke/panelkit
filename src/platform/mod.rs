@@ -2,6 +2,9 @@
 //!
 //! This module provides platform-specific implementations for display, input, and timing.
 
+// Include mock implementations for proof-of-life testing
+pub mod mock;
+
 /// Display driver abstraction
 pub trait DisplayDriver {
     /// Initialize the display
@@ -35,6 +38,11 @@ pub struct PlatformFactory;
 impl PlatformFactory {
     /// Create a display driver based on the current platform
     pub fn create_display_driver() -> Box<dyn DisplayDriver> {
+        // For now, use mock drivers for proof-of-life
+        Box::new(mock::MockDisplayDriver::new())
+        
+        // Once we have real implementations:
+        /*
         #[cfg(feature = "simulator")]
         {
             // Use SDL2 for the simulator
@@ -46,10 +54,16 @@ impl PlatformFactory {
             // Use framebuffer for the target device
             Box::new(FramebufferDisplayDriver::new())
         }
+        */
     }
     
     /// Create an input driver based on the current platform
     pub fn create_input_driver() -> Box<dyn InputDriver> {
+        // For now, use mock drivers for proof-of-life
+        Box::new(mock::MockInputDriver::new())
+        
+        // Once we have real implementations:
+        /*
         #[cfg(feature = "simulator")]
         {
             // Use SDL2 for the simulator
@@ -61,9 +75,13 @@ impl PlatformFactory {
             // Use touch input for the target device
             Box::new(TouchInputDriver::new())
         }
+        */
     }
 }
 
+// These will be implemented later:
+
+/*
 // Simulator implementations
 #[cfg(feature = "simulator")]
 mod simulator {
@@ -201,3 +219,4 @@ mod target {
         }
     }
 }
+*/

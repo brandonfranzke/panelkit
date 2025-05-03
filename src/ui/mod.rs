@@ -2,6 +2,11 @@
 //!
 //! This module handles all UI-related components and rendering.
 
+use std::collections::HashMap;
+
+// Export hello page
+pub mod hello_page;
+
 /// Represents a UI page in the application
 pub trait Page {
     /// Initialize the page
@@ -22,38 +27,80 @@ pub trait Page {
 
 /// The UI manager that handles page navigation and rendering
 pub struct UIManager {
-    // TODO: Implement UI manager
+    pages: HashMap<String, Box<dyn Page>>,
+    current_page: Option<String>,
 }
 
 impl UIManager {
     /// Create a new UI manager
     pub fn new() -> Self {
         Self {
-            // TODO: Initialize UI manager
+            pages: HashMap::new(),
+            current_page: None,
         }
     }
     
     /// Initialize the UI system
     pub fn init(&mut self) -> anyhow::Result<()> {
-        // TODO: Implement UI initialization
+        // Register pages
+        self.register_page("hello", Box::new(hello_page::HelloPage::new()))?;
+        
+        // Navigate to default page
+        self.navigate_to("hello")?;
+        
+        Ok(())
+    }
+    
+    /// Register a page with the UI manager
+    pub fn register_page(&mut self, id: &str, mut page: Box<dyn Page>) -> anyhow::Result<()> {
+        page.init()?;
+        self.pages.insert(id.to_string(), page);
+        log::info!("Registered page: {}", id);
         Ok(())
     }
     
     /// Navigate to a specific page
     pub fn navigate_to(&mut self, page_id: &str) -> anyhow::Result<()> {
-        // TODO: Implement page navigation
+        if !self.pages.contains_key(page_id) {
+            return Err(anyhow::anyhow!("Page not found: {}", page_id));
+        }
+        
+        // Deactivate current page
+        if let Some(current) = &self.current_page {
+            if current != page_id {
+                if let Some(page) = self.pages.get_mut(current) {
+                    page.on_deactivate()?;
+                }
+            }
+        }
+        
+        // Activate new page
+        self.current_page = Some(page_id.to_string());
+        if let Some(page) = self.pages.get_mut(page_id) {
+            page.on_activate()?;
+        }
+        
+        log::info!("Navigated to page: {}", page_id);
         Ok(())
     }
     
     /// Process an event in the UI system
     pub fn process_event(&mut self, event: &crate::event::Event) -> anyhow::Result<()> {
-        // TODO: Implement event processing
+        if let Some(page_id) = &self.current_page {
+            if let Some(page) = self.pages.get_mut(page_id) {
+                page.handle_event(event)?;
+            }
+        }
         Ok(())
     }
     
     /// Render the current UI state
     pub fn render(&self) -> anyhow::Result<()> {
-        // TODO: Implement rendering
+        if let Some(page_id) = &self.current_page {
+            if let Some(page) = self.pages.get(page_id) {
+                page.render()?;
+            }
+        }
         Ok(())
     }
 }

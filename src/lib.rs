@@ -80,12 +80,15 @@ impl Application {
     pub fn run(&mut self) -> anyhow::Result<()> {
         self.running = true;
         
+        log::info!("Starting main application loop");
+        
         while self.running {
             // Poll for input events
             let events = self.input_driver.poll_events()?;
             
             // Process events
             for event in events {
+                log::info!("Processing event: {:?}", event);
                 self.event_broker.publish("input", event.clone());
                 self.ui_manager.process_event(&event)?;
             }
@@ -93,9 +96,9 @@ impl Application {
             // Render UI
             self.ui_manager.render()?;
             
-            // Sleep to maintain reasonable framerate
-            // TODO: Implement proper timing and power management
-            std::thread::sleep(std::time::Duration::from_millis(16));
+            // For proof-of-life, use a longer sleep time
+            // In production, we would use a proper timing strategy
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
         
         Ok(())
