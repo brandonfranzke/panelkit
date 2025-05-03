@@ -22,7 +22,7 @@ CARGO_NATIVE := cargo
 CARGO_ARM := cargo build --target=armv7-unknown-linux-gnueabihf
 
 # Declare phony targets
-.PHONY: all help build-containers local target run deploy create-service install-service clean
+.PHONY: all help build-containers local mac target run run-mac deploy create-service install-service clean
 
 # Default target
 all: help
@@ -33,9 +33,11 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make build-containers    - Build Docker containers for compilation"
-	@echo "  make local               - Build for local development (macOS)"
+	@echo "  make local               - Build for local development (in Docker)"
+	@echo "  make mac                 - Build natively on macOS (no Docker)"
 	@echo "  make target              - Cross-compile for Raspberry Pi target"
 	@echo "  make run                 - Run the local build for testing"
+	@echo "  make run-mac             - Run the macOS native build"
 	@echo "  make deploy              - Deploy to target device"
 	@echo "  make clean               - Clean build artifacts"
 	@echo "  make help                - Show this help message"
@@ -61,7 +63,18 @@ target: build-containers
 	$(DOCKER_RUN) -e LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_CROSS_IMAGE) sh -c "$(CARGO_ARM) --features target --release && cp -r target/armv7-unknown-linux-gnueabihf/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm"
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
 
-# Run local build for testing
+# Native macOS build (no Docker)
+mac:
+	@echo "Building natively for macOS..."
+	mkdir -p $(BUILD_DIR)
+	cargo build --features simulator
+
+# Run macOS native build
+run-mac: mac
+	@echo "Running macOS native build..."
+	RUST_LOG=debug target/debug/$(PROJECT_NAME)
+
+# Run local build for testing (in Docker)
 run: local
 	@echo "Running local build inside Docker container..."
 	$(DOCKER_RUN) -it --net=host -e DISPLAY=$$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix $(DOCKER_NATIVE_IMAGE) sh -c "RUST_LOG=debug /src/target/debug/$(PROJECT_NAME)"

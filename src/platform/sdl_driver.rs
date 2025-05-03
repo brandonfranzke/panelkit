@@ -37,6 +37,16 @@ impl SDLDriver {
             .video()
             .map_err(|e| anyhow::anyhow!("SDL video subsystem error: {}", e))?;
 
+        // Use different SDL window settings for macOS vs other platforms
+        #[cfg(target_os = "macos")]
+        let window = video_subsystem
+            .window(title, width, height)
+            .position_centered()
+            .allow_highdpi() // Enable Retina display support
+            .build()
+            .map_err(|e| anyhow::anyhow!("SDL window error on macOS: {}", e))?;
+
+        #[cfg(not(target_os = "macos"))]
         let window = video_subsystem
             .window(title, width, height)
             .position_centered()
