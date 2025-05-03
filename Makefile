@@ -67,7 +67,7 @@ target: build-containers
 mac: build-containers
 	@echo "Building for macOS within Docker..."
 	mkdir -p $(BUILD_DIR)
-	$(DOCKER_RUN) $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/"
+	$(DOCKER_RUN) -e LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/"
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)"
 
 # Run macOS-compatible build
