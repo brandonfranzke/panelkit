@@ -1,0 +1,23 @@
+# Rust build artifacts
+/target/
+
+# Docker artifacts
+.docker_build/
+.docker_cache/
+
+# Git directory
+.git/
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*~
+
+# Build artifacts
+/build/
+/dist/
+
+# Log files
+*.log
+logs/
