@@ -20,12 +20,13 @@ DOCKER_RUN := docker run --rm -v $(SRC_DIR):/src
 CARGO_NATIVE := cargo
 CARGO_ARM := cargo build --target=armv7-unknown-linux-gnueabihf
 
+# Declare phony targets
+.PHONY: all help build-containers local target run deploy create-service install-service clean
+
 # Default target
-.PHONY: all
 all: help
 
 # Help
-.PHONY: help
 help:
 	@echo "PanelKit - Embedded UI System"
 	@echo ""
@@ -39,14 +40,12 @@ help:
 	@echo "  make help                - Show this help message"
 
 # Build Docker containers
-.PHONY: build-containers
 build-containers:
 	@echo "Building Docker containers..."
 	docker build -t $(DOCKER_NATIVE_IMAGE) -f $(DOCKER_NATIVE_DOCKERFILE) .
 	docker build -t $(DOCKER_CROSS_IMAGE) -f $(DOCKER_CROSS_DOCKERFILE) .
 
 # Build for local development
-.PHONY: local
 local: build-containers
 	@echo "Building for local development..."
 	mkdir -p $(BUILD_DIR)
@@ -54,7 +53,6 @@ local: build-containers
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)"
 
 # Cross-compile for ARM target
-.PHONY: target
 target: build-containers
 	@echo "Cross-compiling for Raspberry Pi target..."
 	mkdir -p $(BUILD_DIR)
@@ -62,13 +60,11 @@ target: build-containers
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
 
 # Run local build for testing
-.PHONY: run
 run: local
 	@echo "Running local build..."
 	$(BUILD_DIR)/$(PROJECT_NAME)
 
 # Deploy to target device
-.PHONY: deploy
 deploy: target
 	@echo "Deploying to target device..."
 	scp $(BUILD_DIR)/$(PROJECT_NAME)-arm $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
@@ -76,28 +72,29 @@ deploy: target
 	@echo "Deployed to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
 
 # Create systemd service file for target
-.PHONY: create-service
 create-service:
 	@echo "Creating systemd service file..."
-	@echo "[Unit]" > $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "Description=PanelKit UI Application" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "After=network.target" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "[Service]" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "Type=simple" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "User=$(TARGET_USER)" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "WorkingDirectory=$(TARGET_DIR)" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "ExecStart=$(TARGET_DIR)/$(PROJECT_NAME)" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "Restart=on-failure" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "StandardOutput=journal" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "StandardError=journal" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "[Install]" >> $(BUILD_DIR)/$(PROJECT_NAME).service
-	@echo "WantedBy=multi-user.target" >> $(BUILD_DIR)/$(PROJECT_NAME).service
+	@mkdir -p $(BUILD_DIR)
+	@cat > $(BUILD_DIR)/$(PROJECT_NAME).service << EOF
+[Unit]
+Description=PanelKit UI Application
+After=network.target
+
+[Service]
+Type=simple
+User=$(TARGET_USER)
+WorkingDirectory=$(TARGET_DIR)
+ExecStart=$(TARGET_DIR)/$(PROJECT_NAME)
+Restart=on-failure
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
 	@echo "Service file created: $(BUILD_DIR)/$(PROJECT_NAME).service"
 
 # Install systemd service on target
-.PHONY: install-service
 install-service: create-service
 	@echo "Installing systemd service on target..."
 	scp $(BUILD_DIR)/$(PROJECT_NAME).service $(TARGET_USER)@$(TARGET_HOST):/tmp/
@@ -105,9 +102,8 @@ install-service: create-service
 	@echo "Service installed and enabled on target device"
 
 # Clean build artifacts
-.PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
-	docker run --rm -v $(SRC_DIR):/src $(DOCKER_NATIVE_IMAGE) sh -c "cargo clean"
+	-docker run --rm -v $(SRC_DIR):/src $(DOCKER_NATIVE_IMAGE) sh -c "cargo clean" 2>/dev/null || true
 	@echo "Clean complete"
