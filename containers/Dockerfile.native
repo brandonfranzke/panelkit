@@ -12,8 +12,10 @@ RUN apt-get update && apt-get install -y \
     libsdl2-dev \
     libsdl2-ttf-dev \
     libsdl2-image-dev \
+    libfreetype6-dev \
     git \
     ca-certificates \
+    x11-xserver-utils \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 

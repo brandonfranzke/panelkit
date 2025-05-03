@@ -64,7 +64,7 @@ target: build-containers
 # Run local build for testing
 run: local
 	@echo "Running local build inside Docker container..."
-	$(DOCKER_RUN) -it $(DOCKER_NATIVE_IMAGE) sh -c "RUST_LOG=info /src/target/debug/$(PROJECT_NAME)"
+	$(DOCKER_RUN) -it --net=host -e DISPLAY=$$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix $(DOCKER_NATIVE_IMAGE) sh -c "RUST_LOG=debug /src/target/debug/$(PROJECT_NAME)"
 
 # Deploy to target device
 deploy: target
