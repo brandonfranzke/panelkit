@@ -37,8 +37,9 @@ The state management system maintains application state and configuration:
 The platform layer abstracts hardware-specific details:
 
 - **Display Driver**: Handles rendering to the screen
-- **Input Driver**: Processes touch and other input events
-- **Platform Factory**: Creates appropriate driver implementations
+- **Input Driver**: Processes touch and other input events 
+- **Combined Driver**: Unified interface for platform services
+- **Platform Factory**: Creates appropriate driver implementations for each platform
 
 ## Data Flow
 
@@ -50,11 +51,12 @@ The platform layer abstracts hardware-specific details:
 
 ## Build System
 
-The build system supports both local development and cross-compilation:
+The build system supports cross-platform development and cross-compilation:
 
 - **Containerized Builds**: All builds occur in Docker containers
 - **Makefile**: Central orchestration for all build workflows
 - **Feature Flags**: Conditional compilation for simulator vs. target
+- **Cross-Platform Support**: Building for macOS, Linux, and ARM targets
 
 ## Deployment
 

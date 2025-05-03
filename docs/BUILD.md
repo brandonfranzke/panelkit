@@ -34,9 +34,13 @@ make build-containers
 
 This creates the Docker images needed for building the application.
 
-### Local Development Build
+### Development Builds
 
-To build for local development and testing:
+You have several options for building and running the application for development:
+
+#### Local Docker Build
+
+To build for local development in Docker:
 
 ```bash
 make local
@@ -44,34 +48,28 @@ make local
 
 This builds the application with simulator features enabled inside the Docker container.
 
-### Running the Application
+#### macOS Native Build
 
-You have two primary options for running the application:
-
-#### Headless Mode
-
-The headless mode allows you to build and run the application:
+To build for macOS (compiled in Docker, runs natively on macOS):
 
 ```bash
-make build-headless  # Build the headless version
-make run-headless    # Run the headless version
+make build-mac    # Build the macOS version
+make run-mac      # Run the macOS version
 ```
 
-This mode:
-- Builds entirely in Docker containers
-- Uses a console-based display driver
-- Simulates touch events automatically 
-- All UI operations are logged to the console
+This approach:
+- Builds in Docker containers but produces a macOS-compatible binary
+- Requires SDL2 libraries installed via Homebrew 
+- Runs natively on macOS without requiring X11/XQuartz
+- Provides full UI functionality with SDL2 rendering
 
-This is the recommended approach for development.
-
-#### Target Mode (For Actual Deployment)
+#### Target Build (For Actual Deployment)
 
 For deploying to the target hardware:
 
 ```bash
-make target         # Cross-compile for ARM
-make deploy         # Deploy to default target device
+make target       # Cross-compile for ARM
+make deploy       # Deploy to default target device
 ```
 
 This builds and deploys the full application to the Raspberry Pi target device.
@@ -139,37 +137,31 @@ The build system creates the following structure:
 
 ```
 build/
-├── panelkit       # Native Linux binary (for simulation)
-├── panelkit-arm   # ARM binary (for Raspberry Pi)
+├── panelkit        # Native Linux binary (for simulation)
+├── panelkit-mac    # macOS-compatible binary
+├── panelkit-arm    # ARM binary (for Raspberry Pi)
 └── panelkit.service # Generated systemd service file
 ```
 
 ## Troubleshooting
 
-### Headless Mode Issues
+### macOS Build Issues
 
-If you have problems with the headless mode:
+If you have problems with the macOS build:
 
-1. Check for RUST_LOG environment variable:
+1. Check that SDL2 libraries are installed:
    ```bash
-   export RUST_LOG=debug
-   ```
-   This ensures you see all debug output from the application.
-
-2. Make sure you're using the correct build:
-   ```bash
-   make build-headless  # Creates the headless build
+   brew install sdl2 sdl2_ttf sdl2_image
    ```
 
-3. Verify the binary has execute permissions:
+2. Make sure the binary has execute permissions:
    ```bash
-   chmod +x build/panelkit-headless
+   chmod +x build/panelkit-mac
    ```
 
-4. Check for these specific errors:
-   - `error: no matches for kind 'bin'`: This means the build failed in Docker
+3. Check for these specific errors:
+   - `dyld: Library not loaded`: Missing SDL2 libraries
    - `permission denied`: The binary doesn't have execute permissions
-   - Silent failure: Try running with RUST_LOG=trace for more verbose output
 
 ### Cross-Compilation Issues
 
@@ -204,11 +196,11 @@ TARGET_HOST=mypi.local TARGET_USER=admin make deploy
 
 ## Architecture-Specific Notes
 
-### Development Machine (x86_64)
+### Development Machine (x86_64/ARM64)
 
 - Builds occur in Docker containers
-- UI runs through X11 forwarding
-- Uses SDL2 for display and input
+- macOS builds with SDL2 for native execution
+- No X11/XQuartz dependencies required
 
 ### Target Device (ARM)
 

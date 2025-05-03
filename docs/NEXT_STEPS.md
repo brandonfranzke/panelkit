@@ -12,6 +12,7 @@ The current implementation provides:
 - Mock platform drivers for testing
 - Direct SDL2 driver for desktop simulation
 - Containerized build environment with cross-compilation support
+- macOS native build support without X11/XQuartz dependencies
 - Working pub/sub event system
 - Basic UI rendering with SDL2
 - Touch event handling for interactive UI elements

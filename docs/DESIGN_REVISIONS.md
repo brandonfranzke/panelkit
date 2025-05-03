@@ -166,35 +166,32 @@ Refine the build system to ensure it works properly across platforms without unn
 - Improved build flags and environment variables
 - Added consistent error handling in build scripts
 
-## Headless Display Driver (2024-05-03)
+## macOS Native Build Support (2024-05-03)
 
 ### Decision
-To accommodate development with containerized builds without requiring a display server, we implemented a headless display driver option.
+To enable cross-platform development without requiring X11/XQuartz on macOS, we implemented a Docker-based build system that produces macOS-compatible binaries.
 
 ### Rationale
-Our design goals include maintaining a clean, containerized build process while minimizing host dependencies. A headless driver allows us to:
-- Build and test in Docker containers
-- Avoid dependencies on display servers (X11, Wayland, etc.)
+Our design goals include maintaining a clean, containerized build process while minimizing host dependencies. The macOS-native approach allows us to:
+- Build in Docker containers for consistency
+- Run natively on macOS without X11/XQuartz dependencies
 - Maintain a consistent development environment
-- Focus on application logic rather than display configuration
+- Provide full UI functionality on macOS for development and testing
 
 ### Implementation
-1. Created `headless_driver.rs` with a display/input driver that:
-   - Logs all display operations to the console
-   - Simulates touch events at regular intervals
-   - Requires no display server or GUI
-2. Added a `headless` feature flag to Cargo.toml
-3. Updated platform factory to prioritize the headless driver when the feature is enabled
-4. Adapted UI components to work in headless mode
-5. Added headless-specific build targets to the Makefile
+1. Updated the Makefile with macOS-specific build targets:
+   - `build-mac`: Compiles in Docker and outputs a macOS-compatible binary
+   - `run-mac`: Runs the binary natively on macOS with SDL2
+2. Added SDL2 dependency management with Homebrew
+3. Updated platform factory to choose the appropriate driver
+4. Refined SDL driver to work optimally on macOS
 
 ### Key Changes
-1. Created a fully console-based display driver
-2. Updated the UI rendering code to handle headless mode
-3. Added feature flags to conditionally compile headless support
-4. Configured the build system to support headless builds
-5. Updated documentation to explain the headless approach
-6. Removed display server dependencies for development builds
+1. Created macOS-specific build targets in the Makefile
+2. Updated the SDL2 driver with macOS-specific configurations
+3. Simplified platform selection logic
+4. Updated documentation to explain the macOS approach
+5. Removed display server dependencies for development builds
 
 ## Future Directions
 
