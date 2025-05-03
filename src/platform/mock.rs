@@ -113,3 +113,51 @@ impl InputDriver for MockInputDriver {
         log::info!("Mock input driver cleaned up");
     }
 }
+
+/// Combined mock driver that implements both display and input traits
+pub struct CombinedMockDriver {
+    display: MockDisplayDriver,
+    input: MockInputDriver,
+}
+
+impl CombinedMockDriver {
+    /// Create a new combined mock driver
+    pub fn new() -> Self {
+        Self {
+            display: MockDisplayDriver::new(),
+            input: MockInputDriver::new(),
+        }
+    }
+}
+
+impl DisplayDriver for CombinedMockDriver {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        self.display.init(width, height)
+    }
+    
+    fn flush(&mut self, buffer: &[u8]) -> Result<()> {
+        self.display.flush(buffer)
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        self.display.dimensions()
+    }
+    
+    fn cleanup(&mut self) {
+        self.display.cleanup()
+    }
+}
+
+impl InputDriver for CombinedMockDriver {
+    fn init(&mut self) -> Result<()> {
+        self.input.init()
+    }
+    
+    fn poll_events(&mut self) -> Result<Vec<Event>> {
+        self.input.poll_events()
+    }
+    
+    fn cleanup(&mut self) {
+        self.input.cleanup()
+    }
+}

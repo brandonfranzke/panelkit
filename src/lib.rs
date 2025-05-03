@@ -31,7 +31,11 @@ pub struct Application {
     event_broker: event::EventBroker,
     state_manager: state::StateManager,
     ui_manager: ui::UIManager,
+    #[cfg(feature = "simulator")]
+    platform_driver: Box<dyn platform::DisplayDriver + platform::InputDriver>,
+    #[cfg(not(feature = "simulator"))]
     display_driver: Box<dyn platform::DisplayDriver>,
+    #[cfg(not(feature = "simulator"))]
     input_driver: Box<dyn platform::InputDriver>,
     running: bool,
 }
@@ -47,25 +51,52 @@ impl Application {
         
         let ui_manager = ui::UIManager::new();
         
-        let display_driver = platform::PlatformFactory::create_display_driver();
-        let input_driver = platform::PlatformFactory::create_input_driver();
+        // Create platform drivers
+        #[cfg(feature = "simulator")]
+        {
+            let platform_driver = platform::PlatformFactory::create_driver()?;
+            
+            Ok(Self {
+                config,
+                event_broker,
+                state_manager,
+                ui_manager,
+                platform_driver,
+                running: false,
+            })
+        }
         
-        Ok(Self {
-            config,
-            event_broker,
-            state_manager,
-            ui_manager,
-            display_driver,
-            input_driver,
-            running: false,
-        })
+        #[cfg(not(feature = "simulator"))]
+        {
+            let display_driver = platform::PlatformFactory::create_display_driver();
+            let input_driver = platform::PlatformFactory::create_input_driver();
+            
+            Ok(Self {
+                config,
+                event_broker,
+                state_manager,
+                ui_manager,
+                display_driver,
+                input_driver,
+                running: false,
+            })
+        }
     }
     
     /// Initialize the application
     pub fn init(&mut self) -> anyhow::Result<()> {
         // Initialize platform components
-        self.display_driver.init(self.config.width, self.config.height)?;
-        self.input_driver.init()?;
+        #[cfg(feature = "simulator")]
+        {
+            self.platform_driver.init(self.config.width, self.config.height)?;
+            self.platform_driver.init()?;
+        }
+        
+        #[cfg(not(feature = "simulator"))]
+        {
+            self.display_driver.init(self.config.width, self.config.height)?;
+            self.input_driver.init()?;
+        }
         
         // Load state
         self.state_manager.load_all()?;
@@ -84,11 +115,24 @@ impl Application {
         
         while self.running {
             // Poll for input events
+            #[cfg(feature = "simulator")]
+            let events = self.platform_driver.poll_events()?;
+            
+            #[cfg(not(feature = "simulator"))]
             let events = self.input_driver.poll_events()?;
             
             // Process events
             for event in events {
-                log::info!("Processing event: {:?}", event);
+                // Check for quit events in simulator mode
+                #[cfg(feature = "simulator")]
+                if let event::Event::Custom { event_type, .. } = &event {
+                    if event_type == "quit" {
+                        log::info!("Received quit event, exiting application");
+                        self.running = false;
+                    }
+                }
+                
+                log::debug!("Processing event: {:?}", event);
                 self.event_broker.publish("input", event.clone());
                 self.ui_manager.process_event(&event)?;
             }
@@ -96,9 +140,19 @@ impl Application {
             // Render UI
             self.ui_manager.render()?;
             
-            // For proof-of-life, use a longer sleep time
-            // In production, we would use a proper timing strategy
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            // Flush display
+            #[cfg(feature = "simulator")]
+            {
+                self.platform_driver.flush(&[])?;
+            }
+            
+            #[cfg(not(feature = "simulator"))]
+            {
+                self.display_driver.flush(&[])?;
+            }
+            
+            // Sleep to maintain reasonable framerate
+            std::thread::sleep(std::time::Duration::from_millis(16));
         }
         
         Ok(())
@@ -111,7 +165,15 @@ impl Application {
     
     /// Clean up resources
     pub fn cleanup(&mut self) {
-        self.display_driver.cleanup();
-        self.input_driver.cleanup();
+        #[cfg(feature = "simulator")]
+        {
+            self.platform_driver.cleanup();
+        }
+        
+        #[cfg(not(feature = "simulator"))]
+        {
+            self.display_driver.cleanup();
+            self.input_driver.cleanup();
+        }
     }
 }

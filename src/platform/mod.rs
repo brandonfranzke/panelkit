@@ -4,6 +4,8 @@
 
 // Include mock implementations for proof-of-life testing
 pub mod mock;
+// Include SDL2 driver for simulator
+pub mod sdl_driver;
 
 /// Display driver abstraction
 pub trait DisplayDriver {
@@ -36,46 +38,41 @@ pub trait InputDriver {
 pub struct PlatformFactory;
 
 impl PlatformFactory {
-    /// Create a display driver based on the current platform
-    pub fn create_display_driver() -> Box<dyn DisplayDriver> {
-        // For now, use mock drivers for proof-of-life
-        Box::new(mock::MockDisplayDriver::new())
-        
-        // Once we have real implementations:
-        /*
+    /// Create a combined display and input driver based on the current platform
+    pub fn create_driver() -> anyhow::Result<Box<dyn DisplayDriver + InputDriver>> {
+        // Use SDL2 for the simulator
         #[cfg(feature = "simulator")]
         {
-            // Use SDL2 for the simulator
-            Box::new(SDLDisplayDriver::new())
+            let sdl_driver = sdl_driver::SDLDriver::new(
+                800, 480, "PanelKit Simulator"
+            )?;
+            Ok(Box::new(sdl_driver))
         }
         
-        #[cfg(feature = "target")]
+        // Use framebuffer for the target device
+        #[cfg(all(feature = "target", not(feature = "simulator")))]
         {
-            // Use framebuffer for the target device
-            Box::new(FramebufferDisplayDriver::new())
+            // TODO: Implement real framebuffer driver
+            let mock_driver = mock::CombinedMockDriver::new();
+            Ok(Box::new(mock_driver))
         }
-        */
+        
+        // Default to mock driver if no features are enabled
+        #[cfg(not(any(feature = "simulator", feature = "target")))]
+        {
+            let mock_driver = mock::CombinedMockDriver::new();
+            Ok(Box::new(mock_driver))
+        }
     }
     
-    /// Create an input driver based on the current platform
+    /// Create a display driver based on the current platform - backward compatibility
+    pub fn create_display_driver() -> Box<dyn DisplayDriver> {
+        Box::new(mock::MockDisplayDriver::new())
+    }
+    
+    /// Create an input driver based on the current platform - backward compatibility
     pub fn create_input_driver() -> Box<dyn InputDriver> {
-        // For now, use mock drivers for proof-of-life
         Box::new(mock::MockInputDriver::new())
-        
-        // Once we have real implementations:
-        /*
-        #[cfg(feature = "simulator")]
-        {
-            // Use SDL2 for the simulator
-            Box::new(SDLInputDriver::new())
-        }
-        
-        #[cfg(feature = "target")]
-        {
-            // Use touch input for the target device
-            Box::new(TouchInputDriver::new())
-        }
-        */
     }
 }
 
