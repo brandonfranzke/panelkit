@@ -55,14 +55,17 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Initialize logger
-    spdlog::default_logger_name("panelkit");
-    spdlog::set_level_filter(match args.log_level {
-        LogLevel::Trace => spdlog::LevelFilter::Trace,
-        LogLevel::Debug => spdlog::LevelFilter::Debug,
-        LogLevel::Info => spdlog::LevelFilter::Info,
-        LogLevel::Warn => spdlog::LevelFilter::Warn,
-        LogLevel::Error => spdlog::LevelFilter::Error,
-    });
+    env_logger::Builder::new()
+        .filter_level(match args.log_level {
+            LogLevel::Trace => log::LevelFilter::Trace,
+            LogLevel::Debug => log::LevelFilter::Debug,
+            LogLevel::Info => log::LevelFilter::Info,
+            LogLevel::Warn => log::LevelFilter::Warn,
+            LogLevel::Error => log::LevelFilter::Error,
+        })
+        .format_timestamp(Some(env_logger::fmt::TimestampPrecision::Millis))
+        .format_module_path(false)
+        .init();
     log::info!("PanelKit starting up...");
 
     // Parse dimensions

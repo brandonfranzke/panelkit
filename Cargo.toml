@@ -10,7 +10,7 @@ license = "MIT"
 [dependencies]
 # Core dependencies
 log = "0.4"
-spdlog = "0.5" # Changed from spdlog-rs to spdlog
+env_logger = "0.10" # Simple logger instead of spdlog
 clap = { version = "4.4", features = ["derive"] }
 anyhow = "1.0"
 thiserror = "1.0"
