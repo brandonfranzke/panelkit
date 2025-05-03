@@ -6,7 +6,6 @@ pub mod event;
 pub mod platform;
 pub mod state;
 pub mod ui;
-
 /// Application configuration
 pub struct AppConfig {
     /// Display width
@@ -32,7 +31,7 @@ pub struct Application {
     state_manager: state::StateManager,
     ui_manager: ui::UIManager,
     #[cfg(feature = "simulator")]
-    platform_driver: Box<dyn platform::DisplayDriver + platform::InputDriver>,
+    platform_driver: Box<dyn platform::Driver>,
     #[cfg(not(feature = "simulator"))]
     display_driver: Box<dyn platform::DisplayDriver>,
     #[cfg(not(feature = "simulator"))]
@@ -89,7 +88,17 @@ impl Application {
         #[cfg(feature = "simulator")]
         {
             self.platform_driver.init(self.config.width, self.config.height)?;
-            self.platform_driver.init()?;
+            self.platform_driver.init_input()?;
+            
+            // Only attempt to get the canvas if we're not in headless mode
+            #[cfg(not(feature = "headless"))]
+            {
+                // Get the canvas from the SDL driver and pass it to the UI manager
+                if let Some(sdl_driver) = self.platform_driver.as_any().downcast_ref::<platform::sdl_driver::SDLDriver>() {
+                    let canvas = sdl_driver.get_canvas();
+                    self.ui_manager.set_canvas(canvas)?;
+                }
+            }
         }
         
         #[cfg(not(feature = "simulator"))]

@@ -43,6 +43,14 @@ impl DisplayDriver for MockDisplayDriver {
     fn cleanup(&mut self) {
         log::info!("Mock display cleaned up");
     }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 /// Mock input driver that periodically generates touch events
@@ -112,12 +120,56 @@ impl InputDriver for MockInputDriver {
     fn cleanup(&mut self) {
         log::info!("Mock input driver cleaned up");
     }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 /// Combined mock driver that implements both display and input traits
 pub struct CombinedMockDriver {
     display: MockDisplayDriver,
     input: MockInputDriver,
+}
+
+// Implement the combined Driver trait
+impl crate::platform::Driver for CombinedMockDriver {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        self.display.init(width, height)
+    }
+    
+    fn flush(&mut self, buffer: &[u8]) -> Result<()> {
+        self.display.flush(buffer)
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        self.display.dimensions()
+    }
+    
+    fn init_input(&mut self) -> Result<()> {
+        self.input.init()
+    }
+    
+    fn poll_events(&mut self) -> Result<Vec<Event>> {
+        self.input.poll_events()
+    }
+    
+    fn cleanup(&mut self) {
+        self.display.cleanup();
+        self.input.cleanup();
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl CombinedMockDriver {
@@ -146,6 +198,14 @@ impl DisplayDriver for CombinedMockDriver {
     fn cleanup(&mut self) {
         self.display.cleanup()
     }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl InputDriver for CombinedMockDriver {
@@ -160,4 +220,13 @@ impl InputDriver for CombinedMockDriver {
     fn cleanup(&mut self) {
         self.input.cleanup()
     }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
+

@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     git \
     ca-certificates \
-    x11-xserver-utils \
     llvm \
     clang \
     libclang-dev \

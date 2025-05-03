@@ -22,7 +22,7 @@ CARGO_NATIVE := cargo
 CARGO_ARM := cargo build --target=armv7-unknown-linux-gnueabihf
 
 # Declare phony targets
-.PHONY: all help build-containers local mac target run run-mac deploy create-service install-service clean
+.PHONY: all help build-containers local target build-headless run-headless mac-native-placeholder deploy transfer create-service install-service clean
 
 # Default target
 all: help
@@ -33,12 +33,12 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make build-containers    - Build Docker containers for compilation"
-	@echo "  make local               - Build for local testing (run in Docker with X11)"
-	@echo "  make mac                 - Build for macOS (in Docker, run natively)"
+	@echo "  make local               - Build for local development in Docker"
 	@echo "  make target              - Cross-compile for Raspberry Pi target"
-	@echo "  make run                 - Run with X11 forwarding (needs XQuartz)"
-	@echo "  make run-mac             - Run natively on macOS (no X11 needed)"
-	@echo "  make deploy              - Deploy to target device"
+	@echo "  make build-headless      - Build with headless driver (in Docker)"
+	@echo "  make run-headless        - Run headless build (in Docker)"
+	@echo "  make deploy              - Deploy to target device (uses TARGET_HOST variable)"
+	@echo "  make transfer            - Transfer binary to custom target device"
 	@echo "  make clean               - Clean build artifacts"
 	@echo "  make help                - Show this help message"
 
@@ -63,25 +63,40 @@ target: build-containers
 	$(DOCKER_RUN) -e DEP_LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_CROSS_IMAGE) sh -c "$(CARGO_ARM) --features target --release && cp -r target/armv7-unknown-linux-gnueabihf/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm"
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
 
-# Build for macOS within Docker but run natively
-mac: build-containers
-	@echo "Building for macOS within Docker..."
+
+# DEPRECATED - Use run-headless instead
+run: 
+	@echo "WARNING: We recommend using 'make run-headless' instead."
+	@echo ""
+	@echo "To proceed anyway with 'run', type 'yes'"
+	@read -p "Continue? [yes/no]: " CONFIRM; \
+	if [ "$$CONFIRM" = "yes" ]; then \
+		make local && \
+		$(DOCKER_RUN) -it \
+			-e RUST_LOG=debug \
+			$(DOCKER_NATIVE_IMAGE) sh -c "cargo run --features simulator"; \
+	else \
+		echo "Cancelled. Consider using 'make run-headless' instead."; \
+	fi
+
+# Build the headless version
+build-headless: build-containers
+	@echo "Building headless version..."
 	mkdir -p $(BUILD_DIR)
-	$(DOCKER_RUN) -e DEP_LV_CONFIG_PATH=/src/config/lvgl \
-		-e LIBCLANG_PATH=/usr/lib/llvm/lib \
-		-e LLVM_CONFIG_PATH=/usr/bin/llvm-config \
-		$(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/"
-	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)"
+	$(DOCKER_RUN) -e RUST_LOG=debug $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator,headless && cp -r target/debug/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-headless"
+	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-headless"
 
-# Run macOS-compatible build
-run-mac: mac
-	@echo "Running macOS-compatible build..."
-	RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)
+# Run the headless version in Docker
+run-headless: build-headless
+	@echo "Running headless version in Docker container..."
+	$(DOCKER_RUN) -e RUST_LOG=debug $(DOCKER_NATIVE_IMAGE) sh -c "cargo run --features simulator,headless"
 
-# Run local build for testing (in Docker)
-run: local
-	@echo "Running local build inside Docker container..."
-	$(DOCKER_RUN) -it --net=host -e DISPLAY=$$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix $(DOCKER_NATIVE_IMAGE) sh -c "RUST_LOG=debug /src/target/debug/$(PROJECT_NAME)"
+# Placeholder for future macOS native build implementation
+# This will be implemented correctly once we figure out cross-compilation
+mac-native-placeholder:
+	@echo "Native macOS build not yet implemented correctly"
+	@echo "We need to create a proper cross-compilation setup for macOS"
+	@echo "This will be implemented in a future update"
 
 # Deploy to target device
 deploy: target
@@ -89,6 +104,12 @@ deploy: target
 	scp $(BUILD_DIR)/$(PROJECT_NAME)-arm $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
 	ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
 	@echo "Deployed to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
+
+# Transfer to custom target
+transfer: target
+	@echo "Transferring to custom target..."
+	chmod +x $(SRC_DIR)/scripts/transfer.sh
+	$(SRC_DIR)/scripts/transfer.sh
 
 # Create systemd service file for target
 create-service:
@@ -112,3 +133,4 @@ clean:
 	rm -rf $(BUILD_DIR)
 	-docker run --rm -v $(SRC_DIR):/src $(DOCKER_NATIVE_IMAGE) sh -c "cargo clean" 2>/dev/null || true
 	@echo "Clean complete"
+

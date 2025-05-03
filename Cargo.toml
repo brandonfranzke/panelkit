@@ -23,10 +23,12 @@ bincode = "1.3"
 crossbeam-channel = "0.5"
 
 # UI and Graphics
-lvgl = { version = "0.5", default-features = false }
-lvgl-sys = { version = "0.5" }
-embedded-graphics = "0.7"
 sdl2 = { version = "0.35", optional = true }
+
+# Temporarily disabling LVGL until we can fix build issues
+# lvgl = { version = "0.5", default-features = false }
+# lvgl-sys = { version = "0.5" }
+# embedded-graphics = "0.7"
 
 # Async helpers
 futures = "0.3"
@@ -40,6 +42,7 @@ futures = "0.3"
 default = ["simulator"]
 simulator = ["sdl2"]
 target = []
+headless = []
 
 [profile.release]
 opt-level = 3

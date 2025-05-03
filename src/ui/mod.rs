@@ -6,7 +6,8 @@ use std::collections::HashMap;
 
 // Export UI pages
 pub mod hello_page;
-pub mod demo_page;
+// pub mod demo_page; // LVGL-based demo page (disabled for now)
+pub mod simple_demo_page; // SDL2-based demo page
 
 /// Represents a UI page in the application
 pub trait Page {
@@ -43,20 +44,15 @@ impl UIManager {
     
     /// Initialize the UI system
     pub fn init(&mut self) -> anyhow::Result<()> {
-        // Initialize LVGL if we're using it
-        #[cfg(feature = "simulator")]
-        {
-            // Initialize LVGL before creating pages
-            lvgl::init();
-        }
-        
         // Register pages
         self.register_page("hello", Box::new(hello_page::HelloPage::new()))?;
         
         // Register demo page when using simulator
         #[cfg(feature = "simulator")]
         {
-            self.register_page("demo", Box::new(demo_page::DemoPage::new()))?;
+            // Get canvas from SDL driver (will be set later)
+            let demo_page = simple_demo_page::SimpleDemoPage::new();
+            self.register_page("demo", Box::new(demo_page))?;
             
             // Navigate to demo page in simulator mode
             self.navigate_to("demo")?;
@@ -115,17 +111,29 @@ impl UIManager {
     
     /// Render the current UI state
     pub fn render(&self) -> anyhow::Result<()> {
-        // Let LVGL do its work if enabled
-        #[cfg(feature = "simulator")]
-        {
-            lvgl::task_handler();
-        }
-        
         // Call the current page's render method
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get(page_id) {
                 page.render()?;
             }
+        }
+        
+        Ok(())
+    }
+    
+    /// Set the SDL canvas for rendering
+    #[cfg(feature = "simulator")]
+    pub fn set_canvas(&mut self, canvas: std::sync::Arc<std::sync::Mutex<sdl2::render::Canvas<sdl2::video::Window>>>) -> anyhow::Result<()> {
+        if let Some(page) = self.pages.get_mut("demo") {
+            // Downcast to SimpleDemoPage
+            let demo_page = unsafe {
+                // This is safe because we know the page is a SimpleDemoPage
+                let page_ptr = page.as_mut() as *mut dyn Page as *mut simple_demo_page::SimpleDemoPage;
+                &mut *page_ptr
+            };
+            
+            // Set the canvas
+            demo_page.set_canvas(canvas);
         }
         
         Ok(())

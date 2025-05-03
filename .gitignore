@@ -38,3 +38,4 @@ vendor/
 # Local environment
 .env
 .env.local
+**/.claude/settings.local.json
