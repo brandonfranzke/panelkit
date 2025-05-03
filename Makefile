@@ -14,7 +14,8 @@ DOCKER_NATIVE_IMAGE := $(PROJECT_NAME)-builder-native
 DOCKER_CROSS_IMAGE := $(PROJECT_NAME)-builder-cross
 DOCKER_NATIVE_DOCKERFILE := $(SRC_DIR)/containers/Dockerfile.native
 DOCKER_CROSS_DOCKERFILE := $(SRC_DIR)/containers/Dockerfile.cross
-DOCKER_RUN := docker run --rm -v $(SRC_DIR):/src
+CARGO_CACHE_VOLUME := $(PROJECT_NAME)-cargo-cache
+DOCKER_RUN := docker run --rm -v $(SRC_DIR):/src -v $(CARGO_CACHE_VOLUME):/root/.cargo/registry
 
 # Cargo settings
 CARGO_NATIVE := cargo
@@ -42,6 +43,7 @@ help:
 # Build Docker containers
 build-containers:
 	@echo "Building Docker containers..."
+	docker volume create $(CARGO_CACHE_VOLUME) || true
 	docker build -t $(DOCKER_NATIVE_IMAGE) -f $(DOCKER_NATIVE_DOCKERFILE) .
 	docker build -t $(DOCKER_CROSS_IMAGE) -f $(DOCKER_CROSS_DOCKERFILE) .
 
@@ -49,8 +51,8 @@ build-containers:
 local: build-containers
 	@echo "Building for local development..."
 	mkdir -p $(BUILD_DIR)
-	$(DOCKER_RUN) -e LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/"
-	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)"
+	$(DOCKER_RUN) -e LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator"
+	@echo "Build complete in Docker container"
 
 # Cross-compile for ARM target
 target: build-containers
@@ -61,8 +63,8 @@ target: build-containers
 
 # Run local build for testing
 run: local
-	@echo "Running local build..."
-	$(BUILD_DIR)/$(PROJECT_NAME)
+	@echo "Running local build inside Docker container..."
+	$(DOCKER_RUN) -it $(DOCKER_NATIVE_IMAGE) sh -c "RUST_LOG=info /src/target/debug/$(PROJECT_NAME)"
 
 # Deploy to target device
 deploy: target
