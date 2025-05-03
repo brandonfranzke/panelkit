@@ -1,0 +1,42 @@
+[package]
+name = "panelkit"
+version = "0.1.0"
+edition = "2021"
+authors = ["Maintainer <maintainer@example.com>"]
+description = "A compact, always-on graphical UI for embedded Linux environments"
+repository = ""
+license = "MIT"
+
+[dependencies]
+# Core dependencies
+log = "0.4"
+spdlog-rs = "0.3"
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+tokio = { version = "1.32", features = ["full"] }
+
+# UI and Graphics
+lvgl = { version = "0.5", default-features = false }
+sdl2 = { version = "0.35", optional = true }
+
+# State management
+redb = "1.0"
+crossbeam-channel = "0.5"
+
+[features]
+default = ["simulator"]
+simulator = ["sdl2"]
+target = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
