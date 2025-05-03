@@ -22,7 +22,7 @@ CARGO_NATIVE := cargo
 CARGO_ARM := cargo build --target=armv7-unknown-linux-gnueabihf
 
 # Declare phony targets
-.PHONY: all help build-containers local target build-headless run-headless mac-native-placeholder deploy transfer create-service install-service clean
+.PHONY: all help build-containers local target build-mac run-mac deploy transfer create-service install-service clean
 
 # Default target
 all: help
@@ -35,8 +35,8 @@ help:
 	@echo "  make build-containers    - Build Docker containers for compilation"
 	@echo "  make local               - Build for local development in Docker"
 	@echo "  make target              - Cross-compile for Raspberry Pi target"
-	@echo "  make build-headless      - Build with headless driver (in Docker)"
-	@echo "  make run-headless        - Run headless build (in Docker)"
+	@echo "  make build-mac           - Build for macOS in Docker, executable in build directory"
+	@echo "  make run-mac             - Run the macOS build (requires SDL2 libraries)"
 	@echo "  make deploy              - Deploy to target device (uses TARGET_HOST variable)"
 	@echo "  make transfer            - Transfer binary to custom target device"
 	@echo "  make clean               - Clean build artifacts"
@@ -64,11 +64,12 @@ target: build-containers
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
 
 
-# DEPRECATED - Use run-headless instead
+# Run in Docker interactively
 run: 
-	@echo "WARNING: We recommend using 'make run-headless' instead."
+	@echo "This will run the application in Docker."
+	@echo "Note: SDL2 rendering requires display server capabilities."
 	@echo ""
-	@echo "To proceed anyway with 'run', type 'yes'"
+	@echo "To proceed with 'run', type 'yes'"
 	@read -p "Continue? [yes/no]: " CONFIRM; \
 	if [ "$$CONFIRM" = "yes" ]; then \
 		make local && \
@@ -76,27 +77,28 @@ run:
 			-e RUST_LOG=debug \
 			$(DOCKER_NATIVE_IMAGE) sh -c "cargo run --features simulator"; \
 	else \
-		echo "Cancelled. Consider using 'make run-headless' instead."; \
+		echo "Cancelled."; \
 	fi
 
-# Build the headless version
-build-headless: build-containers
-	@echo "Building headless version..."
+# Build for macOS (compiled in Docker, runs on host macOS)
+build-mac: build-containers
+	@echo "Building macOS version (compiling in Docker)..."
+	@echo "This builds a binary that can run on macOS with SDL2 libraries."
 	mkdir -p $(BUILD_DIR)
-	$(DOCKER_RUN) -e RUST_LOG=debug $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator,headless && cp -r target/debug/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-headless"
-	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-headless"
+	$(DOCKER_RUN) -e RUST_LOG=debug $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-mac"
+	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-mac
+	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-mac"
+	@echo "Note: The binary can be run on macOS with 'make run-mac'"
 
-# Run the headless version in Docker
-run-headless: build-headless
-	@echo "Running headless version in Docker container..."
-	$(DOCKER_RUN) -e RUST_LOG=debug $(DOCKER_NATIVE_IMAGE) sh -c "cargo run --features simulator,headless"
-
-# Placeholder for future macOS native build implementation
-# This will be implemented correctly once we figure out cross-compilation
-mac-native-placeholder:
-	@echo "Native macOS build not yet implemented correctly"
-	@echo "We need to create a proper cross-compilation setup for macOS"
-	@echo "This will be implemented in a future update"
+# Run the macOS build 
+run-mac: build-mac
+	@echo "Running macOS build..."
+	@echo "Note: This requires SDL2 libraries installed via Homebrew."
+	@if ! brew list | grep -q sdl2; then \
+		echo "SDL2 not found. Installing required libraries..."; \
+		brew install sdl2 sdl2_ttf sdl2_image; \
+	fi
+	RUST_LOG=debug DYLD_LIBRARY_PATH=/opt/homebrew/lib $(BUILD_DIR)/$(PROJECT_NAME)-mac
 
 # Deploy to target device
 deploy: target

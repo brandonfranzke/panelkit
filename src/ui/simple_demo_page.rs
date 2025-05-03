@@ -7,9 +7,7 @@ use crate::ui::Page;
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 
-#[cfg(not(feature = "headless"))]
 use sdl2::pixels::Color;
-#[cfg(not(feature = "headless"))]
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
@@ -41,13 +39,6 @@ impl Page for SimpleDemoPage {
         Ok(())
     }
     
-    #[cfg(feature = "headless")]
-    fn render(&self) -> Result<()> {
-        log::info!("SimpleDemoPage rendered in headless mode");
-        Ok(())
-    }
-    
-    #[cfg(not(feature = "headless"))]
     fn render(&self) -> Result<()> {
         if let Some(canvas_arc) = &self.canvas {
             let mut canvas = canvas_arc.lock().unwrap();

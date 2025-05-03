@@ -42,7 +42,6 @@ futures = "0.3"
 default = ["simulator"]
 simulator = ["sdl2"]
 target = []
-headless = []
 
 [profile.release]
 opt-level = 3

@@ -6,9 +6,6 @@
 pub mod mock;
 // Include SDL2 driver for simulator
 pub mod sdl_driver;
-// Include headless driver for X11-free development
-#[cfg(feature = "headless")]
-pub mod headless_driver;
 
 /// Display driver abstraction
 pub trait DisplayDriver: std::any::Any {
@@ -82,17 +79,8 @@ pub struct PlatformFactory;
 impl PlatformFactory {
     /// Create a combined display and input driver based on the current platform
     pub fn create_driver() -> anyhow::Result<Box<dyn Driver>> {
-        // Use headless driver if the headless feature is enabled (overrides others)
-        #[cfg(feature = "headless")]
-        {
-            let headless_driver = headless_driver::HeadlessDriver::new(
-                800, 480, "PanelKit Headless"
-            )?;
-            return Ok(Box::new(headless_driver));
-        }
-        
         // Use SDL2 for the simulator
-        #[cfg(all(feature = "simulator", not(feature = "headless")))]
+        #[cfg(feature = "simulator")]
         {
             let sdl_driver = sdl_driver::SDLDriver::new(
                 800, 480, "PanelKit Simulator"
@@ -101,7 +89,7 @@ impl PlatformFactory {
         }
         
         // Use framebuffer for the target device
-        #[cfg(all(feature = "target", not(any(feature = "simulator", feature = "headless"))))]
+        #[cfg(all(feature = "target", not(feature = "simulator")))]
         {
             // TODO: Implement real framebuffer driver
             let mock_driver = mock::CombinedMockDriver::new();
@@ -109,7 +97,7 @@ impl PlatformFactory {
         }
         
         // Default to mock driver if no features are enabled
-        #[cfg(not(any(feature = "simulator", feature = "target", feature = "headless")))]
+        #[cfg(not(any(feature = "simulator", feature = "target")))]
         {
             let mock_driver = mock::CombinedMockDriver::new();
             return Ok(Box::new(mock_driver));

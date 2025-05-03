@@ -57,9 +57,9 @@ make local
 # Cross-compile for Raspberry Pi
 make target
 
-# Build and run headless version in Docker (no display needed)
-make build-headless
-make run-headless
+# Build for macOS (compile in Docker, run natively on macOS)
+make build-mac
+make run-mac
 
 # Deploy to default target device
 make deploy
