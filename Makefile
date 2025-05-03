@@ -49,14 +49,14 @@ build-containers:
 local: build-containers
 	@echo "Building for local development..."
 	mkdir -p $(BUILD_DIR)
-	$(DOCKER_RUN) $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/"
+	$(DOCKER_RUN) -e LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_NATIVE_IMAGE) sh -c "cargo build --features simulator && cp -r target/debug/$(PROJECT_NAME) /src/build/"
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)"
 
 # Cross-compile for ARM target
 target: build-containers
 	@echo "Cross-compiling for Raspberry Pi target..."
 	mkdir -p $(BUILD_DIR)
-	$(DOCKER_RUN) $(DOCKER_CROSS_IMAGE) sh -c "$(CARGO_ARM) --features target --release && cp -r target/armv7-unknown-linux-gnueabihf/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm"
+	$(DOCKER_RUN) -e LV_CONFIG_PATH=/src/config/lvgl $(DOCKER_CROSS_IMAGE) sh -c "$(CARGO_ARM) --features target --release && cp -r target/armv7-unknown-linux-gnueabihf/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm"
 	@echo "Build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
 
 # Run local build for testing
