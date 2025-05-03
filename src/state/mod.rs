@@ -60,14 +60,26 @@ impl StateManager {
         
         // Then check persistent storage
         if let Some(db) = &self.persistent_db {
-            let read_txn = db.begin_read()?;
-            let table = read_txn.open_table(STATE_TABLE)?;
-            
-            if let Ok(value) = table.get(key) {
-                if let Some(data) = value {
-                    let result: T = bincode::deserialize(data.value())?;
-                    return Ok(Some(result));
+            // Create a block to ensure proper lifetime scoping
+            let result = {
+                let read_txn = db.begin_read()?;
+                let table = read_txn.open_table(STATE_TABLE)?;
+                
+                if let Ok(value) = table.get(key) {
+                    if let Some(data) = value {
+                        // Clone the data to a Vec to avoid lifetime issues
+                        let data_vec = data.value().to_vec();
+                        Some(bincode::deserialize(&data_vec)?)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
                 }
+            };
+            
+            if result.is_some() {
+                return Ok(result);
             }
         }
         
@@ -77,17 +89,21 @@ impl StateManager {
     /// Load all persistent state into memory
     pub fn load_all(&self) -> anyhow::Result<()> {
         if let Some(db) = &self.persistent_db {
-            let read_txn = db.begin_read()?;
-            let table = read_txn.open_table(STATE_TABLE)?;
-            
-            let mut memory_state = self.memory_state.lock().unwrap();
-            let iter = table.iter()?;
-            
-            for item in iter {
-                let (key, value) = item?;
-                let key_str = key.value().to_string();
-                let value_bytes = value.value().to_vec();
-                memory_state.insert(key_str, value_bytes);
+            // Create a scope to ensure proper lifetime handling
+            {
+                let read_txn = db.begin_read()?;
+                let table = read_txn.open_table(STATE_TABLE)?;
+                
+                let mut memory_state = self.memory_state.lock().unwrap();
+                let iter = table.iter()?;
+                
+                for item in iter {
+                    let (key, value) = item?;
+                    let key_str = key.value().to_string();
+                    let value_bytes = value.value().to_vec();
+                    memory_state.insert(key_str, value_bytes);
+                }
+                // The transaction will be dropped at the end of this scope
             }
         }
         
