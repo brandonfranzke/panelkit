@@ -90,14 +90,10 @@ impl Application {
             self.platform_driver.init(self.config.width, self.config.height)?;
             self.platform_driver.init_input()?;
             
-            // Only attempt to get the canvas if we're not in headless mode
-            #[cfg(not(feature = "headless"))]
-            {
-                // Get the canvas from the SDL driver and pass it to the UI manager
-                if let Some(sdl_driver) = self.platform_driver.as_any().downcast_ref::<platform::sdl_driver::SDLDriver>() {
-                    let canvas = sdl_driver.get_canvas();
-                    self.ui_manager.set_canvas(canvas)?;
-                }
+            // Get the canvas from the SDL driver and pass it to the UI manager
+            if let Some(sdl_driver) = self.platform_driver.as_any().downcast_ref::<platform::sdl_driver::SDLDriver>() {
+                let canvas = sdl_driver.get_canvas();
+                self.ui_manager.set_canvas(canvas)?;
             }
         }
         
