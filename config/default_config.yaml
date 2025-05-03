@@ -1,0 +1,29 @@
+# PanelKit Default Configuration
+
+# Display settings
+display:
+  width: 800
+  height: 480
+  fullscreen: true
+
+# UI settings
+ui:
+  default_page: "hello"
+  touch_threshold: 50
+  long_press_ms: 500
+  
+# Logging settings
+logging:
+  level: "info"
+  to_file: false
+  
+# State persistence
+state:
+  persist: true
+  db_path: "./state.db"
+
+# Power management
+power:
+  idle_timeout_ms: 30000
+  dim_timeout_ms: 60000
+  sleep_timeout_ms: 300000

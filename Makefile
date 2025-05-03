@@ -75,23 +75,9 @@ deploy: target
 create-service:
 	@echo "Creating systemd service file..."
 	@mkdir -p $(BUILD_DIR)
-	@cat > $(BUILD_DIR)/$(PROJECT_NAME).service << EOF
-[Unit]
-Description=PanelKit UI Application
-After=network.target
-
-[Service]
-Type=simple
-User=$(TARGET_USER)
-WorkingDirectory=$(TARGET_DIR)
-ExecStart=$(TARGET_DIR)/$(PROJECT_NAME)
-Restart=on-failure
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
+	@sed -e "s|__USER__|$(TARGET_USER)|g" \
+		-e "s|__WORKDIR__|$(TARGET_DIR)|g" \
+		$(SRC_DIR)/config/panelkit.service.template > $(BUILD_DIR)/$(PROJECT_NAME).service
 	@echo "Service file created: $(BUILD_DIR)/$(PROJECT_NAME).service"
 
 # Install systemd service on target
