@@ -3,41 +3,101 @@
 //! This module provides SDL2 implementation for the PanelKit platform interface.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{GraphicsContext, PlatformDriver};
+use crate::platform::{Color, GraphicsContext, PlatformDriver, Point, Rectangle};
 
-use anyhow::{Result, Context};
+use anyhow::Context;
+use crate::error::{PlatformError, Result};
 use sdl2::event::Event as SdlEvent;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
-use sdl2::pixels::Color;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::any::Any;
+use std::fmt::Display;
 
-/// SDL2 rendering context
+/// SDL2 rendering context that implements the GraphicsContext trait
 pub struct SDLGraphicsContext {
     canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>,
+    width: u32,
+    height: u32,
 }
 
 impl SDLGraphicsContext {
     /// Create a new SDL graphics context
-    pub fn new(canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>) -> Self {
-        Self { canvas }
-    }
-    
-    /// Get the canvas for rendering
-    pub fn canvas(&self) -> Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>> {
-        self.canvas.clone()
+    pub fn new(canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>, width: u32, height: u32) -> Self {
+        log::debug!("Creating new SDLGraphicsContext with canvas");
+        Self { canvas, width, height }
     }
 }
 
 impl GraphicsContext for SDLGraphicsContext {
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn clear(&mut self, color: Color) -> Result<()> {
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| PlatformError::GraphicsContext(
+                format!("Failed to lock SDL canvas mutex: {}", e)
+            ).into())?;
+            
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(color.r, color.g, color.b));
+        canvas.clear();
+        Ok(())
     }
     
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+    fn set_draw_color(&mut self, color: Color) -> Result<()> {
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| PlatformError::GraphicsContext(
+                format!("Failed to lock SDL canvas mutex: {}", e)
+            ).into())?;
+            
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(color.r, color.g, color.b));
+        Ok(())
+    }
+    
+    fn fill_rect(&mut self, rect: Rectangle) -> Result<()> {
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| PlatformError::GraphicsContext(
+                format!("Failed to lock SDL canvas mutex: {}", e)
+            ).into())?;
+            
+        SDLDriver::convert_sdl_error(
+            canvas.fill_rect(sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)),
+            "Failed to fill rectangle"
+        )?;
+            
+        Ok(())
+    }
+    
+    fn draw_rect(&mut self, rect: Rectangle) -> Result<()> {
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| PlatformError::GraphicsContext(
+                format!("Failed to lock SDL canvas mutex: {}", e)
+            ).into())?;
+            
+        SDLDriver::convert_sdl_error(
+            canvas.draw_rect(sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)),
+            "Failed to draw rectangle outline"
+        )?;
+            
+        Ok(())
+    }
+    
+    fn draw_line(&mut self, start: Point, end: Point) -> Result<()> {
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| PlatformError::GraphicsContext(
+                format!("Failed to lock SDL canvas mutex: {}", e)
+            ).into())?;
+            
+        SDLDriver::convert_sdl_error(
+            canvas.draw_line(
+                sdl2::rect::Point::new(start.x, start.y),
+                sdl2::rect::Point::new(end.x, end.y)
+            ),
+            "Failed to draw line"
+        )?;
+        
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 }
 
@@ -45,55 +105,71 @@ impl GraphicsContext for SDLGraphicsContext {
 pub struct SDLDriver {
     sdl_context: sdl2::Sdl,
     canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>,
-    graphics_context: SDLGraphicsContext,
     width: u32,
     height: u32,
     last_touch_point: (i32, i32),
     is_pressed: bool,
 }
 
-// We're not implementing Send for SDLDriver since SDL2 isn't thread-safe
-// Instead, we'll modify the PlatformDriver trait to not require Send
-
 impl SDLDriver {
+    /// Helper function to convert SDL errors to our error type
+    fn convert_sdl_error<T, E: Display>(result: std::result::Result<T, E>, context: &str) -> Result<T> {
+        result.map_err(|e| {
+            PlatformError::SDL(format!("{}: {}", context, e)).into()
+        })
+    }
+    
     /// Create a new SDL driver
     pub fn new(width: u32, height: u32, title: &str) -> Result<Self> {
-        let sdl_context = sdl2::init()
-            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2: {}", e))?;
+        let sdl_context = Self::convert_sdl_error(
+            sdl2::init(),
+            "Failed to initialize SDL2"
+        )?;
             
-        let video_subsystem = sdl_context
-            .video()
-            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2 video subsystem: {}", e))?;
+        let video_subsystem = Self::convert_sdl_error(
+            sdl_context.video(),
+            "Failed to initialize SDL2 video subsystem"
+        )?;
 
         // Use different SDL window settings for macOS vs other platforms
         #[cfg(target_os = "macos")]
-        let window = video_subsystem
-            .window(title, width, height)
-            .position_centered()
-            .allow_highdpi() // Enable Retina display support
-            .build()
-            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 window on macOS: {}", e))?;
+        let window = Self::convert_sdl_error(
+            video_subsystem
+                .window(title, width, height)
+                .position_centered()
+                .allow_highdpi() // Enable Retina display support
+                .build(),
+            "Failed to create SDL2 window on macOS"
+        )?;
 
         #[cfg(not(target_os = "macos"))]
-        let window = video_subsystem
-            .window(title, width, height)
-            .position_centered()
-            .build()
-            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 window: {}", e))?;
+        let window = Self::convert_sdl_error(
+            video_subsystem
+                .window(title, width, height)
+                .position_centered()
+                .build(),
+            "Failed to create SDL2 window"
+        )?;
 
-        let canvas = window
-            .into_canvas()
-            .accelerated()
-            .build()
-            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 canvas: {}", e))?;
+        let mut canvas = Self::convert_sdl_error(
+            window
+                .into_canvas()
+                .accelerated()
+                .present_vsync() // Use vsync for smoother rendering
+                .build(),
+            "Failed to create SDL2 canvas"
+        )?;
+            
+        // Initial color to verify it's working
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(100, 100, 100));
+        canvas.clear();
+        canvas.present();
 
         let canvas_arc = Arc::new(Mutex::new(canvas));
-        let graphics_context = SDLGraphicsContext::new(canvas_arc.clone());
 
         Ok(Self {
             sdl_context,
             canvas: canvas_arc,
-            graphics_context,
             width,
             height,
             last_touch_point: (0, 0),
@@ -102,43 +178,27 @@ impl SDLDriver {
     }
 
     /// Update touch state based on SDL events
-    pub fn update_touch(&mut self, x: i32, y: i32, pressed: bool) {
+    fn update_touch(&mut self, x: i32, y: i32, pressed: bool) {
         self.last_touch_point = (x, y);
         self.is_pressed = pressed;
-    }
-
-    /// Get a reference to the canvas
-    pub fn get_canvas(&self) -> Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>> {
-        self.canvas.clone()
-    }
-
-    /// Clear the screen with a specific color
-    pub fn clear(&mut self, r: u8, g: u8, b: u8) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.set_draw_color(Color::RGB(r, g, b));
-        canvas.clear();
-        Ok(())
     }
 }
 
 // Implement the unified PlatformDriver trait
 impl PlatformDriver for SDLDriver {
-    fn init(&mut self, _width: u32, _height: u32) -> Result<()> {
-        // Initialize SDL
-        self.clear(0, 0, 0)
-            .context("Failed to clear SDL display during initialization")?;
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        log::info!("SDL platform initialized with dimensions: {}x{}", width, height);
         
-        // Present the canvas
-        {
-            let mut canvas = self.canvas.lock()
-                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-                
-            canvas.present();
+        // Update dimensions if provided
+        if width > 0 && height > 0 {
+            self.width = width;
+            self.height = height;
         }
         
-        log::info!("SDL platform initialized with dimensions: {}x{}", self.width, self.height);
+        // Initialize with gray background using a temporary context
+        let mut ctx = self.create_graphics_context()?;
+        ctx.clear(Color::rgb(100, 100, 100))?;
+        
         Ok(())
     }
     
@@ -193,11 +253,20 @@ impl PlatformDriver for SDLDriver {
     }
     
     fn present(&mut self) -> Result<()> {
-        // Present the canvas
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex during present: {}", e))?;
-            
+        // Present the canvas, showing any content rendered so far
+        log::trace!("Presenting SDL canvas");
+        
+        let canvas_result = self.canvas.lock();
+        
+        if let Err(e) = &canvas_result {
+            return Err(PlatformError::GraphicsContext(
+                format!("Failed to lock SDL canvas mutex during present: {}", e)
+            ).into());
+        }
+        
+        let mut canvas = canvas_result.unwrap();
         canvas.present();
+        
         Ok(())
     }
     
@@ -205,13 +274,13 @@ impl PlatformDriver for SDLDriver {
         (self.width, self.height)
     }
     
-    fn graphics_context(&self) -> Option<&dyn GraphicsContext> {
-        Some(&self.graphics_context)
+    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>> {
+        // Create a new graphics context that shares the canvas
+        let context = SDLGraphicsContext::new(self.canvas.clone(), self.width, self.height);
+        Ok(Box::new(context))
     }
     
     fn cleanup(&mut self) {
         log::info!("SDL platform cleaned up");
     }
 }
-
-// Clean implementation with only the PlatformDriver trait

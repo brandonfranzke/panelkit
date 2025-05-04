@@ -4,7 +4,13 @@
 
 use std::collections::HashMap;
 use std::any::Any;
-use anyhow::{Result, Context};
+use anyhow::Context;
+use crate::error::{Result, UIError};
+use crate::platform::GraphicsContext;
+use crate::logging;
+
+// Export UI components
+pub mod components;
 
 // Export UI pages
 pub mod hello_page;
@@ -15,8 +21,8 @@ pub trait Page {
     /// Initialize the page
     fn init(&mut self) -> Result<()>;
     
-    /// Render the page to the display
-    fn render(&self) -> Result<()>;
+    /// Render the page using the provided graphics context
+    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()>;
     
     /// Handle input events for this page
     /// Returns a navigation event if the page wants to navigate
@@ -27,7 +33,10 @@ pub trait Page {
     
     /// Called when this page becomes inactive
     fn on_deactivate(&mut self) -> Result<()>;
-
+    
+    /// Update page layout based on new dimensions
+    fn update_layout(&mut self, width: u32, height: u32) -> Result<()>;
+    
     /// Safe downcast to concrete type
     fn as_any(&self) -> &dyn Any;
     
@@ -35,19 +44,14 @@ pub trait Page {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-/// UI renderer context for platform-specific rendering
-pub enum RenderContext {
-    /// SDL2 rendering context
-    SDL(std::sync::Arc<std::sync::Mutex<sdl2::render::Canvas<sdl2::video::Window>>>),
-    /// Mock rendering context (no-op)
-    Mock,
-}
-
 /// The UI manager that handles page navigation and rendering
 pub struct UIManager {
     pages: HashMap<String, Box<dyn Page>>,
     current_page: Option<String>,
-    render_context: Option<RenderContext>,
+    graphics_context: Option<Box<dyn GraphicsContext>>,
+    width: u32,
+    height: u32,
+    logger: &'static logging::ComponentLogger,
 }
 
 impl UIManager {
@@ -56,47 +60,55 @@ impl UIManager {
         Self {
             pages: HashMap::new(),
             current_page: None,
-            render_context: None,
+            graphics_context: None,
+            width: 800,
+            height: 480,
+            logger: logging::ui_logger(),
         }
     }
     
     /// Initialize the UI system
     pub fn init(&mut self) -> Result<()> {
+        self.logger.info("Initializing UI system");
+        
         // Register Hello page
         self.register_page("hello", Box::new(hello_page::HelloPage::new()))
             .context("Failed to register hello page")?;
         
-        // Register Demo page if using the SDL context
-        if let Some(RenderContext::SDL(_)) = &self.render_context {
-            let demo_page = simple_demo_page::SimpleDemoPage::new();
-            self.register_page("demo", Box::new(demo_page))
-                .context("Failed to register demo page")?;
-                
-            self.navigate_to("demo")
-                .context("Failed to navigate to demo page")?;
-        } else {
-            // Without SDL rendering, use the Hello page
-            self.navigate_to("hello")
-                .context("Failed to navigate to hello page")?;
-        }
+        // Register Demo page
+        self.register_page("demo", Box::new(simple_demo_page::SimpleDemoPage::new()))
+            .context("Failed to register demo page")?;
         
+        // Start with the Demo page
+        self.navigate_to("demo")
+            .context("Failed to navigate to demo page")?;
+        
+        self.logger.info("UI system initialized successfully");
         Ok(())
     }
     
     /// Register a page with the UI manager
     pub fn register_page(&mut self, id: &str, mut page: Box<dyn Page>) -> Result<()> {
+        self.logger.debug(&format!("Registering page: {}", id));
+        
+        // Initialize the page
         page.init()
             .with_context(|| format!("Failed to initialize page '{}'", id))?;
             
+        // Update layout with current dimensions
+        page.update_layout(self.width, self.height)
+            .with_context(|| format!("Failed to update layout for page '{}'", id))?;
+            
         self.pages.insert(id.to_string(), page);
-        log::info!("Registered page: {}", id);
         Ok(())
     }
     
     /// Navigate to a specific page
     pub fn navigate_to(&mut self, page_id: &str) -> Result<()> {
+        self.logger.debug(&format!("Navigating to page: {}", page_id));
+        
         if !self.pages.contains_key(page_id) {
-            return Err(anyhow::anyhow!("Page not found: {}", page_id));
+            return Err(UIError::PageNotFound(page_id.to_string()).into());
         }
         
         // Deactivate current page
@@ -116,7 +128,7 @@ impl UIManager {
                 .with_context(|| format!("Failed to activate page '{}'", page_id))?;
         }
         
-        log::info!("Navigated to page: {}", page_id);
+        self.logger.info(&format!("Navigated to page: {}", page_id));
         Ok(())
     }
     
@@ -139,42 +151,54 @@ impl UIManager {
     }
     
     /// Render the current UI state
-    pub fn render(&self) -> Result<()> {
+    pub fn render(&mut self) -> Result<()> {
+        self.logger.trace("Starting render");
+        
+        if self.graphics_context.is_none() {
+            self.logger.warn("No graphics context available, can't render");
+            return Ok(());
+        }
+        
+        // Get a mutable reference to the graphics context
+        let graphics_context = self.graphics_context.as_mut().unwrap();
+        
         // Call the current page's render method
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get(page_id) {
-                page.render()
+                page.render(graphics_context.as_mut())
                     .with_context(|| format!("Failed to render page '{}'", page_id))?;
+            } else {
+                self.logger.error(&format!("Current page '{}' not found in pages map!", page_id));
+                return Err(UIError::PageNotFound(format!("Current page '{}' not found in pages map", page_id)).into());
             }
+        } else {
+            self.logger.warn("No current page set, nothing to render");
         }
         
+        self.logger.trace("Render complete");
         Ok(())
     }
     
-    /// Set the SDL canvas for rendering (used with simulator)
-    pub fn set_canvas(&mut self, canvas: std::sync::Arc<std::sync::Mutex<sdl2::render::Canvas<sdl2::video::Window>>>) -> Result<()> {
-        // Store the render context
-        self.render_context = Some(RenderContext::SDL(canvas.clone()));
+    /// Set the graphics context for rendering
+    pub fn set_graphics_context(&mut self, ctx: Box<dyn GraphicsContext>) -> Result<()> {
+        self.logger.debug("Setting graphics context for UI manager");
         
-        // If the UI is already initialized, update existing pages
-        if let Some(page) = self.pages.get_mut("demo") {
-            if let Some(demo_page) = page.as_any_mut().downcast_mut::<simple_demo_page::SimpleDemoPage>() {
-                demo_page.set_canvas(canvas.clone());
-                log::debug!("Updated canvas for demo page");
-            } else {
-                log::warn!("Failed to downcast 'demo' page to SimpleDemoPage");
-            }
+        // Get dimensions from context
+        let (width, height) = ctx.dimensions();
+        self.width = width;
+        self.height = height;
+        
+        // Store graphics context
+        self.graphics_context = Some(ctx);
+        
+        // Update layout of all pages
+        for (id, page) in &mut self.pages {
+            self.logger.trace(&format!("Updating layout for page '{}'", id));
+            page.update_layout(width, height)
+                .with_context(|| format!("Failed to update layout for page '{}'", id))?;
         }
         
-        if let Some(page) = self.pages.get_mut("hello") {
-            if let Some(hello_page) = page.as_any_mut().downcast_mut::<hello_page::HelloPage>() {
-                hello_page.set_canvas(canvas.clone());
-                log::debug!("Updated canvas for hello page");
-            } else {
-                log::warn!("Failed to downcast 'hello' page to HelloPage");
-            }
-        }
-        
+        self.logger.debug("Graphics context set successfully");
         Ok(())
     }
 }

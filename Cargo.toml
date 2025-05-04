@@ -25,6 +25,9 @@ crossbeam-channel = "0.5"
 # UI and Graphics
 sdl2 = { version = "0.35", optional = true }
 
+# For debug logging
+once_cell = "1.18"
+
 # Temporarily disabling LVGL until we can fix build issues
 # lvgl = { version = "0.5", default-features = false }
 # lvgl-sys = { version = "0.5" }

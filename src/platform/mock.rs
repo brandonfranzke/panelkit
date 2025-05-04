@@ -3,29 +3,61 @@
 //! This module provides mock implementations of platform-specific components for testing.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{GraphicsContext, PlatformDriver};
+use crate::platform::{Color, GraphicsContext, PlatformDriver, Point, Rectangle};
 use anyhow::Result;
-// Standard library imports
 use std::time::{Duration, Instant};
-use std::any::Any;
 
-/// Mock graphics context that does nothing
-pub struct MockGraphicsContext;
+/// Mock graphics context that simulates rendering operations
+pub struct MockGraphicsContext {
+    width: u32,
+    height: u32,
+    current_color: Color,
+}
 
 impl MockGraphicsContext {
     /// Create a new mock graphics context
-    pub fn new() -> Self {
-        Self
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            width,
+            height,
+            current_color: Color::rgb(0, 0, 0),
+        }
     }
 }
 
 impl GraphicsContext for MockGraphicsContext {
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn clear(&mut self, color: Color) -> Result<()> {
+        log::trace!("Mock clear with color: RGB({}, {}, {})", color.r, color.g, color.b);
+        Ok(())
     }
     
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+    fn set_draw_color(&mut self, color: Color) -> Result<()> {
+        self.current_color = color;
+        log::trace!("Mock set color: RGB({}, {}, {})", color.r, color.g, color.b);
+        Ok(())
+    }
+    
+    fn fill_rect(&mut self, rect: Rectangle) -> Result<()> {
+        log::trace!("Mock fill rectangle: ({}, {}, {}, {}) with color RGB({}, {}, {})",
+            rect.x, rect.y, rect.width, rect.height,
+            self.current_color.r, self.current_color.g, self.current_color.b);
+        Ok(())
+    }
+    
+    fn draw_rect(&mut self, rect: Rectangle) -> Result<()> {
+        log::trace!("Mock draw rectangle outline: ({}, {}, {}, {})",
+            rect.x, rect.y, rect.width, rect.height);
+        Ok(())
+    }
+    
+    fn draw_line(&mut self, start: Point, end: Point) -> Result<()> {
+        log::trace!("Mock draw line from ({}, {}) to ({}, {})",
+            start.x, start.y, end.x, end.y);
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 }
 
@@ -39,31 +71,36 @@ pub struct MockDriver {
     y: i32,
     x_increment: i32,
     y_increment: i32,
-    graphics_context: MockGraphicsContext,
 }
 
 impl MockDriver {
     /// Create a new mock driver
     pub fn new() -> Self {
+        let width = 800;
+        let height = 480;
+        
         Self {
-            width: 800,
-            height: 480,
+            width,
+            height,
             last_event: Instant::now(),
             event_interval: Duration::from_secs(2), // Generate an event every 2 seconds
             x: 100,
             y: 100,
             x_increment: 50,
             y_increment: 30,
-            graphics_context: MockGraphicsContext::new(),
         }
     }
 }
 
 impl PlatformDriver for MockDriver {
     fn init(&mut self, width: u32, height: u32) -> Result<()> {
-        self.width = width;
-        self.height = height;
-        log::info!("Mock platform initialized with dimensions: {}x{}", width, height);
+        // Update dimensions if provided
+        if width > 0 && height > 0 {
+            self.width = width;
+            self.height = height;
+        }
+        
+        log::info!("Mock platform initialized with dimensions: {}x{}", self.width, self.height);
         Ok(())
     }
     
@@ -77,14 +114,14 @@ impl PlatformDriver for MockDriver {
             self.y += self.y_increment;
             
             // Bounce off edges
-            if self.x < 0 || self.x > 800 {
+            if self.x < 0 || self.x > self.width as i32 {
                 self.x_increment = -self.x_increment;
-                self.x = self.x.clamp(0, 800);
+                self.x = self.x.clamp(0, self.width as i32);
             }
             
-            if self.y < 0 || self.y > 480 {
+            if self.y < 0 || self.y > self.height as i32 {
                 self.y_increment = -self.y_increment;
-                self.y = self.y.clamp(0, 480);
+                self.y = self.y.clamp(0, self.height as i32);
             }
             
             // Create touch event
@@ -102,7 +139,7 @@ impl PlatformDriver for MockDriver {
     }
     
     fn present(&mut self) -> Result<()> {
-        log::debug!("Mock platform presenting (no-op)");
+        log::trace!("Mock platform presenting (no-op)");
         Ok(())
     }
     
@@ -110,13 +147,13 @@ impl PlatformDriver for MockDriver {
         (self.width, self.height)
     }
     
-    fn graphics_context(&self) -> Option<&dyn GraphicsContext> {
-        Some(&self.graphics_context)
+    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>> {
+        // Create a new mock graphics context
+        let context = MockGraphicsContext::new(self.width, self.height);
+        Ok(Box::new(context))
     }
     
     fn cleanup(&mut self) {
         log::info!("Mock platform cleaned up");
     }
 }
-
-// Only the unified MockDriver is needed now

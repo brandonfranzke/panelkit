@@ -6,17 +6,12 @@ use anyhow::Result;
 use std::any::Any;
 
 // Include platform implementations
+pub mod graphics;
 pub mod mock;
 pub mod sdl_driver;
 
-/// Graphics context - a generic handle provided by platform drivers for UI rendering
-pub trait GraphicsContext {
-    /// Get the context as Any for safe downcasting
-    fn as_any(&self) -> &dyn Any;
-    
-    /// Get the context as mutable Any for safe downcasting
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
+// Re-export graphics types for convenience
+pub use graphics::{Color, Point, Rectangle, GraphicsContext, Renderable};
 
 /// Unified platform driver interface that handles both display and input
 pub trait PlatformDriver {
@@ -32,8 +27,8 @@ pub trait PlatformDriver {
     /// Get the display dimensions
     fn dimensions(&self) -> (u32, u32);
     
-    /// Get a graphics context for rendering
-    fn graphics_context(&self) -> Option<&dyn GraphicsContext>;
+    /// Create a graphics context for rendering
+    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>>;
     
     /// Release all resources
     fn cleanup(&mut self);
@@ -65,5 +60,3 @@ impl PlatformFactory {
         }
     }
 }
-
-// No legacy traits needed - this is a clean implementation

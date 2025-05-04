@@ -4,18 +4,20 @@
 
 use crate::event::Event;
 use crate::ui::Page;
-use anyhow::Result;
+use crate::logging;
+use crate::platform::{Color, GraphicsContext, Point, Rectangle};
+use crate::ui::components::{button::Button, layout::TitleBar, text::Text, text::TextAlign, ColoredRectangle};
+use crate::error::Result;
 use std::any::Any;
-use std::sync::{Arc, Mutex};
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
 
 /// A simple Hello World page
 pub struct HelloPage {
     counter: u32,
-    canvas: Option<Arc<Mutex<Canvas<Window>>>>,
+    width: u32,
+    height: u32,
+    counter_box: Rectangle,
+    right_arrow: [Point; 3],
+    logger: &'static logging::ComponentLogger,
 }
 
 impl HelloPage {
@@ -23,108 +25,139 @@ impl HelloPage {
     pub fn new() -> Self {
         Self { 
             counter: 0,
-            canvas: None,
+            width: 800,
+            height: 480,
+            counter_box: Rectangle::new(350, 200, 100, 50),
+            right_arrow: [
+                Point::new(700, 240), // Point
+                Point::new(670, 210), // Top
+                Point::new(670, 270), // Bottom
+            ],
+            logger: logging::get_logger("HelloPage"),
         }
-    }
-    
-    /// Set the SDL2 canvas
-    pub fn set_canvas(&mut self, canvas: Arc<Mutex<Canvas<Window>>>) {
-        self.canvas = Some(canvas);
     }
 }
 
 impl Page for HelloPage {
     fn init(&mut self) -> Result<()> {
-        log::info!("HelloPage initialized");
+        self.logger.info("Initializing HelloPage");
         Ok(())
     }
     
-    fn render(&self) -> Result<()> {
-        if let Some(canvas_arc) = &self.canvas {
-            let mut canvas = canvas_arc.lock().unwrap();
-            
-            // Clear the canvas with a green background
-            canvas.set_draw_color(Color::RGB(50, 200, 100));
-            canvas.clear();
-            
-            // Draw title text area
-            canvas.set_draw_color(Color::RGB(30, 120, 60));
-            canvas.fill_rect(Rect::new(0, 0, 800, 70))
-                .map_err(|e| anyhow::anyhow!("Error drawing title area: {}", e))?;
-            
-            // Draw a white rectangle for the counter display
-            canvas.set_draw_color(Color::RGB(255, 255, 255));
-            canvas.fill_rect(Rect::new(350, 200, 100, 50))
-                .map_err(|e| anyhow::anyhow!("Error drawing counter display: {}", e))?;
-            
-            // Draw "Hello, World!" box
-            canvas.set_draw_color(Color::RGB(255, 255, 255));
-            canvas.fill_rect(Rect::new(250, 100, 300, 60))
-                .map_err(|e| anyhow::anyhow!("Error drawing text box: {}", e))?;
-            canvas.set_draw_color(Color::RGB(0, 0, 0));
-            canvas.draw_rect(Rect::new(250, 100, 300, 60))
-                .map_err(|e| anyhow::anyhow!("Error drawing text box outline: {}", e))?;
-            
-            // Draw navigation arrows
-            canvas.set_draw_color(Color::RGB(200, 200, 200));
-            
-            // Right arrow (to Demo page)
-            let right_arrow_points = [
-                (700, 240),  // Point
-                (670, 210),  // Top
-                (670, 270)   // Bottom
-            ];
-            
-            for i in 0..right_arrow_points.len() {
-                let j = (i + 1) % right_arrow_points.len();
-                canvas.draw_line(
-                    sdl2::rect::Point::new(right_arrow_points[i].0, right_arrow_points[i].1),
-                    sdl2::rect::Point::new(right_arrow_points[j].0, right_arrow_points[j].1)
-                ).map_err(|e| anyhow::anyhow!("Error drawing arrow: {}", e))?;
-            }
-            
-            // Don't call present() here - the platform driver will do that
-        } else {
-            log::info!("HelloPage rendered with counter: {} (no canvas available)", self.counter);
+    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+        self.logger.trace("Rendering HelloPage");
+        
+        // Clear the screen with a green background
+        ctx.clear(Color::rgb(50, 200, 100))?;
+        
+        // Draw title bar
+        TitleBar::new(
+            0, 0, self.width, 70, 
+            "Hello Page", 
+            Color::rgb(255, 255, 255), 
+            Color::rgb(30, 120, 60)
+        ).render(ctx)?;
+        
+        // Draw "Hello, World!" text with a border
+        ColoredRectangle::filled(250, 100, 300, 60, Color::rgb(255, 255, 255)).render(ctx)?;
+        ColoredRectangle::outlined(250, 100, 300, 60, Color::rgb(0, 0, 0)).render(ctx)?;
+        
+        Text::new(400, 130, "Hello, World!", Color::rgb(0, 0, 0))
+            .with_align(TextAlign::Center)
+            .with_font_size(24)
+            .render(ctx)?;
+        
+        // Draw counter display
+        ColoredRectangle::filled(
+            self.counter_box.x, 
+            self.counter_box.y, 
+            self.counter_box.width, 
+            self.counter_box.height, 
+            Color::rgb(255, 255, 255)
+        ).render(ctx)?;
+        
+        // Draw counter value
+        let count_to_show = std::cmp::min(self.counter, 5);
+        for i in 0..count_to_show {
+            let x_pos = 360 + (i as i32 * 15);
+            ColoredRectangle::filled(
+                x_pos, 210, 10, 30, Color::rgb(0, 0, 0)
+            ).render(ctx)?;
         }
         
+        // Draw navigation arrow to Demo page
+        ctx.set_draw_color(Color::rgb(200, 200, 200))?;
+        for i in 0..self.right_arrow.len() {
+            let j = (i + 1) % self.right_arrow.len();
+            ctx.draw_line(self.right_arrow[i], self.right_arrow[j])?;
+        }
+        
+        self.logger.trace("HelloPage rendered successfully");
         Ok(())
     }
     
     fn handle_event(&mut self, event: &Event) -> Result<Option<String>> {
         match event {
             Event::Touch { x, y, action } => {
-                log::info!("HelloPage received touch event: {:?} at ({}, {})", action, x, y);
+                self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", action, x, y));
                 
                 // Check if counter area was clicked
-                if *x >= 350 && *x <= 450 && *y >= 200 && *y <= 250 {
+                if *x >= self.counter_box.x && 
+                   *x <= self.counter_box.x + self.counter_box.width as i32 &&
+                   *y >= self.counter_box.y && 
+                   *y <= self.counter_box.y + self.counter_box.height as i32 {
                     self.counter += 1;
-                    log::info!("Counter clicked! New value: {}", self.counter);
+                    self.logger.info(&format!("Counter incremented to: {}", self.counter));
                 }
                 
                 // Check if right arrow was clicked (for navigation)
-                if *x >= 670 && *x <= 700 && *y >= 210 && *y <= 270 &&
+                let arrow_bounds = Rectangle::new(670, 210, 30, 60);
+                if *x >= arrow_bounds.x && 
+                   *x <= arrow_bounds.x + arrow_bounds.width as i32 &&
+                   *y >= arrow_bounds.y && 
+                   *y <= arrow_bounds.y + arrow_bounds.height as i32 &&
                    matches!(action, crate::event::TouchAction::Press) {
-                    log::info!("Right arrow clicked! Navigating to Demo page");
-                    
-                    // Return the page ID to navigate to
+                    self.logger.info("Right arrow clicked, navigating to Demo page");
                     return Ok(Some("demo".to_string()));
                 }
             }
             _ => {}
         }
         
-        // No navigation requested
         Ok(None)
     }
     
     fn on_activate(&mut self) -> Result<()> {
-        log::info!("HelloPage activated");
+        self.logger.info("HelloPage activated");
         Ok(())
     }
     
     fn on_deactivate(&mut self) -> Result<()> {
-        log::info!("HelloPage deactivated");
+        self.logger.info("HelloPage deactivated");
+        Ok(())
+    }
+    
+    fn update_layout(&mut self, width: u32, height: u32) -> Result<()> {
+        self.logger.debug(&format!("Updating layout to {}x{}", width, height));
+        
+        self.width = width;
+        self.height = height;
+        
+        // Update responsive layout elements
+        self.counter_box = Rectangle::new(
+            (width as i32 - 100) / 2,  // Center horizontally
+            200, 
+            100, 
+            50
+        );
+        
+        // Right arrow (depends on screen width)
+        self.right_arrow = [
+            Point::new(width as i32 - 100, height as i32 / 2),    // Point
+            Point::new(width as i32 - 130, height as i32 / 2 - 30), // Top
+            Point::new(width as i32 - 130, height as i32 / 2 + 30), // Bottom
+        ];
+        
         Ok(())
     }
     

@@ -4,7 +4,7 @@
 
 use clap::{Parser, ValueEnum};
 use log::LevelFilter;
-use panelkit::{AppConfig, Application};
+use panelkit::{AppConfig, Application, logging};
 use std::path::PathBuf;
 
 /// Represents available log levels for the application
@@ -42,8 +42,12 @@ struct Args {
     dimensions: String,
 
     /// Enable fullscreen mode
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long, default_value_t = false)]
     fullscreen: bool,
+    
+    /// Disable fullscreen mode (overrides --fullscreen)
+    #[arg(long, default_value_t = false)]
+    no_fullscreen: bool,
     
     /// Path to state database
     #[arg(short, long)]
@@ -55,18 +59,10 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Initialize logger
-    env_logger::Builder::new()
-        .filter_level(match args.log_level {
-            LogLevel::Trace => log::LevelFilter::Trace,
-            LogLevel::Debug => log::LevelFilter::Debug,
-            LogLevel::Info => log::LevelFilter::Info,
-            LogLevel::Warn => log::LevelFilter::Warn,
-            LogLevel::Error => log::LevelFilter::Error,
-        })
-        .format_timestamp(Some(env_logger::fmt::TimestampPrecision::Millis))
-        .format_module_path(false)
-        .init();
-    log::info!("PanelKit starting up...");
+    logging::init(args.log_level.into());
+    let logger = logging::app_logger();
+
+    logger.info("PanelKit starting up");
 
     // Parse dimensions
     let dimensions = if args.dimensions == "auto" {
@@ -89,14 +85,22 @@ fn main() -> anyhow::Result<()> {
         (width, height)
     };
     
-    log::info!("Using dimensions: {}x{}", dimensions.0, dimensions.1);
-    log::info!("Fullscreen mode: {}", args.fullscreen);
+    logger.info(&format!("Using dimensions: {}x{}", dimensions.0, dimensions.1));
     
     // Create application config
+    // If no_fullscreen is specified, it overrides fullscreen setting
+    let fullscreen_setting = if args.no_fullscreen {
+        false
+    } else {
+        args.fullscreen
+    };
+    
+    logger.info(&format!("Fullscreen mode: {}", fullscreen_setting));
+    
     let config = AppConfig {
         width: dimensions.0,
         height: dimensions.1,
-        fullscreen: args.fullscreen,
+        fullscreen: fullscreen_setting,
         state_path: args.state_path,
         log_level: args.log_level.into(),
     };
@@ -106,12 +110,12 @@ fn main() -> anyhow::Result<()> {
     app.init()?;
     
     // Run application
-    log::info!("PanelKit main loop starting");
+    logger.info("Starting main application loop");
     let result = app.run();
     
     // Clean up
     app.cleanup();
-    log::info!("PanelKit terminated");
+    logger.info("Application terminated");
     
     result
 }

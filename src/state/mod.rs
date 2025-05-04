@@ -28,8 +28,11 @@ impl StateManager {
     }
     
     /// Set a value in the state store
-    pub fn set<T: serde::Serialize>(&self, key: &str, value: &T, _persist: bool) -> anyhow::Result<()> {
-        let serialized = bincode::serialize(value)?;
+    pub fn set<T: serde::Serialize>(&self, key: &str, value: &T, _persist: bool) -> crate::error::Result<()> {
+        let serialized = bincode::serialize(value)
+            .map_err(|e| crate::error::StateError::SerializationError(format!(
+                "Failed to serialize value for key '{}': {}", key, e
+            )))?;
         
         // Just update memory state for now
         self.memory_state.lock().unwrap().insert(key.to_string(), serialized);
@@ -41,11 +44,14 @@ impl StateManager {
     }
     
     /// Get a value from the state store
-    pub fn get<T: for<'de> serde::Deserialize<'de>>(&self, key: &str) -> anyhow::Result<Option<T>> {
+    pub fn get<T: for<'de> serde::Deserialize<'de>>(&self, key: &str) -> crate::error::Result<Option<T>> {
         // Just check memory for now
         if let Some(data) = self.memory_state.lock().unwrap().get(key) {
             log::debug!("State value retrieved: {}", key);
-            return Ok(Some(bincode::deserialize(data)?));
+            return Ok(Some(bincode::deserialize(data)
+                .map_err(|e| crate::error::StateError::SerializationError(format!(
+                    "Failed to deserialize value for key '{}': {}", key, e
+                )))?));
         }
         
         log::debug!("State value not found: {}", key);
@@ -53,7 +59,7 @@ impl StateManager {
     }
     
     /// Load all persistent state into memory - stub implementation
-    pub fn load_all(&self) -> anyhow::Result<()> {
+    pub fn load_all(&self) -> crate::error::Result<()> {
         // Just log for proof-of-life
         log::info!("State manager initialized (persistence not implemented for proof-of-life)");
         Ok(())

@@ -2,12 +2,18 @@
 //!
 //! This library provides the core functionality for PanelKit.
 
+pub mod error;
 pub mod event;
+pub mod logging;
 pub mod platform;
 pub mod state;
 pub mod ui;
 
-use anyhow::{Result, Context};
+// Re-export error types and Result for convenience
+pub use error::{Error, Result}; 
+
+// Continue to use anyhow for context in implementation
+use anyhow::Context;
 
 /// Application configuration
 pub struct AppConfig {
@@ -40,6 +46,9 @@ pub struct Application {
 impl Application {
     /// Create a new application with the given configuration
     pub fn new(config: AppConfig) -> Result<Self> {
+        let logger = logging::app_logger();
+        logger.info("Creating new application instance");
+        
         let event_broker = event::EventBroker::new();
         
         let state_manager = state::StateManager::new(
@@ -64,35 +73,43 @@ impl Application {
     
     /// Initialize the application
     pub fn init(&mut self) -> Result<()> {
-        // Initialize platform driver
+        let logger = logging::app_logger();
+        logger.info("Starting initialization");
+        
+        // Step 1: Initialize platform driver
+        logger.debug("Initializing platform driver");
         self.platform_driver.init(self.config.width, self.config.height)
             .context("Failed to initialize platform driver")?;
         
-        // Get graphics context and set it for UI rendering
-        if let Some(context) = self.platform_driver.graphics_context() {
-            // Check if we have an SDL graphics context and pass it to the UI
-            if let Some(sdl_context) = context.as_any().downcast_ref::<platform::sdl_driver::SDLGraphicsContext>() {
-                self.ui_manager.set_canvas(sdl_context.canvas())
-                    .context("Failed to set SDL canvas for UI manager")?;
-            }
-        }
+        // Step 2: Create graphics context and set it for UI rendering
+        logger.debug("Creating graphics context for UI");
+        let graphics_context = self.platform_driver.create_graphics_context()
+            .context("Failed to create graphics context")?;
         
-        // Load state
+        // Pass graphics context to UI manager
+        self.ui_manager.set_graphics_context(graphics_context)
+            .context("Failed to set graphics context for UI manager")?;
+        
+        // Step 3: Load state
+        logger.debug("Loading application state");
         self.state_manager.load_all()
             .context("Failed to load application state")?;
         
-        // Initialize UI
+        // Step 4: Initialize UI
+        logger.debug("Initializing UI system");
         self.ui_manager.init()
             .context("Failed to initialize UI system")?;
         
+        logger.info("Initialization complete");
         Ok(())
     }
     
     /// Run the application main loop
     pub fn run(&mut self) -> Result<()> {
+        let logger = logging::app_logger();
         self.running = true;
         
-        log::info!("Starting main application loop");
+        logger.info("Starting main application loop");
         
         while self.running {
             // Poll for input events
@@ -104,40 +121,40 @@ impl Application {
                 // Check for system events
                 match &event {
                     event::Event::Custom { event_type, .. } if event_type == "quit" => {
-                        log::info!("Received quit event, exiting application");
+                        logger.info("Received quit event, exiting application");
                         self.running = false;
                     },
                     event::Event::Navigate { page_id } => {
-                        log::info!("Received navigation event to page: {}", page_id);
+                        logger.info(&format!("Received navigation event to page: {}", page_id));
                         if let Err(e) = self.ui_manager.navigate_to(page_id) {
-                            log::error!("Failed to navigate to page '{}': {}", page_id, e);
+                            logger.error(&format!("Failed to navigate to page '{}': {}", page_id, e));
                         }
                     },
                     _ => {}
                 }
                 
-                log::debug!("Processing event: {:?}", event);
+                logger.trace(&format!("Processing event: {:?}", event));
                 self.event_broker.publish("input", event.clone());
                 
                 match self.ui_manager.process_event(&event) {
                     Ok(_) => {},
                     Err(e) => {
-                        log::error!("Error processing event in UI: {:#}", e);
+                        logger.error(&format!("Error processing event in UI: {:#}", e));
                         // Continue running despite errors in event handling
                     }
                 }
             }
             
             // Render UI
+            logger.trace("Rendering UI");
             if let Err(e) = self.ui_manager.render() {
-                log::error!("Error rendering UI: {:#}", e);
-                // Continue rendering despite errors
+                logger.error(&format!("Error rendering UI: {:#}", e));
             }
             
             // Present to display
+            logger.trace("Presenting to display");
             if let Err(e) = self.platform_driver.present() {
-                log::error!("Error presenting to display: {:#}", e);
-                // Continue running despite display errors
+                logger.error(&format!("Error presenting to display: {:#}", e));
             }
             
             // Sleep to maintain reasonable framerate
@@ -150,11 +167,12 @@ impl Application {
     /// Stop the application
     pub fn stop(&mut self) {
         self.running = false;
+        logging::app_logger().info("Application stopped");
     }
     
     /// Clean up resources
     pub fn cleanup(&mut self) {
         self.platform_driver.cleanup();
-        log::info!("Application resources cleaned up");
+        logging::app_logger().info("Application resources cleaned up");
     }
 }
