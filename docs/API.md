@@ -100,7 +100,7 @@ impl Page for MyPage {
 This trait defines the interface for platform-specific implementations:
 
 ```rust
-pub trait PlatformDriver: Send {
+pub trait PlatformDriver {
     fn init(&mut self, width: u32, height: u32) -> Result<()>;
     fn poll_events(&mut self) -> Result<Vec<Event>>;
     fn present(&mut self) -> Result<()>;
@@ -115,11 +115,13 @@ pub trait PlatformDriver: Send {
 Provides access to platform-specific rendering capabilities:
 
 ```rust
-pub trait GraphicsContext: Send + Sync {
+pub trait GraphicsContext {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 ```
+
+Note: The platform abstraction is designed for a single-threaded application model in the current implementation. Thread-safety constraints have been removed to simplify SDL2 integration.
 
 ## Event System
 
@@ -183,7 +185,7 @@ while let Ok(event) = receiver.try_recv() {
 // Create state manager
 let state_manager = state::StateManager::new(Some(path))?;
 
-// Store values
+// Store values (note: persistence flag is currently ignored)
 state_manager.set("setting_name", &value, true)?;
 
 // Retrieve values
@@ -191,6 +193,8 @@ if let Some(value) = state_manager.get::<String>("setting_name")? {
     // Use value
 }
 ```
+
+Note: The current implementation only supports in-memory storage. Persistence to disk is not yet implemented in this proof-of-concept but the architecture is designed to support it in the future.
 
 ## Error Handling
 

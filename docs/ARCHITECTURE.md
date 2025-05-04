@@ -38,8 +38,9 @@ The central component that orchestrates the entire system:
 Manages the user interface:
 - **UIManager**: Handles page navigation and layout
 - **Page trait**: Interface for all UI pages
-- **RenderContext**: Handles rendering differences between platforms 
-- **Safely typed**: Uses downcasting for type-safe access to concrete types
+- **Safely typed**: Uses downcasting (`as_any/as_any_mut`) for type-safe access to concrete types
+- **Direct rendering**: Currently uses SDL2 Canvas directly (rather than a declarative approach)
+- **LVGL integration**: Originally planned but deferred due to integration challenges (see DESIGN_REVISIONS.md)
 
 ### 3. Platform Abstraction (platform/mod.rs)
 
@@ -47,9 +48,11 @@ Provides unified hardware abstraction:
 - **PlatformDriver**: Core unified interface for all platforms
 - **GraphicsContext**: Abstract graphics handling for different platforms
 - **Implementation variants**:
-  - SDLDriver: For development and simulation
+  - SDLDriver: For development and simulation (current primary implementation)
   - MockDriver: For testing and headless operation
-  - (Future) FramebufferDriver: For embedded targets
+  - (Future) FramebufferDriver: For embedded targets (planned)
+
+Note: The current implementation uses some platform-specific code in the application layer when accessing SDL contexts. Future improvements will fully abstract these details.
 
 ### 4. Event System (event/mod.rs)
 
@@ -61,9 +64,10 @@ Implements a robust event system:
 ### 5. State Management (state/mod.rs)
 
 Manages application state:
-- **State persistence** between application restarts
-- **In-memory caching** for performance
+- **In-memory state storage** (current implementation)
 - **Serialization** of configuration and state data
+- **State persistence** (architecture prepared, not yet implemented)
+- **Reactive state** (planned for future implementation)
 
 ## Key Design Patterns
 

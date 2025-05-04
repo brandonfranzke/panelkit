@@ -65,7 +65,7 @@ build-container: check-deps
 dev: check-deps
 	@echo "Building for macOS development..."
 	@mkdir -p $(BUILD_DIR)
-	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib" cargo build --features simulator
+	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" LIBRARY_PATH="/opt/homebrew/lib" cargo build --features simulator
 	@cp target/debug/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@echo "✅ macOS build complete: $(BUILD_DIR)/$(PROJECT_NAME)-macos"
@@ -73,7 +73,7 @@ dev: check-deps
 # Run the macOS development build
 run: dev
 	@echo "Running macOS development build..."
-	@RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos
+	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos
 
 # Cross-compile for Raspberry Pi target
 target: build-container

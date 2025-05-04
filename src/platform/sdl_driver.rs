@@ -4,7 +4,6 @@
 
 use crate::event::{Event, TouchAction};
 use crate::platform::{GraphicsContext, PlatformDriver};
-use crate::platform::{DisplayDriver, InputDriver, Driver}; // Legacy traits
 
 use anyhow::{Result, Context};
 use sdl2::event::Event as SdlEvent;
@@ -53,15 +52,18 @@ pub struct SDLDriver {
     is_pressed: bool,
 }
 
+// We're not implementing Send for SDLDriver since SDL2 isn't thread-safe
+// Instead, we'll modify the PlatformDriver trait to not require Send
+
 impl SDLDriver {
     /// Create a new SDL driver
     pub fn new(width: u32, height: u32, title: &str) -> Result<Self> {
         let sdl_context = sdl2::init()
-            .context("Failed to initialize SDL2")?;
+            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2: {}", e))?;
             
         let video_subsystem = sdl_context
             .video()
-            .context("Failed to initialize SDL2 video subsystem")?;
+            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2 video subsystem: {}", e))?;
 
         // Use different SDL window settings for macOS vs other platforms
         #[cfg(target_os = "macos")]
@@ -70,20 +72,20 @@ impl SDLDriver {
             .position_centered()
             .allow_highdpi() // Enable Retina display support
             .build()
-            .context("Failed to create SDL2 window on macOS")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 window on macOS: {}", e))?;
 
         #[cfg(not(target_os = "macos"))]
         let window = video_subsystem
             .window(title, width, height)
             .position_centered()
             .build()
-            .context("Failed to create SDL2 window")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 window: {}", e))?;
 
         let canvas = window
             .into_canvas()
             .accelerated()
             .build()
-            .context("Failed to create SDL2 canvas")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 canvas: {}", e))?;
 
         let canvas_arc = Arc::new(Mutex::new(canvas));
         let graphics_context = SDLGraphicsContext::new(canvas_arc.clone());
@@ -143,7 +145,7 @@ impl PlatformDriver for SDLDriver {
     fn poll_events(&mut self) -> Result<Vec<Event>> {
         let mut events = Vec::new();
         let mut event_pump = self.sdl_context.event_pump()
-            .context("Failed to get SDL event pump")?;
+            .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
         
         for sdl_event in event_pump.poll_iter() {
             match sdl_event {
@@ -212,88 +214,4 @@ impl PlatformDriver for SDLDriver {
     }
 }
 
-// Legacy trait implementations for backward compatibility
-
-impl Driver for SDLDriver {
-    fn init(&mut self, width: u32, height: u32) -> Result<()> {
-        <Self as PlatformDriver>::init(self, width, height)
-    }
-    
-    fn flush(&mut self, _buffer: &[u8]) -> Result<()> {
-        self.present()
-    }
-    
-    fn dimensions(&self) -> (u32, u32) {
-        <Self as PlatformDriver>::dimensions(self)
-    }
-    
-    fn init_input(&mut self) -> Result<()> {
-        // No specific input initialization needed for SDL
-        Ok(())
-    }
-    
-    fn poll_events(&mut self) -> Result<Vec<Event>> {
-        <Self as PlatformDriver>::poll_events(self)
-    }
-    
-    fn cleanup(&mut self) {
-        <Self as PlatformDriver>::cleanup(self)
-    }
-    
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-
-impl DisplayDriver for SDLDriver {
-    fn init(&mut self, width: u32, height: u32) -> Result<()> {
-        <Self as PlatformDriver>::init(self, width, height)
-    }
-    
-    fn flush(&mut self, _buffer: &[u8]) -> Result<()> {
-        self.present()
-    }
-    
-    fn dimensions(&self) -> (u32, u32) {
-        <Self as PlatformDriver>::dimensions(self)
-    }
-    
-    fn cleanup(&mut self) {
-        <Self as PlatformDriver>::cleanup(self)
-    }
-    
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-
-impl InputDriver for SDLDriver {
-    fn init(&mut self) -> Result<()> {
-        // No specific input initialization needed for SDL
-        Ok(())
-    }
-    
-    fn poll_events(&mut self) -> Result<Vec<Event>> {
-        <Self as PlatformDriver>::poll_events(self)
-    }
-    
-    fn cleanup(&mut self) {
-        <Self as PlatformDriver>::cleanup(self)
-    }
-    
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
+// Clean implementation with only the PlatformDriver trait
