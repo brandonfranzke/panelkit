@@ -4,9 +4,9 @@
 
 use std::collections::HashMap;
 use std::any::Any;
-use anyhow::Context;
-use crate::error::{Result, UIError};
-use crate::platform::{GraphicsContext, Renderable};
+use anyhow::{Result, Context};
+use crate::error::UIError;
+use crate::platform::GraphicsContext;
 use crate::logging;
 
 // Export UI components
@@ -21,9 +21,9 @@ pub mod transition_page;
 pub mod hello_transition_page;
 pub mod world_transition_page;
 
-// New rendering abstraction-based pages
-pub mod new_hello_page;
-pub mod new_world_page;
+// Rendering abstraction-based pages
+pub mod hello_rendering_page;
+pub mod world_rendering_page;
 
 // LVGL-based pages (conditionally)
 #[cfg(feature = "use_lvgl")]
@@ -34,6 +34,42 @@ pub mod lvgl_pages;
 pub mod hello_lvgl_page;
 #[cfg(feature = "use_lvgl")]
 pub mod world_lvgl_page;
+
+// Compatibility helper for working with both graphics and rendering types
+pub mod compat {
+    use crate::platform::graphics;
+    use crate::rendering::primitives;
+    
+    /// Convert a graphics Point to a primitives Point
+    pub fn point_to_rendering(p: &graphics::Point) -> primitives::Point {
+        primitives::Point::new(p.x, p.y)
+    }
+    
+    /// Convert a primitives Point to a graphics Point
+    pub fn point_from_rendering(p: &primitives::Point) -> graphics::Point {
+        graphics::Point::new(p.x, p.y)
+    }
+    
+    /// Convert a graphics Rectangle to a primitives Rectangle
+    pub fn rect_to_rendering(r: &graphics::Rectangle) -> primitives::Rectangle {
+        primitives::Rectangle::new(r.x, r.y, r.width, r.height)
+    }
+    
+    /// Convert a primitives Rectangle to a graphics Rectangle
+    pub fn rect_from_rendering(r: &primitives::Rectangle) -> graphics::Rectangle {
+        graphics::Rectangle::new(r.x, r.y, r.width, r.height)
+    }
+    
+    /// Convert a graphics Color to a primitives Color
+    pub fn color_to_rendering(c: &graphics::Color) -> primitives::Color {
+        primitives::Color::rgb(c.r, c.g, c.b)
+    }
+    
+    /// Convert a primitives Color to a graphics Color
+    pub fn color_from_rendering(c: &primitives::Color) -> graphics::Color {
+        graphics::Color::rgb(c.r, c.g, c.b)
+    }
+}
 
 /// Represents a UI page in the application
 pub trait Page {
@@ -110,11 +146,11 @@ impl UIManager {
                 self.logger.info("Using rendering abstraction-based pages");
                 
                 // Register Hello page with rendering abstraction
-                self.register_page("hello", Box::new(new_hello_page::NewHelloPage::new()))
+                self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
                     .context("Failed to register hello page using rendering abstraction")?;
                 
                 // Register World page with rendering abstraction  
-                self.register_page("world", Box::new(new_world_page::NewWorldPage::new()))
+                self.register_page("world", Box::new(world_rendering_page::WorldRenderingPage::new()))
                     .context("Failed to register world page using rendering abstraction")?;
             } else {
                 self.logger.info("Using standard transition-based pages");

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Instructions for running PanelKit on the embedded target with the new rendering abstraction
+# Instructions for running PanelKit on the embedded target with the rendering abstraction
 
 # The command to run on the target device:
 # PANELKIT_USE_RENDERING=1 RUST_LOG=debug ./panelkit

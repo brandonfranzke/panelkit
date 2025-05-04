@@ -40,7 +40,7 @@ Manages the user interface:
 - **Page trait**: Interface for all UI pages
 - **Safely typed**: Uses downcasting (`as_any/as_any_mut`) for type-safe access to concrete types
 - **Direct rendering**: Currently uses SDL2 Canvas directly (rather than a declarative approach)
-- **LVGL integration**: Originally planned but deferred due to integration challenges (see DESIGN_REVISIONS.md)
+- **LVGL integration**: Originally planned but deferred due to integration challenges (see ARCHITECTURE_DECISIONS.md)
 
 ### 3. Platform Abstraction (platform/mod.rs)
 

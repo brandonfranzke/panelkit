@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run PanelKit with the new rendering abstraction
+# Run PanelKit with the rendering abstraction
 
 # Export the environment variable
 export PANELKIT_USE_RENDERING=1

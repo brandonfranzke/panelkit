@@ -1,17 +1,19 @@
-//! World page implementation using the new rendering abstraction
+//! World page implementation using the rendering abstraction
 //!
 //! This module provides a "World" page that uses the rendering abstraction layer.
 
 use crate::event::Event;
 use crate::ui::Page;
-use crate::platform::{GraphicsContext, Point, Rectangle, Color, TextStyle, FontSize, TextAlignment};
+use crate::platform::GraphicsContext;
+use crate::platform::graphics::{Point, Rectangle, Color};
 use crate::logging;
 use crate::rendering::RenderingBackend;
-use crate::error::Result;
+use crate::ui::compat;
+use anyhow::Result;
 use std::any::Any;
 
-/// World page using the new rendering abstraction
-pub struct NewWorldPage {
+/// World page using the rendering abstraction
+pub struct WorldRenderingPage {
     width: u32,
     height: u32,
     title_area: Rectangle,
@@ -21,8 +23,8 @@ pub struct NewWorldPage {
     logger: &'static logging::ComponentLogger,
 }
 
-impl NewWorldPage {
-    /// Create a new World page
+impl WorldRenderingPage {
+    /// Create a World page
     pub fn new() -> Self {
         let width = 800;
         let height = 480;
@@ -56,103 +58,124 @@ impl NewWorldPage {
         ctx.clear(Color::ui_background())?;
         
         // Draw title bar background
-        let mut driver_ctx = match ctx.as_any_mut().downcast_mut::<crate::platform::rendering_driver::RenderingGraphicsContext>() {
+        let driver_ctx = match ctx.as_any_mut().downcast_mut::<crate::platform::rendering_driver::RenderingGraphicsContext>() {
             Some(ctx) => ctx,
             None => {
-                self.logger.warn("Failed to downcast to RenderingGraphicsContext - falling back to legacy rendering");
+                self.logger.warn("Failed to downcast to RenderingGraphicsContext - falling back to standard rendering");
                 
-                // Fall back to legacy rendering if we can't get the new context
-                return self.draw_title_bar_legacy(ctx);
+                // Fall back to standard rendering if we can't get the rendering context
+                return self.draw_title_bar_fallback(ctx);
             }
         };
         
         // Get the backend from the context
         if let Some(backend) = driver_ctx.backend.as_any_mut().downcast_mut::<crate::rendering::sdl_backend::SDLBackend>() {
+            // Create rendering primitives
+            use crate::rendering::primitives;
+            
             // Draw title area
-            backend.fill_rect(self.title_area, Color::rgb(30, 90, 120))?;
+            let rendering_rect = primitives::Rectangle::from_graphics(self.title_area);
+            let rendering_color = primitives::Color::rgb(30, 90, 120);
+            backend.fill_rect(rendering_rect, rendering_color)?;
             
             // Draw title text
             let title_position = Point::new(
                 self.title_area.x + (self.title_area.width as i32 / 2),
                 self.title_area.y + (self.title_area.height as i32 / 2) - 10
             );
+            let rendering_position = primitives::Point::from_graphics(title_position);
             
-            let title_style = TextStyle::new(Color::white())
-                .with_size(FontSize::Large)
-                .with_alignment(TextAlignment::Center);
+            // Create a TextStyle using rendering primitives version
+            let rendering_style = primitives::TextStyle::new(primitives::Color::white())
+                .with_size(primitives::FontSize::Large)
+                .with_alignment(primitives::TextAlignment::Center);
                 
-            backend.draw_text("World Page", title_position, title_style)?;
+            backend.draw_text("World Page", rendering_position, rendering_style)?;
         }
         
         Ok(())
     }
     
-    /// Draw title bar using legacy rendering (fallback)
-    fn draw_title_bar_legacy(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
-        // This is a simplified version for compatibility with legacy GraphicsContext
+    /// Draw title bar using standard rendering (fallback)
+    fn draw_title_bar_fallback(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+        // This is a simplified version for compatibility with standard GraphicsContext
         ctx.fill_rect(self.title_area)?;
         Ok(())
     }
     
     /// Draw content area
     fn draw_content(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
-        let mut driver_ctx = match ctx.as_any_mut().downcast_mut::<crate::platform::rendering_driver::RenderingGraphicsContext>() {
+        let driver_ctx = match ctx.as_any_mut().downcast_mut::<crate::platform::rendering_driver::RenderingGraphicsContext>() {
             Some(ctx) => ctx,
             None => {
-                self.logger.warn("Failed to downcast to RenderingGraphicsContext - falling back to legacy rendering");
+                self.logger.warn("Failed to downcast to RenderingGraphicsContext - falling back to standard rendering");
                 
-                // Fall back to legacy rendering if we can't get the new context
-                return self.draw_content_legacy(ctx);
+                // Fall back to standard rendering if we can't get the rendering context
+                return self.draw_content_fallback(ctx);
             }
         };
         
         // Get the backend from the context
         if let Some(backend) = driver_ctx.backend.as_any_mut().downcast_mut::<crate::rendering::sdl_backend::SDLBackend>() {
+            // Create rendering primitives
+            use crate::rendering::primitives;
+            
             // Draw world text
             let content_position = Point::new(
                 self.content_area.x + (self.content_area.width as i32 / 2),
                 self.content_area.y + (self.content_area.height as i32 / 2) - 20
             );
+            let rendering_position = primitives::Point::from_graphics(content_position);
             
-            let content_style = TextStyle::new(Color::rgb(30, 30, 30))
-                .with_size(FontSize::ExtraLarge)
-                .with_alignment(TextAlignment::Center)
+            // Convert TextStyle to rendering primitives version
+            let rendering_style = primitives::TextStyle::new(primitives::Color::rgb(30, 30, 30))
+                .with_size(primitives::FontSize::ExtraLarge)
+                .with_alignment(primitives::TextAlignment::Center)
                 .with_bold(true);
                 
-            backend.draw_text("World", content_position, content_style)?;
+            backend.draw_text("World", rendering_position, rendering_style)?;
             
             // Draw navigation arrow
-            let arrow_color = Color::rgb(50, 100, 200);
+            let rendering_arrow_color = primitives::Color::rgb(50, 100, 200);
             
             // Draw filled triangle for arrow
             for i in 0..3 {
                 let j = (i + 1) % 3;
-                backend.draw_line(self.left_arrow_points[i], self.left_arrow_points[j], arrow_color)?;
+                // Convert platform Point to rendering Point using our helper
+                let start_point = compat::point_to_rendering(&self.left_arrow_points[i]);
+                let end_point = compat::point_to_rendering(&self.left_arrow_points[j]);
+                backend.draw_line(start_point, end_point, rendering_arrow_color)?;
             }
             
             // Draw "back" button
+            // Convert platform Rectangle to rendering Rectangle using our helper
+            let rendering_button_rect = compat::rect_to_rendering(&self.button_area);
+            let rendering_bg_color = primitives::Color::rgb(30, 90, 120);
+            let rendering_text_color = primitives::Color::white();
+            let rendering_border_color = primitives::Color::rgb(20, 60, 80);
+            
             backend.draw_button(
-                self.button_area,
+                rendering_button_rect,
                 "← Back",
-                Color::rgb(30, 90, 120),
-                Color::white(),
-                Color::rgb(20, 60, 80)
+                rendering_bg_color,
+                rendering_text_color,
+                rendering_border_color
             )?;
         }
         
         Ok(())
     }
     
-    /// Draw content using legacy rendering (fallback)
-    fn draw_content_legacy(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
-        // This is a simplified version for compatibility with legacy GraphicsContext
+    /// Draw content using standard rendering (fallback)
+    fn draw_content_fallback(&self, _ctx: &mut dyn GraphicsContext) -> Result<()> {
+        // This is a simplified version for compatibility with standard GraphicsContext
         Ok(())
     }
 }
 
-impl Page for NewWorldPage {
+impl Page for WorldRenderingPage {
     fn init(&mut self) -> Result<()> {
-        self.logger.info("Initializing NewWorldPage");
+        self.logger.info("Initializing WorldRenderingPage");
         
         // Update layout
         self.update_layout(self.width, self.height)?;
@@ -161,7 +184,7 @@ impl Page for NewWorldPage {
     }
     
     fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
-        self.logger.trace("Rendering NewWorldPage");
+        self.logger.trace("Rendering WorldRenderingPage");
         
         // Draw title bar
         self.draw_title_bar(ctx)?;
@@ -169,13 +192,13 @@ impl Page for NewWorldPage {
         // Draw main content
         self.draw_content(ctx)?;
         
-        self.logger.trace("NewWorldPage rendering complete");
+        self.logger.trace("WorldRenderingPage rendering complete");
         Ok(())
     }
     
     fn handle_event(&mut self, event: &Event) -> Result<Option<String>> {
         match event {
-            Event::Touch { x, y, action } => {
+            Event::Touch { x, y, action: _ } => {
                 // Check if the user clicked the back button
                 if self.button_area.contains(&Point::new(*x, *y)) {
                     self.logger.info("Back button clicked, navigating to Hello page");
@@ -208,12 +231,12 @@ impl Page for NewWorldPage {
     }
     
     fn on_activate(&mut self) -> Result<()> {
-        self.logger.info("NewWorldPage activated");
+        self.logger.info("WorldRenderingPage activated");
         Ok(())
     }
     
     fn on_deactivate(&mut self) -> Result<()> {
-        self.logger.info("NewWorldPage deactivated");
+        self.logger.info("WorldRenderingPage deactivated");
         Ok(())
     }
     

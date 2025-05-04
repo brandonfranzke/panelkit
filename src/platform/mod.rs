@@ -3,7 +3,6 @@
 //! This module provides platform-specific implementations for display, input, and timing.
 
 use anyhow::Result;
-use std::any::Any;
 
 // Include platform implementations
 pub mod graphics;
@@ -48,7 +47,7 @@ impl PlatformFactory {
         let default_height = 480;
         let app_title = "PanelKit";
         
-        // Use our new rendering abstraction-based driver
+        // Use our rendering abstraction-based driver
         match rendering_driver::RenderingPlatformDriver::new(app_title, default_width, default_height) {
             Ok(driver) => {
                 log::info!("Using rendering abstraction-based platform driver");
@@ -56,11 +55,11 @@ impl PlatformFactory {
             },
             Err(e) => {
                 log::warn!("Failed to initialize rendering platform driver: {:?}. Falling back to standard drivers.", e);
-                // Fall through to legacy drivers
+                // Fall through to standard drivers
             }
         }
         
-        // Legacy driver paths (fallback)
+        // Standard driver paths (fallback)
         #[cfg(feature = "host")]
         {
             // Default to SDL driver

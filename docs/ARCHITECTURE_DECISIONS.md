@@ -1,6 +1,6 @@
-# PanelKit Design Revisions and Implementation Decisions
+# PanelKit Architecture Decisions
 
-This document tracks significant changes to the design and key implementation decisions made during the development of PanelKit. It serves as a chronological record to understand how and why the design evolved.
+This document outlines the key architectural decisions that have shaped PanelKit's design. Understanding these decisions provides insight into the technical foundations of the project.
 
 ## Initial Architecture (2024-05-03)
 
