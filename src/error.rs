@@ -5,6 +5,9 @@
 use thiserror::Error;
 use std::fmt;
 
+// Re-export anyhow types for convenience
+pub use anyhow::{Context, Result as AnyhowResult};
+
 /// Main error type for PanelKit
 #[derive(Error, Debug)]
 pub enum Error {
@@ -38,6 +41,10 @@ pub enum Error {
         context: String,
         source: Box<dyn std::error::Error + Send + Sync>,
     },
+    
+    /// Wrap anyhow error
+    #[error("Error: {0}")]
+    Anyhow(#[from] anyhow::Error),
 }
 
 impl Error {

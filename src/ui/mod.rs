@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::any::Any;
 use anyhow::Context;
 use crate::error::{Result, UIError};
-use crate::platform::GraphicsContext;
+use crate::platform::{GraphicsContext, Renderable};
 use crate::logging;
 
 // Export UI components
@@ -15,6 +15,25 @@ pub mod components;
 // Export UI pages
 pub mod hello_page;
 pub mod simple_demo_page;
+
+// Transition-capable pages
+pub mod transition_page;
+pub mod hello_transition_page;
+pub mod world_transition_page;
+
+// New rendering abstraction-based pages
+pub mod new_hello_page;
+pub mod new_world_page;
+
+// LVGL-based pages (conditionally)
+#[cfg(feature = "use_lvgl")]
+pub mod lvgl_page;
+#[cfg(feature = "use_lvgl")]
+pub mod lvgl_pages;
+#[cfg(feature = "use_lvgl")]
+pub mod hello_lvgl_page;
+#[cfg(feature = "use_lvgl")]
+pub mod world_lvgl_page;
 
 /// Represents a UI page in the application
 pub trait Page {
@@ -71,17 +90,48 @@ impl UIManager {
     pub fn init(&mut self) -> Result<()> {
         self.logger.info("Initializing UI system");
         
-        // Register Hello page
-        self.register_page("hello", Box::new(hello_page::HelloPage::new()))
-            .context("Failed to register hello page")?;
+        // Register pages based on available features
+        #[cfg(feature = "use_lvgl")]
+        {
+            // Register Hello page with LVGL
+            self.register_page("hello", Box::new(lvgl_pages::HelloPage::new()))
+                .context("Failed to register hello page")?;
+            
+            // Register World page with LVGL
+            self.register_page("world", Box::new(lvgl_pages::WorldPage::new()))
+                .context("Failed to register world page")?;
+        }
         
-        // Register Demo page
-        self.register_page("demo", Box::new(simple_demo_page::SimpleDemoPage::new()))
-            .context("Failed to register demo page")?;
+        #[cfg(not(feature = "use_lvgl"))]
+        {
+            // Check for PANELKIT_USE_RENDERING env variable 
+            // to enable the rendering abstraction-based pages
+            if std::env::var("PANELKIT_USE_RENDERING").is_ok() {
+                self.logger.info("Using rendering abstraction-based pages");
+                
+                // Register Hello page with rendering abstraction
+                self.register_page("hello", Box::new(new_hello_page::NewHelloPage::new()))
+                    .context("Failed to register hello page using rendering abstraction")?;
+                
+                // Register World page with rendering abstraction  
+                self.register_page("world", Box::new(new_world_page::NewWorldPage::new()))
+                    .context("Failed to register world page using rendering abstraction")?;
+            } else {
+                self.logger.info("Using standard transition-based pages");
+                
+                // Register Hello page with transition capabilities
+                self.register_page("hello", Box::new(hello_transition_page::HelloTransitionPage::new()))
+                    .context("Failed to register hello page")?;
+                
+                // Register World page with transition capabilities
+                self.register_page("world", Box::new(world_transition_page::WorldTransitionPage::new()))
+                    .context("Failed to register world page")?;
+            }
+        }
         
-        // Start with the Demo page
-        self.navigate_to("demo")
-            .context("Failed to navigate to demo page")?;
+        // Start with the Hello page
+        self.navigate_to("hello")
+            .context("Failed to navigate to hello page")?;
         
         self.logger.info("UI system initialized successfully");
         Ok(())

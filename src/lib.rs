@@ -6,14 +6,15 @@ pub mod error;
 pub mod event;
 pub mod logging;
 pub mod platform;
+pub mod rendering;
 pub mod state;
 pub mod ui;
 
 // Re-export error types and Result for convenience
-pub use error::{Error, Result}; 
+pub use error::{Error, Result, AnyhowResult}; 
 
 // Continue to use anyhow for context in implementation
-use anyhow::Context;
+use error::Context;
 
 /// Application configuration
 pub struct AppConfig {

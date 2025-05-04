@@ -3,10 +3,11 @@
 //! This module provides SDL2 implementation for the PanelKit platform interface.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{Color, GraphicsContext, PlatformDriver, Point, Rectangle};
+use crate::platform::{GraphicsContext, PlatformDriver};
+use crate::platform::graphics::{Color, Point, Rectangle};
 
-use anyhow::Context;
-use crate::error::{PlatformError, Result};
+use crate::error::PlatformError;
+use anyhow::{Result, Context};
 use sdl2::event::Event as SdlEvent;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
@@ -32,9 +33,7 @@ impl SDLGraphicsContext {
 impl GraphicsContext for SDLGraphicsContext {
     fn clear(&mut self, color: Color) -> Result<()> {
         let mut canvas = self.canvas.lock()
-            .map_err(|e| PlatformError::GraphicsContext(
-                format!("Failed to lock SDL canvas mutex: {}", e)
-            ).into())?;
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
             
         canvas.set_draw_color(sdl2::pixels::Color::RGB(color.r, color.g, color.b));
         canvas.clear();
@@ -43,9 +42,7 @@ impl GraphicsContext for SDLGraphicsContext {
     
     fn set_draw_color(&mut self, color: Color) -> Result<()> {
         let mut canvas = self.canvas.lock()
-            .map_err(|e| PlatformError::GraphicsContext(
-                format!("Failed to lock SDL canvas mutex: {}", e)
-            ).into())?;
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
             
         canvas.set_draw_color(sdl2::pixels::Color::RGB(color.r, color.g, color.b));
         Ok(())
@@ -53,9 +50,7 @@ impl GraphicsContext for SDLGraphicsContext {
     
     fn fill_rect(&mut self, rect: Rectangle) -> Result<()> {
         let mut canvas = self.canvas.lock()
-            .map_err(|e| PlatformError::GraphicsContext(
-                format!("Failed to lock SDL canvas mutex: {}", e)
-            ).into())?;
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
             
         SDLDriver::convert_sdl_error(
             canvas.fill_rect(sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)),
@@ -67,9 +62,7 @@ impl GraphicsContext for SDLGraphicsContext {
     
     fn draw_rect(&mut self, rect: Rectangle) -> Result<()> {
         let mut canvas = self.canvas.lock()
-            .map_err(|e| PlatformError::GraphicsContext(
-                format!("Failed to lock SDL canvas mutex: {}", e)
-            ).into())?;
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
             
         SDLDriver::convert_sdl_error(
             canvas.draw_rect(sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)),
@@ -81,9 +74,7 @@ impl GraphicsContext for SDLGraphicsContext {
     
     fn draw_line(&mut self, start: Point, end: Point) -> Result<()> {
         let mut canvas = self.canvas.lock()
-            .map_err(|e| PlatformError::GraphicsContext(
-                format!("Failed to lock SDL canvas mutex: {}", e)
-            ).into())?;
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
             
         SDLDriver::convert_sdl_error(
             canvas.draw_line(
@@ -115,7 +106,7 @@ impl SDLDriver {
     /// Helper function to convert SDL errors to our error type
     fn convert_sdl_error<T, E: Display>(result: std::result::Result<T, E>, context: &str) -> Result<T> {
         result.map_err(|e| {
-            PlatformError::SDL(format!("{}: {}", context, e)).into()
+            anyhow::anyhow!("{}: {}", context, e)
         })
     }
     
@@ -216,6 +207,18 @@ impl PlatformDriver for SDLDriver {
                         payload: "".to_string() 
                     });
                 },
+                SdlEvent::KeyDown { keycode: Some(Keycode::Right), .. } => {
+                    events.push(Event::Custom { 
+                        event_type: "next_page".to_string(), 
+                        payload: "".to_string() 
+                    });
+                },
+                SdlEvent::KeyDown { keycode: Some(Keycode::Left), .. } => {
+                    events.push(Event::Custom { 
+                        event_type: "prev_page".to_string(), 
+                        payload: "".to_string() 
+                    });
+                },
                 SdlEvent::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
                     self.update_touch(x, y, true);
                     events.push(Event::Touch { 
@@ -259,9 +262,7 @@ impl PlatformDriver for SDLDriver {
         let canvas_result = self.canvas.lock();
         
         if let Err(e) = &canvas_result {
-            return Err(PlatformError::GraphicsContext(
-                format!("Failed to lock SDL canvas mutex during present: {}", e)
-            ).into());
+            return Err(anyhow::anyhow!("Failed to lock SDL canvas mutex during present: {}", e));
         }
         
         let mut canvas = canvas_result.unwrap();

@@ -23,12 +23,13 @@ PanelKit is designed as a self-contained appliance-like UI system for embedded d
 PanelKit is in active development with:
 
 - Core application architecture and runtime implemented
-- Unified platform driver interface with SDL2 and mock implementations
+- Unified platform driver interface with multiple implementations
+- Rendering abstraction layer with pluggable backends (SDL2, framebuffer)
 - UI manager with page navigation and safe component access
 - Event system with typed events and pub/sub messaging
 - State management framework with serialization support
-- Build system for both local development and target deployment
-- Proper error handling with context and recovery
+- Build system for both host development and embedded deployment
+- Comprehensive error handling with context and recovery
 
 ## Getting Started
 
@@ -50,10 +51,13 @@ Build and run the application on your development machine:
 
 ```bash
 # Build for local development
-make dev
+make host
 
 # Run the application
 make run
+
+# Run the application with rendering abstraction layer enabled
+./scripts/run_with_rendering.sh
 ```
 
 Deploy to a Raspberry Pi:
@@ -64,6 +68,9 @@ make target
 
 # Deploy to the target device
 make deploy TARGET_HOST=raspberrypi.local TARGET_USER=pi
+
+# Run on the target with rendering abstraction enabled
+ssh pi@raspberrypi.local "cd /home/pi/panelkit && PANELKIT_USE_RENDERING=1 RUST_LOG=debug ./panelkit"
 ```
 
 ### Architecture
@@ -82,8 +89,18 @@ PanelKit follows a layered architecture with clean separation of concerns:
 │ Event System  │     │Platform Driver │     │ State Manager │
 │ - Pub/sub     │◄───►│ - Display     │◄───►│ - Data store  │
 │ - Dispatching │     │ - Input       │     │ - Persistence │
-└───────────────┘     └───────────────┘     └───────────────┘
+└───────────────┘     └───────┬───────┘     └───────────────┘
+                              │
+                              ▼
+                     ┌───────────────────┐
+                     │Rendering Backend  │
+                     │ - SDL2 (Host)     │
+                     │ - Framebuffer     │
+                     │   (Embedded)      │
+                     └───────────────────┘
 ```
+
+The architecture includes a rendering abstraction layer that provides a clean interface for different rendering backends, allowing the same UI code to run on both host (SDL2) and embedded (framebuffer) targets.
 
 For more details, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
@@ -95,7 +112,7 @@ The project provides targets for both development and deployment:
 
 ```bash
 # Local development build
-make dev
+make host
 
 # Run the development build
 make run
@@ -165,6 +182,7 @@ panelkit/
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and components
+- [Rendering Architecture](docs/RENDERING_ARCHITECTURE.md) - Rendering abstraction design
 - [Build Guide](docs/BUILD.md) - Detailed build and deployment instructions
 - [API Reference](docs/API.md) - Developer interface documentation
 - [Next Steps](docs/NEXT_STEPS.md) - Development roadmap

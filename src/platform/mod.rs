@@ -9,9 +9,11 @@ use std::any::Any;
 pub mod graphics;
 pub mod mock;
 pub mod sdl_driver;
+pub mod rendering_driver;
 
-// Re-export graphics types for convenience
-pub use graphics::{Color, Point, Rectangle, GraphicsContext, Renderable};
+// Re-export graphics types for convenience and transitional compatibility
+pub use graphics::{GraphicsContext, Renderable};
+pub use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
 
 /// Unified platform driver interface that handles both display and input
 pub trait PlatformDriver {
@@ -40,14 +42,40 @@ pub struct PlatformFactory;
 impl PlatformFactory {
     /// Create a platform driver based on the current environment
     pub fn create() -> Result<Box<dyn PlatformDriver>> {
-        #[cfg(feature = "simulator")]
+        // Default dimensions - these should be overridden by application config
+        // or auto-detected when possible
+        let default_width = 800;
+        let default_height = 480;
+        let app_title = "PanelKit";
+        
+        // Use our new rendering abstraction-based driver
+        match rendering_driver::RenderingPlatformDriver::new(app_title, default_width, default_height) {
+            Ok(driver) => {
+                log::info!("Using rendering abstraction-based platform driver");
+                return Ok(Box::new(driver));
+            },
+            Err(e) => {
+                log::warn!("Failed to initialize rendering platform driver: {:?}. Falling back to standard drivers.", e);
+                // Fall through to legacy drivers
+            }
+        }
+        
+        // Legacy driver paths (fallback)
+        #[cfg(feature = "host")]
         {
-            let sdl_driver = sdl_driver::SDLDriver::new(800, 480, "PanelKit Simulator")?;
+            // Default to SDL driver
+            let sdl_driver = sdl_driver::SDLDriver::new(
+                default_width, 
+                default_height, 
+                app_title
+            )?;
             return Ok(Box::new(sdl_driver));
         }
         
-        #[cfg(not(feature = "simulator"))]
+        #[cfg(feature = "embedded")]
         {
+            // For now, use mock driver for embedded feature
+            // This will be replaced with a proper framebuffer driver
             let mock_driver = mock::MockDriver::new();
             return Ok(Box::new(mock_driver));
         }

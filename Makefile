@@ -19,7 +19,7 @@ DOCKER_RUN := docker run --rm -v $(SRC_DIR):/src -v $(CARGO_CACHE_VOLUME):/root/
 ARM_TARGET := armv7-unknown-linux-gnueabihf
 
 # Primary targets
-.PHONY: all help check-deps dev build-container target deploy clean
+.PHONY: all help check-deps host run build-container target deploy clean
 
 # Default target
 all: help
@@ -30,10 +30,10 @@ help:
 	@echo ""
 	@echo "Development targets:"
 	@echo "  make check-deps      - Check if required dependencies are installed"
-	@echo "  make dev             - Build for local macOS development"
-	@echo "  make run             - Run the macOS development build"
-	@echo "  make target          - Cross-compile for Raspberry Pi target"
-	@echo "  make deploy          - Deploy to Raspberry Pi target"
+	@echo "  make host            - Build for host development environment"
+	@echo "  make run             - Run the host development build"
+	@echo "  make target          - Cross-compile for embedded target (Raspberry Pi)"
+	@echo "  make deploy          - Deploy to embedded target device"
 	@echo "  make clean           - Clean build artifacts"
 	@echo ""
 	@echo "Deployment targets:"
@@ -61,25 +61,28 @@ build-container: check-deps
 	@docker build -t $(DOCKER_IMAGE) -f $(DOCKER_DOCKERFILE) .
 	@echo "✅ Docker container built successfully"
 
-# Build for local macOS development
-dev: check-deps
-	@echo "Building for macOS development..."
+# Build for host development environment
+host: check-deps
+	@echo "Building for host development environment..."
 	@mkdir -p $(BUILD_DIR)
-	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" LIBRARY_PATH="/opt/homebrew/lib" cargo build --features simulator
+	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
+		LIBRARY_PATH="/opt/homebrew/lib" \
+		cargo build --features host
 	@cp target/debug/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-macos
-	@echo "✅ macOS build complete: $(BUILD_DIR)/$(PROJECT_NAME)-macos"
+	@echo "✅ Host build complete: $(BUILD_DIR)/$(PROJECT_NAME)-macos"
 
-# Run the macOS development build
-run: dev
-	@echo "Running macOS development build..."
-	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos
+# Run the host development build
+run: host
+	@echo "Running host development build..."
+	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug PANELKIT_USE_NEW_RENDERING=1 $(BUILD_DIR)/$(PROJECT_NAME)-macos
 
-# Cross-compile for Raspberry Pi target
+# Cross-compile for embedded target
 target: build-container
-	@echo "Cross-compiling for Raspberry Pi target..."
+	@echo "Cross-compiling for embedded target..."
 	@mkdir -p $(BUILD_DIR)
-	@$(DOCKER_RUN) $(DOCKER_IMAGE) cargo build --target=$(ARM_TARGET) --features target --release
+	@$(DOCKER_RUN) $(DOCKER_IMAGE) \
+		bash -c "cargo build --target=$(ARM_TARGET) --features embedded --release"
 	@$(DOCKER_RUN) $(DOCKER_IMAGE) cp -r /src/target/$(ARM_TARGET)/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-arm
 	@echo "✅ Target build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
@@ -92,7 +95,7 @@ deploy: target
 	@scp $(BUILD_DIR)/$(PROJECT_NAME)-arm $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
 	@ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
 	@echo "✅ Deployed to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
-	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME)\""
+	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug PANELKIT_USE_NEW_RENDERING=1 ./$(PROJECT_NAME)\""
 
 # Create systemd service file for target
 create-service:

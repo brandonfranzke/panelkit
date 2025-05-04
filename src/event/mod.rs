@@ -16,6 +16,12 @@ pub enum Event {
         action: TouchAction,
     },
     
+    /// Key event with key name and press/release state
+    Key {
+        key: String,
+        pressed: bool,
+    },
+    
     /// Network status change
     NetworkStatus(bool),
     
@@ -38,7 +44,7 @@ pub enum Event {
 }
 
 /// Touch actions that can be performed
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TouchAction {
     Press,
     Release,
@@ -48,7 +54,7 @@ pub enum TouchAction {
 }
 
 /// Direction of a swipe gesture
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SwipeDirection {
     Left,
     Right,

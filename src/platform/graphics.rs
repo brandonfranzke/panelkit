@@ -62,7 +62,7 @@ impl Rectangle {
 ///
 /// This trait defines the core drawing operations that any
 /// graphics implementation must provide.
-pub trait GraphicsContext: Send {
+pub trait GraphicsContext {
     /// Clear the entire drawing surface with a color
     fn clear(&mut self, color: Color) -> Result<()>;
     
@@ -80,6 +80,16 @@ pub trait GraphicsContext: Send {
     
     /// Get the dimensions of the drawing surface
     fn dimensions(&self) -> (u32, u32);
+    
+    /// Get a reference to self as Any for downcasting
+    fn as_any(&self) -> &dyn std::any::Any {
+        self as &dyn std::any::Any
+    }
+    
+    /// Get a mutable reference to self as Any for downcasting
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self as &mut dyn std::any::Any
+    }
 }
 
 /// A rendering primitive that can be drawn to a graphics context

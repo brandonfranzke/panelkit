@@ -3,7 +3,8 @@
 //! This module provides mock implementations of platform-specific components for testing.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{Color, GraphicsContext, PlatformDriver, Point, Rectangle};
+use crate::platform::{self, GraphicsContext, PlatformDriver};
+use crate::platform::graphics::{Color, Point, Rectangle};
 use anyhow::Result;
 use std::time::{Duration, Instant};
 
