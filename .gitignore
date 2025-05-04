@@ -39,3 +39,6 @@ vendor/
 .env
 .env.local
 **/.claude/settings.local.json
+
+# Claude Code
+CLAUDE.md
