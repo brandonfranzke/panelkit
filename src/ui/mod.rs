@@ -19,7 +19,8 @@ pub trait Page {
     fn render(&self) -> Result<()>;
     
     /// Handle input events for this page
-    fn handle_event(&mut self, event: &crate::event::Event) -> Result<()>;
+    /// Returns a navigation event if the page wants to navigate
+    fn handle_event(&mut self, event: &crate::event::Event) -> Result<Option<String>>;
     
     /// Called when this page becomes active
     fn on_activate(&mut self) -> Result<()>;
@@ -123,8 +124,15 @@ impl UIManager {
     pub fn process_event(&mut self, event: &crate::event::Event) -> Result<()> {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {
-                page.handle_event(event)
+                // Handle the event and check for navigation requests
+                let navigation = page.handle_event(event)
                     .with_context(|| format!("Failed to process event in page '{}'", page_id))?;
+                
+                // If the page wants to navigate, do it
+                if let Some(target_page) = navigation {
+                    self.navigate_to(&target_page)
+                        .with_context(|| format!("Failed to navigate to page '{}'", target_page))?;
+                }
             }
         }
         Ok(())
@@ -149,16 +157,21 @@ impl UIManager {
         self.render_context = Some(RenderContext::SDL(canvas.clone()));
         
         // If the UI is already initialized, update existing pages
-        if let Some(page_id) = &self.current_page {
-            if page_id == "demo" {
-                if let Some(page) = self.pages.get_mut("demo") {
-                    if let Some(demo_page) = page.as_any_mut().downcast_mut::<simple_demo_page::SimpleDemoPage>() {
-                        demo_page.set_canvas(canvas);
-                        log::debug!("Updated canvas for demo page");
-                    } else {
-                        log::warn!("Failed to downcast 'demo' page to SimpleDemoPage");
-                    }
-                }
+        if let Some(page) = self.pages.get_mut("demo") {
+            if let Some(demo_page) = page.as_any_mut().downcast_mut::<simple_demo_page::SimpleDemoPage>() {
+                demo_page.set_canvas(canvas.clone());
+                log::debug!("Updated canvas for demo page");
+            } else {
+                log::warn!("Failed to downcast 'demo' page to SimpleDemoPage");
+            }
+        }
+        
+        if let Some(page) = self.pages.get_mut("hello") {
+            if let Some(hello_page) = page.as_any_mut().downcast_mut::<hello_page::HelloPage>() {
+                hello_page.set_canvas(canvas.clone());
+                log::debug!("Updated canvas for hello page");
+            } else {
+                log::warn!("Failed to downcast 'hello' page to HelloPage");
             }
         }
         

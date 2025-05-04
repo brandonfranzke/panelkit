@@ -14,7 +14,7 @@ ui:
   
 # Logging settings
 logging:
-  level: "info"
+  level: "debug"
   to_file: false
   
 # State persistence

@@ -25,6 +25,11 @@ pub enum Event {
         value: String,
     },
     
+    /// Navigation event to a specific page
+    Navigate {
+        page_id: String,
+    },
+    
     /// Custom event with a type and payload
     Custom {
         event_type: String,

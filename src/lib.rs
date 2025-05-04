@@ -101,12 +101,19 @@ impl Application {
             
             // Process events
             for event in events {
-                // Check for quit events
-                if let event::Event::Custom { event_type, .. } = &event {
-                    if event_type == "quit" {
+                // Check for system events
+                match &event {
+                    event::Event::Custom { event_type, .. } if event_type == "quit" => {
                         log::info!("Received quit event, exiting application");
                         self.running = false;
-                    }
+                    },
+                    event::Event::Navigate { page_id } => {
+                        log::info!("Received navigation event to page: {}", page_id);
+                        if let Err(e) = self.ui_manager.navigate_to(page_id) {
+                            log::error!("Failed to navigate to page '{}': {}", page_id, e);
+                        }
+                    },
+                    _ => {}
                 }
                 
                 log::debug!("Processing event: {:?}", event);

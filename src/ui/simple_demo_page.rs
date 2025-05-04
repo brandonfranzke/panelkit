@@ -73,15 +73,32 @@ impl Page for SimpleDemoPage {
             canvas.set_draw_color(Color::RGB(48, 169, 255));
             canvas.fill_rect(Rect::new(250, 400, 150, 20))
                 .map_err(|e| anyhow::anyhow!("Error drawing slider fill: {}", e))?;
+                
+            // Draw navigation arrows
+            canvas.set_draw_color(Color::RGB(200, 200, 200));
             
-            // Present the canvas
-            canvas.present();
+            // Left arrow (to Hello page)
+            let left_arrow_points = [
+                (100, 240),  // Point
+                (130, 210),  // Top
+                (130, 270)   // Bottom
+            ];
+            
+            for i in 0..left_arrow_points.len() {
+                let j = (i + 1) % left_arrow_points.len();
+                canvas.draw_line(
+                    sdl2::rect::Point::new(left_arrow_points[i].0, left_arrow_points[i].1),
+                    sdl2::rect::Point::new(left_arrow_points[j].0, left_arrow_points[j].1)
+                ).map_err(|e| anyhow::anyhow!("Error drawing arrow: {}", e))?;
+            }
+            
+            // Don't call present() here - the platform driver will do that
         }
         
         Ok(())
     }
     
-    fn handle_event(&mut self, event: &Event) -> Result<()> {
+    fn handle_event(&mut self, event: &Event) -> Result<Option<String>> {
         match event {
             Event::Touch { x, y, action } => {
                 log::info!("SimpleDemoPage received touch event: {:?} at ({}, {})", action, x, y);
@@ -91,11 +108,21 @@ impl Page for SimpleDemoPage {
                     self.counter += 1;
                     log::info!("Button clicked! Counter: {}", self.counter);
                 }
+                
+                // Check if left arrow was clicked (for navigation)
+                if *x >= 100 && *x <= 130 && *y >= 210 && *y <= 270 &&
+                   matches!(action, crate::event::TouchAction::Press) {
+                    log::info!("Left arrow clicked! Navigating to Hello page");
+                    
+                    // Return the page ID to navigate to
+                    return Ok(Some("hello".to_string()));
+                }
             }
             _ => {}
         }
         
-        Ok(())
+        // No navigation requested
+        Ok(None)
     }
     
     fn on_activate(&mut self) -> Result<()> {
