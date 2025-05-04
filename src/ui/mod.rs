@@ -21,9 +21,6 @@ pub mod simple_demo_page;
 // Core application pages
 pub mod hello_rendering_page;
 pub mod world_rendering_page;
-
-// Additional implementation options under src/deprecated/
-
 // Compatibility helper for working with both graphics and rendering types
 pub mod compat {
     use crate::platform::graphics;

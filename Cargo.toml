@@ -28,13 +28,8 @@ sdl2 = { version = "0.35", features = ["ttf"], optional = true }
 # For debug logging
 once_cell = "1.18"
 
-# LVGL UI Framework
-lvgl = { version = "0.6", default-features = false, optional = true }
-lvgl-sys = { version = "0.6", optional = true }
-embedded-graphics = { version = "0.6.2", optional = true }
-
-# Need to manually specify bindgen version to avoid compilation issues
-bindgen = { version = "0.63", optional = true }
+# Dependencies below this line are historical and can likely be removed in the future
+# when a thorough dependency audit is performed
 
 # Async helpers
 futures = "0.3"
@@ -43,16 +38,10 @@ futures = "0.3"
 # [dependencies.redb]
 # version = "1.0"
 # optional = true
-
-# Note: simple_ui binary has been removed as it was a PoC that is 
-# superseded by the main rendering abstraction
-
 [features]
 default = ["host"]
 host = ["sdl2"]
 embedded = []
-# LVGL integration has been deprecated in favor of the rendering abstraction
-# use_lvgl = ["lvgl", "lvgl-sys", "embedded-graphics"]
 
 [profile.release]
 opt-level = 3
