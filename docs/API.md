@@ -228,9 +228,9 @@ Configure PanelKit behavior with Cargo features:
 # Cargo.toml
 
 [features]
-default = ["simulator"]
-simulator = ["sdl2"]
-target = []
+default = ["host"]
+host = ["sdl2"]
+embedded = []
 ```
 
 These flags control which platform implementation is used at runtime.

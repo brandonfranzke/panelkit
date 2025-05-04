@@ -27,7 +27,7 @@ A simpler approach might be to use Docker for Mac with volume mounts to compile 
 ```bash
 # Build in Docker with volume mount to macOS file system
 docker run --rm -v $(pwd):/src -w /src rust:latest \
-    cargo build --features simulator
+    cargo build --features host
     
 # Then run the binary natively on macOS
 ./target/debug/panelkit
@@ -47,7 +47,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 brew install sdl2 sdl2_ttf sdl2_image
 
 # Build and run
-cargo build --features simulator
+cargo build --features host
 ./target/debug/panelkit
 ```
 
@@ -56,7 +56,7 @@ cargo build --features simulator
 For macOS development with the current constraints:
 
 1. Install Rust and SDL2 libraries directly on the macOS system.
-2. Use the standard Cargo build system with the simulator feature.
+2. Use the standard Cargo build system with the host feature.
 3. For production/release, consider setting up a proper CI/CD pipeline with macOS runners.
 
 ## Future Work

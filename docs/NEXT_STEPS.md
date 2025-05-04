@@ -7,7 +7,7 @@ This document outlines the future development roadmap for PanelKit.
 The current implementation provides:
 
 - Unified platform driver interface with trait-based abstraction
-- Working SDL2-based simulation environment for development
+- Working SDL2-based host environment for development
 - Safe type-based downcasting for platform-specific features
 - Robust error handling with proper context and recovery
 - Event-driven architecture with pub/sub messaging

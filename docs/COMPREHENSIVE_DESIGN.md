@@ -27,9 +27,9 @@ PanelKit is a compact, always-on graphical user interface application designed f
    - Well-defined interfaces between components
    - Maintainable and extensible codebase
 
-5. **Cross-development and simulation**
-   - Compile for ARM target (cross-compile)
-   - Native desktop version for simulation/testing
+5. **Cross-development**
+   - Compile for ARM embedded targets (cross-compile)
+   - Native desktop version for host development
    - Containerized builds for clean host system
 
 6. **Clean and reproducible build workflow**
@@ -236,8 +236,8 @@ panelkit/
 
 ### Feature Flags
 
-- `simulator`: Enable SDL2-based simulation on desktop
-- `target`: Enable optimizations and features for target hardware
+- `host`: Enable SDL2-based simulation on desktop
+- `embedded`: Enable optimizations and features for target hardware
 
 ## Roadmap and Future Considerations
 

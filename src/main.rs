@@ -111,11 +111,11 @@ fn main() -> anyhow::Result<()> {
     
     // Run application
     logger.info("Starting main application loop");
-    let result = app.run();
+    let result = app.run()?;
     
     // Clean up
     app.cleanup();
     logger.info("Application terminated");
     
-    result
+    Ok(result)
 }

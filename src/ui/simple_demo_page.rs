@@ -5,7 +5,7 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::platform::{Color, GraphicsContext, Point, Rectangle};
+use crate::platform::{Color, GraphicsContext, Point, Rectangle, Renderable};
 use crate::ui::components::{
     button::Button, 
     layout::{Container, TitleBar}, 
@@ -44,7 +44,7 @@ impl SimpleDemoPage {
                 Point::new(130, 210), // Top
                 Point::new(130, 270), // Bottom
             ],
-            logger: logging::get_logger("DemoPage"),
+            logger: logging::demo_logger(),
         }
     }
     

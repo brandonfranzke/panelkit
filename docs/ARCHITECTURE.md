@@ -48,7 +48,7 @@ Provides unified hardware abstraction:
 - **PlatformDriver**: Core unified interface for all platforms
 - **GraphicsContext**: Abstract graphics handling for different platforms
 - **Implementation variants**:
-  - SDLDriver: For development and simulation (current primary implementation)
+  - SDLDriver: For host development (current primary implementation)
   - MockDriver: For testing and headless operation
   - (Future) FramebufferDriver: For embedded targets (planned)
 

@@ -38,10 +38,10 @@ make check-deps
 Build the application for local development:
 
 ```bash
-make dev
+make host
 ```
 
-This builds the application with simulator features enabled directly on your machine.
+This builds the application with host features enabled directly on your machine.
 
 ### Running the Application
 
@@ -55,7 +55,7 @@ This starts the application with a graphical UI for testing.
 
 ### Cross-Compiling for Raspberry Pi
 
-Build for the Raspberry Pi target:
+Build for the Raspberry Pi embedded target:
 
 ```bash
 make target
@@ -146,8 +146,8 @@ make clean
 
 PanelKit uses feature flags to control compilation:
 
-- `simulator`: Enables SDL2-based simulation for desktop development
-- `target`: Enables optimizations for target hardware
+- `host`: Enables SDL2-based simulation for desktop development
+- `embedded`: Enables optimizations for target hardware
 
 ## Troubleshooting
 

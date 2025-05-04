@@ -5,7 +5,7 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::platform::{Color, GraphicsContext, Point, Rectangle};
+use crate::platform::{Color, GraphicsContext, Point, Rectangle, Renderable};
 use crate::ui::components::{button::Button, layout::TitleBar, text::Text, text::TextAlign, ColoredRectangle};
 use crate::error::Result;
 use std::any::Any;
@@ -33,7 +33,7 @@ impl HelloPage {
                 Point::new(670, 210), // Top
                 Point::new(670, 270), // Bottom
             ],
-            logger: logging::get_logger("HelloPage"),
+            logger: logging::hello_logger(),
         }
     }
 }

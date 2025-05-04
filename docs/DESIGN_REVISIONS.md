@@ -26,7 +26,7 @@ The initial architecture was established with these key components:
 ## LVGL Integration Attempt (2024-05-03)
 
 ### Decision
-Initially, we planned to use LVGL as the UI framework with SDL2 as the backend for simulator mode.
+Initially, we planned to use LVGL as the UI framework with SDL2 as the backend for host development mode.
 
 ### Implementation
 - Added LVGL dependencies to Cargo.toml

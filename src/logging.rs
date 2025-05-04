@@ -83,3 +83,13 @@ pub fn event_logger() -> &'static ComponentLogger {
     static LOGGER: OnceLock<ComponentLogger> = OnceLock::new();
     LOGGER.get_or_init(|| ComponentLogger::new("Event"))
 }
+
+pub fn hello_logger() -> &'static ComponentLogger {
+    static LOGGER: OnceLock<ComponentLogger> = OnceLock::new();
+    LOGGER.get_or_init(|| ComponentLogger::new("HelloPage"))
+}
+
+pub fn demo_logger() -> &'static ComponentLogger {
+    static LOGGER: OnceLock<ComponentLogger> = OnceLock::new();
+    LOGGER.get_or_init(|| ComponentLogger::new("DemoPage"))
+}
