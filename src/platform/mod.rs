@@ -47,19 +47,19 @@ impl PlatformFactory {
         let default_height = 480;
         let app_title = "PanelKit";
         
-        // Use our rendering abstraction-based driver
+        // Use rendering driver
         match rendering_driver::RenderingPlatformDriver::new(app_title, default_width, default_height) {
             Ok(driver) => {
-                log::info!("Using rendering abstraction-based platform driver");
+                log::info!("Initialized platform driver");
                 return Ok(Box::new(driver));
             },
             Err(e) => {
-                log::warn!("Failed to initialize rendering platform driver: {:?}. Falling back to standard drivers.", e);
+                log::warn!("Failed to initialize platform driver: {:?}. Falling back to alternative drivers.", e);
                 // Fall through to standard drivers
             }
         }
         
-        // Standard driver paths (fallback)
+        // Alternative driver paths
         #[cfg(feature = "host")]
         {
             // Default to SDL driver

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Instructions for running PanelKit on the embedded target with the rendering abstraction
+# Instructions for running PanelKit on the embedded target
 
 # The command to run on the target device:
 # RUST_LOG=debug ./panelkit
 
-echo "To run PanelKit on the embedded target with rendering abstraction enabled:"
+echo "To run PanelKit on the embedded target:"
 echo "1. Connect to your target device:"
 echo "   ssh pi@raspberrypi.local"
 echo "2. Navigate to the PanelKit directory:"

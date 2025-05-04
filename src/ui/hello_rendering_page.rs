@@ -1,6 +1,6 @@
-//! Hello page implementation using the rendering abstraction
+//! Hello page implementation
 //!
-//! This module provides a "Hello" page that uses the rendering abstraction layer.
+//! This module provides a "Hello" page for the application.
 
 use crate::event::Event;
 use crate::ui::Page;
@@ -11,7 +11,7 @@ use crate::rendering::RenderingBackend;
 use anyhow::Result; 
 use std::any::Any;
 
-/// Hello page using the rendering abstraction
+/// Hello page implementation
 pub struct HelloRenderingPage {
     width: u32,
     height: u32,

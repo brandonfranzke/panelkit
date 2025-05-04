@@ -1,8 +1,5 @@
 #!/bin/bash
-# Run PanelKit with the rendering abstraction
-
-# Note: PANELKIT_USE_RENDERING environment variable is no longer needed
-# as the rendering abstraction is now the only implementation
+# Run PanelKit in development mode
 
 # Run the application with debug logging
 if [ -f "build/panelkit-macos" ]; then

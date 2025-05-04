@@ -1,6 +1,6 @@
-//! World page implementation using the rendering abstraction
+//! World page implementation
 //!
-//! This module provides a "World" page that uses the rendering abstraction layer.
+//! This module provides a "World" page for the application.
 
 use crate::event::Event;
 use crate::ui::Page;
@@ -12,7 +12,7 @@ use crate::ui::compat;
 use anyhow::Result;
 use std::any::Any;
 
-/// World page using the rendering abstraction
+/// World page implementation
 pub struct WorldRenderingPage {
     width: u32,
     height: u32,

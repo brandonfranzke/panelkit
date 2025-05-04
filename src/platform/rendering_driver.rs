@@ -1,6 +1,6 @@
-//! Rendering-based platform driver
+//! Rendering platform driver
 //!
-//! This module implements the PlatformDriver trait using the rendering abstraction.
+//! This module implements the PlatformDriver trait using the rendering system.
 
 use anyhow::Result;
 use crate::platform::{PlatformDriver, GraphicsContext};
@@ -14,7 +14,7 @@ thread_local! {
     static CURRENT_COLOR: std::cell::RefCell<Color> = std::cell::RefCell::new(Color::black());
 }
 
-/// Platform driver implementation that uses the rendering abstraction
+/// Primary platform driver implementation
 pub struct RenderingPlatformDriver {
     rendering_backend: Box<dyn RenderingBackend>,
     width: u32,

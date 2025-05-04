@@ -16,16 +16,13 @@ pub mod components;
 pub mod hello_page;
 pub mod simple_demo_page;
 
-// Note: Transition-based pages have been removed as all environments
-// now use the rendering abstraction-based pages.
+// UI Pages
 
-// Rendering abstraction-based pages
+// Core application pages
 pub mod hello_rendering_page;
 pub mod world_rendering_page;
 
-// Note: LVGL-based pages have been moved to src/deprecated/lvgl/
-// They are no longer part of the active codebase as we've standardized
-// on the rendering abstraction.
+// Additional implementation options under src/deprecated/
 
 // Compatibility helper for working with both graphics and rendering types
 pub mod compat {
@@ -118,8 +115,8 @@ impl UIManager {
     pub fn init(&mut self) -> Result<()> {
         self.logger.info("Initializing UI system");
         
-        // Register pages with rendering abstraction
-        self.logger.info("Initializing rendering abstraction pages");
+        // Register UI pages
+        self.logger.info("Initializing application pages");
         
         // Register Hello page
         self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
