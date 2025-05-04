@@ -41,12 +41,17 @@ impl Page for SimpleDemoPage {
     }
     
     fn render(&self) -> Result<()> {
+        log::info!("SimpleDemoPage: Starting render");
         if let Some(canvas_arc) = &self.canvas {
+            log::info!("SimpleDemoPage: Canvas found, locking");
             let mut canvas = canvas_arc.lock().unwrap();
+            log::info!("SimpleDemoPage: Canvas locked successfully");
             
             // Clear the canvas with a blue background
+            log::info!("SimpleDemoPage: Setting blue background");
             canvas.set_draw_color(Color::RGB(100, 149, 237)); // Cornflower blue
             canvas.clear();
+            log::info!("SimpleDemoPage: Background cleared");
             
             // Draw title text area
             canvas.set_draw_color(Color::RGB(50, 50, 150));

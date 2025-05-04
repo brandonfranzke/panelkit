@@ -42,7 +42,7 @@ struct Args {
     dimensions: String,
 
     /// Enable fullscreen mode
-    #[arg(short, long, default_value_t = true)]
+    #[arg(short, long, default_value_t = false)]
     fullscreen: bool,
     
     /// Path to state database
@@ -91,6 +91,13 @@ fn main() -> anyhow::Result<()> {
     
     log::info!("Using dimensions: {}x{}", dimensions.0, dimensions.1);
     log::info!("Fullscreen mode: {}", args.fullscreen);
+    
+    // Check if simulator feature is enabled
+    #[cfg(feature = "simulator")]
+    log::info!("Build configuration: 'simulator' feature is ENABLED");
+    
+    #[cfg(not(feature = "simulator"))]
+    log::info!("Build configuration: 'simulator' feature is DISABLED");
     
     // Create application config
     let config = AppConfig {

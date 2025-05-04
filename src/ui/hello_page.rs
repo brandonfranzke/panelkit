@@ -40,12 +40,17 @@ impl Page for HelloPage {
     }
     
     fn render(&self) -> Result<()> {
+        log::info!("HelloPage: Starting render");
         if let Some(canvas_arc) = &self.canvas {
+            log::info!("HelloPage: Canvas found, locking");
             let mut canvas = canvas_arc.lock().unwrap();
+            log::info!("HelloPage: Canvas locked successfully");
             
             // Clear the canvas with a green background
+            log::info!("HelloPage: Setting green background");
             canvas.set_draw_color(Color::RGB(50, 200, 100));
             canvas.clear();
+            log::info!("HelloPage: Background cleared");
             
             // Draw title text area
             canvas.set_draw_color(Color::RGB(30, 120, 60));

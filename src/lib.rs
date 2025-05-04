@@ -64,27 +64,45 @@ impl Application {
     
     /// Initialize the application
     pub fn init(&mut self) -> Result<()> {
-        // Initialize platform driver
+        log::info!("Application: Beginning initialization...");
+        
+        // Step 1: Initialize platform driver
+        log::info!("Application: Initializing platform driver...");
         self.platform_driver.init(self.config.width, self.config.height)
             .context("Failed to initialize platform driver")?;
+        log::info!("Application: Platform driver initialized successfully");
         
-        // Get graphics context and set it for UI rendering
+        // Step 2: Get graphics context and set it for UI rendering
+        log::info!("Application: Getting graphics context...");
         if let Some(context) = self.platform_driver.graphics_context() {
-            // Check if we have an SDL graphics context and pass it to the UI
+            log::info!("Application: Graphics context available, checking type...");
+            
+            // Check if we have an SDL graphics context
             if let Some(sdl_context) = context.as_any().downcast_ref::<platform::sdl_driver::SDLGraphicsContext>() {
+                log::info!("Application: Found SDL graphics context, setting canvas...");
                 self.ui_manager.set_canvas(sdl_context.canvas())
                     .context("Failed to set SDL canvas for UI manager")?;
+                log::info!("Application: Canvas set successfully");
+            } else {
+                log::warn!("Application: Graphics context is not an SDL context");
             }
+        } else {
+            log::warn!("Application: No graphics context available");
         }
         
-        // Load state
+        // Step 3: Load state
+        log::info!("Application: Loading application state...");
         self.state_manager.load_all()
             .context("Failed to load application state")?;
+        log::info!("Application: State loaded successfully");
         
-        // Initialize UI
+        // Step 4: Initialize UI
+        log::info!("Application: Initializing UI system...");
         self.ui_manager.init()
             .context("Failed to initialize UI system")?;
+        log::info!("Application: UI system initialized successfully");
         
+        log::info!("Application: Initialization complete");
         Ok(())
     }
     
@@ -128,16 +146,12 @@ impl Application {
                 }
             }
             
-            // Render UI
-            if let Err(e) = self.ui_manager.render() {
-                log::error!("Error rendering UI: {:#}", e);
-                // Continue rendering despite errors
-            }
-            
-            // Present to display
-            if let Err(e) = self.platform_driver.present() {
-                log::error!("Error presenting to display: {:#}", e);
-                // Continue running despite display errors
+            // For now, only present the platform driver's content
+            // Skip UI rendering for simplicity
+            log::info!("Application: Starting platform present (basic mode)");
+            match self.platform_driver.present() {
+                Ok(_) => log::info!("Application: Platform presented successfully"),
+                Err(e) => log::error!("Error presenting to display: {:#}", e)
             }
             
             // Sleep to maintain reasonable framerate

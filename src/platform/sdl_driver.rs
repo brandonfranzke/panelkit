@@ -68,7 +68,7 @@ impl SDLDriver {
         // Use different SDL window settings for macOS vs other platforms
         #[cfg(target_os = "macos")]
         let window = video_subsystem
-            .window(title, width, height)
+            .window("PanelKit - SDL2 Window - macOS", width, height)
             .position_centered()
             .allow_highdpi() // Enable Retina display support
             .build()
@@ -126,19 +126,17 @@ impl SDLDriver {
 // Implement the unified PlatformDriver trait
 impl PlatformDriver for SDLDriver {
     fn init(&mut self, _width: u32, _height: u32) -> Result<()> {
-        // Initialize SDL
-        self.clear(0, 0, 0)
-            .context("Failed to clear SDL display during initialization")?;
+        // Initialize SDL - set a bright red clear color to verify it's working
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
         
-        // Present the canvas
-        {
-            let mut canvas = self.canvas.lock()
-                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-                
-            canvas.present();
-        }
+        // Set very bright red background for testing
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 0, 0));
+        canvas.clear();
+        canvas.present();
         
-        log::info!("SDL platform initialized with dimensions: {}x{}", self.width, self.height);
+        log::info!("SDL platform initialized with dimensions: {}x{} (RED BACKGROUND)", 
+                  self.width, self.height);
         Ok(())
     }
     
@@ -193,10 +191,19 @@ impl PlatformDriver for SDLDriver {
     }
     
     fn present(&mut self) -> Result<()> {
-        // Present the canvas
+        // Let's simplify for debugging
         let mut canvas = self.canvas.lock()
             .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex during present: {}", e))?;
-            
+        
+        // Set a simple red background
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 0, 0));
+        canvas.clear();
+        
+        // Add some visual elements
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(255, 255, 255));
+        canvas.fill_rect(sdl2::rect::Rect::new(300, 200, 200, 100))
+            .map_err(|e| anyhow::anyhow!("Failed to draw white box: {}", e))?;
+        
         canvas.present();
         Ok(())
     }

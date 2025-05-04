@@ -45,21 +45,28 @@ pub struct PlatformFactory;
 impl PlatformFactory {
     /// Create a platform driver based on the current environment
     pub fn create() -> Result<Box<dyn PlatformDriver>> {
+        log::info!("PlatformFactory: Creating platform driver...");
+        
         #[cfg(feature = "simulator")]
         {
+            log::info!("PlatformFactory: 'simulator' feature enabled, creating SDL driver");
             let sdl_driver = sdl_driver::SDLDriver::new(800, 480, "PanelKit Simulator")?;
+            log::info!("PlatformFactory: SDL driver created successfully");
             return Ok(Box::new(sdl_driver));
         }
         
         #[cfg(not(feature = "simulator"))]
         {
+            log::info!("PlatformFactory: 'simulator' feature disabled, creating mock driver");
             let mock_driver = mock::MockDriver::new();
+            log::info!("PlatformFactory: Mock driver created successfully");
             return Ok(Box::new(mock_driver));
         }
         
         // This should be unreachable due to the cfg blocks above
         #[allow(unreachable_code)]
         {
+            log::warn!("PlatformFactory: Reached unreachable code path - using mock driver as fallback");
             let mock_driver = mock::MockDriver::new();
             Ok(Box::new(mock_driver))
         }

@@ -62,24 +62,46 @@ impl UIManager {
     
     /// Initialize the UI system
     pub fn init(&mut self) -> Result<()> {
+        log::info!("UIManager: Beginning initialization...");
+        
         // Register Hello page
+        log::info!("UIManager: Registering 'hello' page...");
         self.register_page("hello", Box::new(hello_page::HelloPage::new()))
             .context("Failed to register hello page")?;
+        log::info!("UIManager: 'hello' page registered successfully");
+        
+        // Check render context status
+        log::info!("UIManager: Checking render context...");
+        if let Some(ctx) = &self.render_context {
+            match ctx {
+                RenderContext::SDL(_) => log::info!("UIManager: Found SDL render context"),
+                RenderContext::Mock => log::info!("UIManager: Found Mock render context"),
+            }
+        } else {
+            log::warn!("UIManager: No render context available!");
+        }
         
         // Register Demo page if using the SDL context
         if let Some(RenderContext::SDL(_)) = &self.render_context {
+            log::info!("UIManager: Registering 'demo' page...");
             let demo_page = simple_demo_page::SimpleDemoPage::new();
             self.register_page("demo", Box::new(demo_page))
                 .context("Failed to register demo page")?;
+            log::info!("UIManager: 'demo' page registered successfully");
                 
+            log::info!("UIManager: Navigating to 'demo' page...");
             self.navigate_to("demo")
                 .context("Failed to navigate to demo page")?;
+            log::info!("UIManager: Navigation to 'demo' page successful");
         } else {
             // Without SDL rendering, use the Hello page
+            log::info!("UIManager: No SDL context, navigating to 'hello' page...");
             self.navigate_to("hello")
                 .context("Failed to navigate to hello page")?;
+            log::info!("UIManager: Navigation to 'hello' page successful");
         }
         
+        log::info!("UIManager: Initialization complete");
         Ok(())
     }
     
@@ -140,12 +162,33 @@ impl UIManager {
     
     /// Render the current UI state
     pub fn render(&self) -> Result<()> {
-        // Call the current page's render method
-        if let Some(page_id) = &self.current_page {
-            if let Some(page) = self.pages.get(page_id) {
-                page.render()
-                    .with_context(|| format!("Failed to render page '{}'", page_id))?;
+        log::info!("UIManager: Starting render");
+        
+        // Check if we have a render context
+        match &self.render_context {
+            Some(ctx) => log::info!("UIManager: Render context found"),
+            None => {
+                log::error!("UIManager: No render context available - UI cannot render!");
+                return Ok(());
             }
+        }
+        
+        // Check if we have a current page
+        if let Some(page_id) = &self.current_page {
+            log::info!("UIManager: Current page is '{}'", page_id);
+            
+            if let Some(page) = self.pages.get(page_id) {
+                log::info!("UIManager: Found page '{}', rendering...", page_id);
+                
+                match page.render() {
+                    Ok(_) => log::info!("UIManager: Page '{}' rendered successfully", page_id),
+                    Err(e) => log::error!("UIManager: Failed to render page '{}': {}", page_id, e),
+                }
+            } else {
+                log::error!("UIManager: Current page '{}' not found in pages map!", page_id);
+            }
+        } else {
+            log::error!("UIManager: No current page set!");
         }
         
         Ok(())
@@ -153,6 +196,7 @@ impl UIManager {
     
     /// Set the SDL canvas for rendering (used with simulator)
     pub fn set_canvas(&mut self, canvas: std::sync::Arc<std::sync::Mutex<sdl2::render::Canvas<sdl2::video::Window>>>) -> Result<()> {
+        log::info!("UI Manager: Setting SDL canvas for rendering");
         // Store the render context
         self.render_context = Some(RenderContext::SDL(canvas.clone()));
         
