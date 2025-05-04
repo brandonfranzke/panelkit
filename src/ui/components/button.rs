@@ -2,7 +2,8 @@
 //!
 //! This module provides a simple button component.
 
-use crate::platform::{Color, GraphicsContext, Point, Rectangle, Renderable};
+use crate::platform::{GraphicsContext, Renderable};
+use crate::platform::graphics::{Color, Point, Rectangle};
 use crate::ui::components::{ColoredRectangle, UIComponent};
 use anyhow::Result;
 
@@ -102,7 +103,7 @@ impl Renderable for Button {
 }
 
 impl UIComponent for Button {
-    fn bounds(&self) -> Rectangle {
+    fn bounds(&self) -> crate::platform::graphics::Rectangle {
         self.bounds
     }
 }

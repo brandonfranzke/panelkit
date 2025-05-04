@@ -3,9 +3,9 @@
 //! This module implements the RenderingBackend trait using direct framebuffer 
 //! access for embedded targets. Currently this is a stub implementation.
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use crate::rendering::{RenderingBackend, Surface};
-use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
+use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle};
 use std::any::Any;
 
 /// Framebuffer implementation of the RenderingBackend trait
@@ -75,7 +75,7 @@ impl RenderingBackend for FramebufferBackend {
         Ok(())
     }
     
-    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+    fn draw_button(&mut self, rect: Rectangle, text: &str, _bg_color: Color, _text_color: Color, _border_color: Color) -> Result<()> {
         log::debug!("Draw button '{}' at {:?} (STUB IMPLEMENTATION)", text, rect);
         Ok(())
     }

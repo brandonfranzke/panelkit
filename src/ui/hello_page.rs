@@ -5,9 +5,10 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::platform::{Color, GraphicsContext, Point, Rectangle, Renderable};
-use crate::ui::components::{button::Button, layout::TitleBar, text::Text, text::TextAlign, ColoredRectangle};
-use crate::error::Result;
+use crate::platform::{GraphicsContext, Renderable};
+use crate::platform::graphics::{Color, Point, Rectangle};
+use crate::ui::components::{layout::TitleBar, text::Text, text::TextAlign, ColoredRectangle};
+use anyhow::Result;
 use std::any::Any;
 
 /// A simple Hello World page

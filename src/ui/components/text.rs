@@ -2,7 +2,8 @@
 //!
 //! This module provides a simple text rendering component using basic shapes.
 
-use crate::platform::{Color, GraphicsContext, Rectangle, Renderable};
+use crate::platform::{GraphicsContext, Renderable};
+use crate::platform::graphics::Color;
 use crate::ui::components::{ColoredRectangle, UIComponent};
 use anyhow::Result;
 
@@ -119,7 +120,7 @@ impl Renderable for Text {
 }
 
 impl UIComponent for Text {
-    fn bounds(&self) -> Rectangle {
+    fn bounds(&self) -> crate::platform::graphics::Rectangle {
         let text_width = self.calc_width();
         let text_height = self.calc_height();
         
@@ -130,7 +131,7 @@ impl UIComponent for Text {
             TextAlign::Right => self.x - text_width as i32,
         };
         
-        Rectangle::new(x, self.y, text_width, text_height)
+        crate::platform::graphics::Rectangle::new(x, self.y, text_width, text_height)
     }
 }
 

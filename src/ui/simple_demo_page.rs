@@ -5,16 +5,15 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::platform::{Color, GraphicsContext, Point, Rectangle, Renderable};
+use crate::platform::{GraphicsContext, Renderable};
+use crate::platform::graphics::{Color, Point, Rectangle};
 use crate::ui::components::{
-    button::Button, 
-    layout::{Container, TitleBar}, 
+    layout::TitleBar,
     text::Text, 
     text::TextAlign, 
-    ColoredRectangle, 
-    Line
+    ColoredRectangle
 };
-use crate::error::Result;
+use anyhow::Result;
 use std::any::Any;
 
 /// A demo page showcasing various UI components

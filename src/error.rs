@@ -3,7 +3,6 @@
 //! This module provides consistent error types and handling for the application.
 
 use thiserror::Error;
-use std::fmt;
 
 // Re-export anyhow types for convenience
 pub use anyhow::{Context, Result as AnyhowResult};

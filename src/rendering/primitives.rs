@@ -1,6 +1,11 @@
 //! Rendering primitives for PanelKit
 //!
 //! This module defines the basic types used for rendering operations.
+//! 
+//! It also provides conversions between these types and the graphics module types
+//! to ensure compatibility between the two systems.
+
+use crate::platform::graphics;
 
 /// RGB color representation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +39,21 @@ impl Color {
     pub fn ui_background() -> Self { Self::rgb(240, 240, 240) }
     pub fn ui_accent() -> Self { Self::rgb(0, 120, 215) }
     pub fn ui_text() -> Self { Self::rgb(10, 10, 10) }
+    
+    /// Convert from a graphics::Color
+    pub fn from_graphics(color: graphics::Color) -> Self {
+        Self {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+            a: 255,
+        }
+    }
+    
+    /// Convert to a graphics::Color
+    pub fn to_graphics(&self) -> graphics::Color {
+        graphics::Color::rgb(self.r, self.g, self.b)
+    }
 }
 
 /// 2D point representation
@@ -47,6 +67,19 @@ impl Point {
     /// Create a new point
     pub fn new(x: i32, y: i32) -> Self {
         Self { x, y }
+    }
+    
+    /// Convert from a graphics::Point
+    pub fn from_graphics(point: graphics::Point) -> Self {
+        Self {
+            x: point.x,
+            y: point.y,
+        }
+    }
+    
+    /// Convert to a graphics::Point
+    pub fn to_graphics(&self) -> graphics::Point {
+        graphics::Point::new(self.x, self.y)
     }
     
     /// Create a point at the origin (0, 0)
@@ -75,6 +108,21 @@ impl Rectangle {
     /// Create a new rectangle
     pub fn new(x: i32, y: i32, width: u32, height: u32) -> Self {
         Self { x, y, width, height }
+    }
+    
+    /// Convert from a graphics::Rectangle
+    pub fn from_graphics(rect: graphics::Rectangle) -> Self {
+        Self {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+        }
+    }
+    
+    /// Convert to a graphics::Rectangle
+    pub fn to_graphics(&self) -> graphics::Rectangle {
+        graphics::Rectangle::new(self.x, self.y, self.width, self.height)
     }
     
     /// Create a rectangle at the origin (0, 0)

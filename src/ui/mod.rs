@@ -16,13 +16,8 @@ pub mod components;
 pub mod hello_page;
 pub mod simple_demo_page;
 
-// Transition-capable pages 
-// Note: These pages are maintained as a fallback but are being deprecated
-// in favor of the rendering abstraction-based pages. All environments should
-// now be using PANELKIT_USE_RENDERING=1.
-pub mod transition_page;
-pub mod hello_transition_page;
-pub mod world_transition_page;
+// Note: Transition-based pages have been removed as all environments
+// now use the rendering abstraction-based pages.
 
 // Rendering abstraction-based pages
 pub mod hello_rendering_page;
@@ -123,34 +118,16 @@ impl UIManager {
     pub fn init(&mut self) -> Result<()> {
         self.logger.info("Initializing UI system");
         
-        // Register pages based on environment
-        // Note: LVGL integration has been deprecated in favor of the rendering abstraction
+        // Register pages with rendering abstraction
+        self.logger.info("Initializing rendering abstraction pages");
         
-        // Check for PANELKIT_USE_RENDERING env variable 
-        // to enable the rendering abstraction-based pages
-        if std::env::var("PANELKIT_USE_RENDERING").is_ok() {
-            self.logger.info("Using rendering abstraction-based pages");
-            
-            // Register Hello page with rendering abstraction
-            self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
-                .context("Failed to register hello page using rendering abstraction")?;
-            
-            // Register World page with rendering abstraction  
-            self.register_page("world", Box::new(world_rendering_page::WorldRenderingPage::new()))
-                .context("Failed to register world page using rendering abstraction")?;
-        } else {
-            self.logger.info("Using standard transition-based pages");
-            // NOTE: This code path is being maintained as a fallback but is considered deprecated.
-            // All environments should be using PANELKIT_USE_RENDERING=1.
-            
-            // Register Hello page with transition capabilities
-            self.register_page("hello", Box::new(hello_transition_page::HelloTransitionPage::new()))
-                .context("Failed to register hello page")?;
-            
-            // Register World page with transition capabilities
-            self.register_page("world", Box::new(world_transition_page::WorldTransitionPage::new()))
-                .context("Failed to register world page")?;
-        }
+        // Register Hello page
+        self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
+            .context("Failed to register hello page")?;
+        
+        // Register World page
+        self.register_page("world", Box::new(world_rendering_page::WorldRenderingPage::new()))
+            .context("Failed to register world page")?;
         
         // Start with the Hello page
         self.navigate_to("hello")

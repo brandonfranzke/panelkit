@@ -75,7 +75,7 @@ host: check-deps
 # Run the host development build
 run: host
 	@echo "Running host development build..."
-	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug PANELKIT_USE_RENDERING=1 $(BUILD_DIR)/$(PROJECT_NAME)-macos
+	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos
 
 # Cross-compile for embedded target
 target: build-container
@@ -95,7 +95,7 @@ deploy: target
 	@scp $(BUILD_DIR)/$(PROJECT_NAME)-arm $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
 	@ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
 	@echo "✅ Deployed to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
-	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug PANELKIT_USE_RENDERING=1 ./$(PROJECT_NAME)\""
+	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME)\""
 
 # Create systemd service file for target
 create-service:

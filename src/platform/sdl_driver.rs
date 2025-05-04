@@ -6,8 +6,7 @@ use crate::event::{Event, TouchAction};
 use crate::platform::{GraphicsContext, PlatformDriver};
 use crate::platform::graphics::{Color, Point, Rectangle};
 
-use crate::error::PlatformError;
-use anyhow::{Result, Context};
+use anyhow::Result;
 use sdl2::event::Event as SdlEvent;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
@@ -89,6 +88,14 @@ impl GraphicsContext for SDLGraphicsContext {
     
     fn dimensions(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 

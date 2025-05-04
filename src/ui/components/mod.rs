@@ -2,7 +2,8 @@
 //!
 //! This module provides reusable UI components for building pages.
 
-use crate::platform::{Color, GraphicsContext, Point, Rectangle, Renderable};
+use crate::platform::{GraphicsContext, Renderable};
+use crate::platform::graphics::Rectangle;
 use anyhow::Result;
 
 pub mod button;
@@ -12,10 +13,10 @@ pub mod layout;
 /// Represents a basic UI element that can be rendered to a graphics context
 pub trait UIComponent: Renderable {
     /// Get the bounding rectangle of this component
-    fn bounds(&self) -> Rectangle;
+    fn bounds(&self) -> crate::platform::graphics::Rectangle;
     
     /// Check if a point is inside this component
-    fn contains(&self, point: Point) -> bool {
+    fn contains(&self, point: crate::platform::graphics::Point) -> bool {
         let bounds = self.bounds();
         point.x >= bounds.x && 
         point.x < bounds.x + bounds.width as i32 &&
@@ -26,28 +27,28 @@ pub trait UIComponent: Renderable {
 
 /// A basic colored rectangle component
 pub struct ColoredRectangle {
-    bounds: Rectangle,
-    color: Color,
+    bounds: crate::platform::graphics::Rectangle,
+    color: crate::platform::graphics::Color,
     filled: bool,
 }
 
 impl ColoredRectangle {
     /// Create a new colored rectangle
-    pub fn new(x: i32, y: i32, width: u32, height: u32, color: Color, filled: bool) -> Self {
+    pub fn new(x: i32, y: i32, width: u32, height: u32, color: crate::platform::graphics::Color, filled: bool) -> Self {
         Self {
-            bounds: Rectangle::new(x, y, width, height),
+            bounds: crate::platform::graphics::Rectangle::new(x, y, width, height),
             color,
             filled,
         }
     }
     
     /// Create a filled rectangle
-    pub fn filled(x: i32, y: i32, width: u32, height: u32, color: Color) -> Self {
+    pub fn filled(x: i32, y: i32, width: u32, height: u32, color: crate::platform::graphics::Color) -> Self {
         Self::new(x, y, width, height, color, true)
     }
     
     /// Create an outlined rectangle
-    pub fn outlined(x: i32, y: i32, width: u32, height: u32, color: Color) -> Self {
+    pub fn outlined(x: i32, y: i32, width: u32, height: u32, color: crate::platform::graphics::Color) -> Self {
         Self::new(x, y, width, height, color, false)
     }
 }
@@ -67,24 +68,24 @@ impl Renderable for ColoredRectangle {
 }
 
 impl UIComponent for ColoredRectangle {
-    fn bounds(&self) -> Rectangle {
+    fn bounds(&self) -> crate::platform::graphics::Rectangle {
         self.bounds
     }
 }
 
 /// A line component 
 pub struct Line {
-    start: Point,
-    end: Point,
-    color: Color,
+    start: crate::platform::graphics::Point,
+    end: crate::platform::graphics::Point,
+    color: crate::platform::graphics::Color,
 }
 
 impl Line {
     /// Create a new line
-    pub fn new(start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: Color) -> Self {
+    pub fn new(start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: crate::platform::graphics::Color) -> Self {
         Self {
-            start: Point::new(start_x, start_y),
-            end: Point::new(end_x, end_y),
+            start: crate::platform::graphics::Point::new(start_x, start_y),
+            end: crate::platform::graphics::Point::new(end_x, end_y),
             color,
         }
     }

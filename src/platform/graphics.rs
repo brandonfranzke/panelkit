@@ -4,7 +4,7 @@
 //! the UI system from specific rendering implementations.
 
 use anyhow::Result;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 /// Represents a color in RGB format
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -26,6 +26,11 @@ impl Color {
     pub fn red() -> Self { Self::rgb(255, 0, 0) }
     pub fn green() -> Self { Self::rgb(0, 255, 0) }
     pub fn blue() -> Self { Self::rgb(0, 0, 255) }
+    
+    /// UI-specific colors
+    pub fn ui_background() -> Self { Self::rgb(240, 240, 240) }
+    pub fn ui_accent() -> Self { Self::rgb(0, 120, 215) }
+    pub fn ui_text() -> Self { Self::rgb(10, 10, 10) }
 }
 
 /// Represents a point in 2D space
@@ -56,6 +61,14 @@ impl Rectangle {
     pub fn new(x: i32, y: i32, width: u32, height: u32) -> Self {
         Self { x, y, width, height }
     }
+    
+    /// Check if a point is inside the rectangle
+    pub fn contains(&self, point: &Point) -> bool {
+        point.x >= self.x && 
+        point.x < self.x + self.width as i32 &&
+        point.y >= self.y && 
+        point.y < self.y + self.height as i32
+    }
 }
 
 /// Graphics context that provides drawing primitives
@@ -82,14 +95,10 @@ pub trait GraphicsContext {
     fn dimensions(&self) -> (u32, u32);
     
     /// Get a reference to self as Any for downcasting
-    fn as_any(&self) -> &dyn std::any::Any {
-        self as &dyn std::any::Any
-    }
+    fn as_any(&self) -> &dyn std::any::Any;
     
     /// Get a mutable reference to self as Any for downcasting
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self as &mut dyn std::any::Any
-    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
 /// A rendering primitive that can be drawn to a graphics context

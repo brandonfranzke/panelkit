@@ -8,9 +8,9 @@ use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle, FontSize,
 use sdl2::event::Event as SdlEvent;
 use sdl2::pixels::Color as SdlColor;
 use sdl2::rect::{Point as SdlPoint, Rect as SdlRect};
-use sdl2::render::{Canvas, Texture, TextureCreator};
+use sdl2::render::Canvas;
 use sdl2::ttf::{Font, Sdl2TtfContext};
-use sdl2::video::{Window, WindowContext};
+use sdl2::video::Window;
 use std::any::Any;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -30,10 +30,10 @@ impl SDLBackend {
     pub fn new(title: &str) -> Result<Self> {
         // Initialize SDL2
         let sdl_context = sdl2::init()
-            .context("Failed to initialize SDL2")?;
+            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2: {}", e))?;
             
         let video_subsystem = sdl_context.video()
-            .context("Failed to initialize SDL2 video subsystem")?;
+            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2 video subsystem: {}", e))?;
         
         // Create window
         let window = video_subsystem
@@ -41,7 +41,7 @@ impl SDLBackend {
             .position_centered()
             .allow_highdpi() // Enable Retina display support
             .build()
-            .context("Failed to create SDL2 window")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 window: {}", e))?;
             
         // Create canvas
         let canvas = window
@@ -49,11 +49,11 @@ impl SDLBackend {
             .accelerated()
             .present_vsync() // Use vsync for smoother rendering
             .build()
-            .context("Failed to create SDL2 canvas")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create SDL2 canvas: {}", e))?;
             
         // Initialize TTF
         let ttf_context = sdl2::ttf::init()
-            .context("Failed to initialize SDL2 TTF")?;
+            .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2 TTF: {}", e))?;
             
         // Find a usable font
         let font_path = find_system_font()?;
@@ -71,7 +71,7 @@ impl SDLBackend {
     /// Poll for events and convert them to PanelKit events
     pub fn poll_events(&self) -> Result<Vec<crate::event::Event>> {
         let mut event_pump = self.sdl_context.event_pump()
-            .context("Failed to get SDL event pump")?;
+            .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
             
         let mut events = Vec::new();
         
@@ -161,7 +161,7 @@ impl SDLBackend {
     /// Load a font with the requested size
     fn load_font(&self, size: u16) -> Result<Font> {
         self.ttf_context.load_font(&self.font_path, size)
-            .context(format!("Failed to load font {} at size {}", self.font_path, size))
+            .map_err(|e| anyhow::anyhow!("Failed to load font {} at size {}: {}", self.font_path, size, e))
     }
 }
 
@@ -218,7 +218,7 @@ impl RenderingBackend for SDLBackend {
             
         canvas.set_draw_color(self.to_sdl_color(color));
         canvas.fill_rect(self.to_sdl_rect(rect))
-            .context("Failed to fill rectangle")?;
+            .map_err(|e| anyhow::anyhow!("Failed to fill rectangle: {}", e))?;
             
         Ok(())
     }
@@ -229,7 +229,7 @@ impl RenderingBackend for SDLBackend {
             
         canvas.set_draw_color(self.to_sdl_color(color));
         canvas.draw_rect(self.to_sdl_rect(rect))
-            .context("Failed to draw rectangle")?;
+            .map_err(|e| anyhow::anyhow!("Failed to draw rectangle: {}", e))?;
             
         Ok(())
     }
@@ -240,7 +240,7 @@ impl RenderingBackend for SDLBackend {
             
         canvas.set_draw_color(self.to_sdl_color(color));
         canvas.draw_line(self.to_sdl_point(start), self.to_sdl_point(end))
-            .context("Failed to draw line")?;
+            .map_err(|e| anyhow::anyhow!("Failed to draw line: {}", e))?;
             
         Ok(())
     }
@@ -268,11 +268,11 @@ impl RenderingBackend for SDLBackend {
         // Render text to surface
         let surface = font.render(text)
             .blended(self.to_sdl_color(style.color))
-            .context("Failed to render text to surface")?;
+            .map_err(|e| anyhow::anyhow!("Failed to render text to surface: {}", e))?;
             
         // Create texture from surface
         let texture = texture_creator.create_texture_from_surface(&surface)
-            .context("Failed to create texture from text surface")?;
+            .map_err(|e| anyhow::anyhow!("Failed to create texture from text surface: {}", e))?;
             
         // Get text dimensions
         let text_width = surface.width();
@@ -292,7 +292,7 @@ impl RenderingBackend for SDLBackend {
         // Draw the text
         let mut canvas = canvas_lock;
         canvas.copy(&texture, None, Some(dest_rect))
-            .context("Failed to copy text texture to canvas")?;
+            .map_err(|e| anyhow::anyhow!("Failed to copy text texture to canvas: {}", e))?;
             
         Ok(())
     }
@@ -321,10 +321,9 @@ impl RenderingBackend for SDLBackend {
     }
     
     fn create_surface(&mut self, width: u32, height: u32) -> Result<Box<dyn Surface>> {
-        // This is a stub implementation that doesn't actually create a usable surface due to lifetime issues
-        // In a real implementation, we would refactor to handle the lifetime issues properly
-        // For now, return an error to indicate that this functionality is not available
-        anyhow::bail!("SDLBackend::create_surface is not implemented due to lifetime issues")
+        // Create a simplified surface implementation
+        let surface = SDLSurface::new(width, height);
+        Ok(Box::new(surface))
     }
     
     fn as_any(&self) -> &dyn Any {
@@ -337,57 +336,66 @@ impl RenderingBackend for SDLBackend {
 }
 
 /// SDL implementation of a rendering surface
+/// 
+/// This is a simplified implementation that avoids lifetime issues by
+/// using a vector buffer instead of an SDL texture directly.
 pub struct SDLSurface {
-    texture: Arc<Mutex<Texture<'static>>>,
-    texture_creator: TextureCreator<WindowContext>,
-    ttf_context: Sdl2TtfContext,
-    font_path: String,
     width: u32,
     height: u32,
+    color: Color,
+    buffer: Vec<u32>,  // RGBA buffer for pixel data
 }
 
 impl SDLSurface {
-    /// Convert a Color to an SDL Color
-    fn to_sdl_color(&self, color: Color) -> SdlColor {
-        SdlColor::RGBA(color.r, color.g, color.b, color.a)
+    /// Create a new SDL surface
+    fn new(width: u32, height: u32) -> Self {
+        // Create buffer initialized with transparent pixels
+        let buffer_size = (width * height) as usize;
+        let buffer = vec![0; buffer_size]; // 0x00000000 = transparent black
+        
+        Self {
+            width,
+            height,
+            color: Color::transparent(),
+            buffer,
+        }
     }
     
-    /// Convert a Point to an SDL Point
-    fn to_sdl_point(&self, point: Point) -> SdlPoint {
-        SdlPoint::new(point.x, point.y)
+    /// Get the internal buffer
+    pub fn buffer(&self) -> &[u32] {
+        &self.buffer
     }
     
-    /// Convert a Rectangle to an SDL Rect
-    fn to_sdl_rect(&self, rect: Rectangle) -> SdlRect {
-        SdlRect::new(rect.x, rect.y, rect.width, rect.height)
-    }
-    
-    /// Load a font with the requested size
-    fn load_font(&self, size: u16) -> Result<Font> {
-        self.ttf_context.load_font(&self.font_path, size)
-            .context(format!("Failed to load font {} at size {}", self.font_path, size))
+    /// Set a pixel in the buffer
+    fn set_pixel(&mut self, x: u32, y: u32, color: Color) {
+        if x >= self.width || y >= self.height {
+            return; // Out of bounds
+        }
+        
+        let offset = (y * self.width + x) as usize;
+        if offset < self.buffer.len() {
+            let pixel = ((color.a as u32) << 24) | 
+                        ((color.r as u32) << 16) | 
+                        ((color.g as u32) << 8) | 
+                        (color.b as u32);
+            self.buffer[offset] = pixel;
+        }
     }
 }
 
 impl Surface for SDLSurface {
     fn clear(&mut self, color: Color) -> Result<()> {
-        let mut texture = self.texture.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL texture mutex: {}", e))?;
-            
-        texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            // Fill buffer with color
-            let stride = pitch / 4; // 4 bytes per pixel (RGBA)
-            
-            for y in 0..self.height {
-                for x in 0..self.width {
-                    let offset = (y as usize * stride + x as usize) * 4;
-                    buffer[offset] = color.r;
-                    buffer[offset + 1] = color.g;
-                    buffer[offset + 2] = color.b;
-                    buffer[offset + 3] = color.a;
-                }
-            }
-        }).context("Failed to lock texture")?;
+        self.color = color;
+        
+        // Fill the buffer with the color
+        let pixel = ((color.a as u32) << 24) | 
+                    ((color.r as u32) << 16) | 
+                    ((color.g as u32) << 8) | 
+                    (color.b as u32);
+                    
+        for i in 0..self.buffer.len() {
+            self.buffer[i] = pixel;
+        }
         
         Ok(())
     }
@@ -397,95 +405,122 @@ impl Surface for SDLSurface {
     }
     
     fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        let mut texture = self.texture.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL texture mutex: {}", e))?;
-            
-        // Create a canvas for this texture
-        let mut canvas = self.texture_creator.create_renderer(texture.as_mut())?;
+        // Simple implementation by setting pixels directly
+        let x_start = rect.x.max(0) as u32;
+        let y_start = rect.y.max(0) as u32;
+        let x_end = (rect.x + rect.width as i32).min(self.width as i32) as u32;
+        let y_end = (rect.y + rect.height as i32).min(self.height as i32) as u32;
         
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.fill_rect(self.to_sdl_rect(rect))
-            .context("Failed to fill rectangle on surface")?;
-            
+        for y in y_start..y_end {
+            for x in x_start..x_end {
+                self.set_pixel(x, y, color);
+            }
+        }
+        
         Ok(())
     }
     
     fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        let mut texture = self.texture.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL texture mutex: {}", e))?;
+        // Draw horizontal lines (top and bottom)
+        for x in rect.x.max(0)..(rect.x + rect.width as i32).min(self.width as i32) {
+            if rect.y >= 0 && rect.y < self.height as i32 {
+                self.set_pixel(x as u32, rect.y as u32, color);
+            }
             
-        // Create a canvas for this texture
-        let mut canvas = self.texture_creator.create_renderer(texture.as_mut())?;
+            let bottom_y = rect.y + rect.height as i32 - 1;
+            if bottom_y >= 0 && bottom_y < self.height as i32 {
+                self.set_pixel(x as u32, bottom_y as u32, color);
+            }
+        }
         
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.draw_rect(self.to_sdl_rect(rect))
-            .context("Failed to draw rectangle on surface")?;
+        // Draw vertical lines (left and right)
+        for y in rect.y.max(0)..(rect.y + rect.height as i32).min(self.height as i32) {
+            if rect.x >= 0 && rect.x < self.width as i32 {
+                self.set_pixel(rect.x as u32, y as u32, color);
+            }
             
+            let right_x = rect.x + rect.width as i32 - 1;
+            if right_x >= 0 && right_x < self.width as i32 {
+                self.set_pixel(right_x as u32, y as u32, color);
+            }
+        }
+        
         Ok(())
     }
     
     fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
-        let mut texture = self.texture.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL texture mutex: {}", e))?;
-            
-        // Create a canvas for this texture
-        let mut canvas = self.texture_creator.create_renderer(texture.as_mut())?;
+        // Bresenham line algorithm
+        let mut x0 = start.x;
+        let mut y0 = start.y;
+        let x1 = end.x;
+        let y1 = end.y;
         
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.draw_line(self.to_sdl_point(start), self.to_sdl_point(end))
-            .context("Failed to draw line on surface")?;
+        let dx = (x1 - x0).abs();
+        let dy = -(y1 - y0).abs();
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+        
+        loop {
+            if x0 >= 0 && x0 < self.width as i32 && y0 >= 0 && y0 < self.height as i32 {
+                self.set_pixel(x0 as u32, y0 as u32, color);
+            }
             
+            if x0 == x1 && y0 == y1 {
+                break;
+            }
+            
+            let e2 = 2 * err;
+            if e2 >= dy {
+                if x0 == x1 {
+                    break;
+                }
+                err += dy;
+                x0 += sx;
+            }
+            
+            if e2 <= dx {
+                if y0 == y1 {
+                    break;
+                }
+                err += dx;
+                y0 += sy;
+            }
+        }
+        
         Ok(())
     }
     
     fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
-        let mut texture = self.texture.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL texture mutex: {}", e))?;
-            
-        // Create a canvas for this texture
-        let mut canvas = self.texture_creator.create_renderer(texture.as_mut())?;
+        // Simple implementation - just log that the function was called
+        // In a real implementation, we would need to render the text to the buffer
+        log::debug!("SDLSurface::draw_text called with text: {} at position: ({}, {})", 
+                  text, position.x, position.y);
+                  
+        // At least draw a rectangle to indicate where text would be
+        let width = text.len() as u32 * 8; // Rough estimate
+        let height = match style.font_size {
+            FontSize::Small => 12,
+            FontSize::Medium => 16,
+            FontSize::Large => 20,
+            FontSize::ExtraLarge => 24,
+            FontSize::Custom(size) => size as u32,
+        };
         
-        // Load font with appropriate style
-        let mut font = self.load_font(style.font_size.to_points())?;
+        let rect = Rectangle::new(
+            position.x - match style.alignment {
+                TextAlignment::Left => 0,
+                TextAlignment::Center => (width / 2) as i32,
+                TextAlignment::Right => width as i32,
+            },
+            position.y - (height / 2) as i32,
+            width,
+            height
+        );
         
-        // Set font style
-        let mut sdl_font_style = sdl2::ttf::FontStyle::NORMAL;
-        if style.bold {
-            sdl_font_style = sdl_font_style | sdl2::ttf::FontStyle::BOLD;
-        }
-        if style.italic {
-            sdl_font_style = sdl_font_style | sdl2::ttf::FontStyle::ITALIC;
-        }
-        font.set_style(sdl_font_style);
+        // Just draw a colored border to show where text would be
+        self.draw_rect(rect, style.color)?;
         
-        // Render text to surface
-        let surface = font.render(text)
-            .blended(self.to_sdl_color(style.color))
-            .context("Failed to render text to surface")?;
-            
-        // Create texture from surface
-        let text_texture = self.texture_creator.create_texture_from_surface(&surface)
-            .context("Failed to create texture from text surface")?;
-            
-        // Get text dimensions
-        let text_width = surface.width();
-        let text_height = surface.height();
-        
-        // Determine position based on alignment
-        let mut x = position.x;
-        match style.alignment {
-            TextAlignment::Left => {}
-            TextAlignment::Center => x -= (text_width / 2) as i32,
-            TextAlignment::Right => x -= text_width as i32,
-        }
-        
-        // Create destination rectangle
-        let dest_rect = SdlRect::new(x, position.y, text_width, text_height);
-        
-        // Draw the text
-        canvas.copy(&text_texture, None, Some(dest_rect))
-            .context("Failed to copy text texture to surface")?;
-            
         Ok(())
     }
     

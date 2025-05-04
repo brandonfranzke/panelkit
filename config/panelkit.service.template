@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=__USER__
 WorkingDirectory=__WORKDIR__
-ExecStart=/bin/bash -c "PANELKIT_USE_RENDERING=1 RUST_LOG=info __WORKDIR__/panelkit"
+ExecStart=/bin/bash -c "RUST_LOG=info __WORKDIR__/panelkit"
 Restart=on-failure
 StandardOutput=journal
 StandardError=journal

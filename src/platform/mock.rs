@@ -3,7 +3,7 @@
 //! This module provides mock implementations of platform-specific components for testing.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{self, GraphicsContext, PlatformDriver};
+use crate::platform::{GraphicsContext, PlatformDriver};
 use crate::platform::graphics::{Color, Point, Rectangle};
 use anyhow::Result;
 use std::time::{Duration, Instant};
@@ -59,6 +59,14 @@ impl GraphicsContext for MockGraphicsContext {
     
     fn dimensions(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
