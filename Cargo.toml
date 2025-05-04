@@ -44,15 +44,15 @@ futures = "0.3"
 # version = "1.0"
 # optional = true
 
-[[bin]]
-name = "simple_ui"
-path = "src/simple_ui/main.rs"
+# Note: simple_ui binary has been removed as it was a PoC that is 
+# superseded by the main rendering abstraction
 
 [features]
 default = ["host"]
 host = ["sdl2"]
 embedded = []
-use_lvgl = ["lvgl", "lvgl-sys", "embedded-graphics"]
+# LVGL integration has been deprecated in favor of the rendering abstraction
+# use_lvgl = ["lvgl", "lvgl-sys", "embedded-graphics"]
 
 [profile.release]
 opt-level = 3

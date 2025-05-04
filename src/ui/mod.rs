@@ -16,7 +16,10 @@ pub mod components;
 pub mod hello_page;
 pub mod simple_demo_page;
 
-// Transition-capable pages
+// Transition-capable pages 
+// Note: These pages are maintained as a fallback but are being deprecated
+// in favor of the rendering abstraction-based pages. All environments should
+// now be using PANELKIT_USE_RENDERING=1.
 pub mod transition_page;
 pub mod hello_transition_page;
 pub mod world_transition_page;
@@ -25,15 +28,9 @@ pub mod world_transition_page;
 pub mod hello_rendering_page;
 pub mod world_rendering_page;
 
-// LVGL-based pages (conditionally)
-#[cfg(feature = "use_lvgl")]
-pub mod lvgl_page;
-#[cfg(feature = "use_lvgl")]
-pub mod lvgl_pages;
-#[cfg(feature = "use_lvgl")]
-pub mod hello_lvgl_page;
-#[cfg(feature = "use_lvgl")]
-pub mod world_lvgl_page;
+// Note: LVGL-based pages have been moved to src/deprecated/lvgl/
+// They are no longer part of the active codebase as we've standardized
+// on the rendering abstraction.
 
 // Compatibility helper for working with both graphics and rendering types
 pub mod compat {
@@ -126,43 +123,33 @@ impl UIManager {
     pub fn init(&mut self) -> Result<()> {
         self.logger.info("Initializing UI system");
         
-        // Register pages based on available features
-        #[cfg(feature = "use_lvgl")]
-        {
-            // Register Hello page with LVGL
-            self.register_page("hello", Box::new(lvgl_pages::HelloPage::new()))
+        // Register pages based on environment
+        // Note: LVGL integration has been deprecated in favor of the rendering abstraction
+        
+        // Check for PANELKIT_USE_RENDERING env variable 
+        // to enable the rendering abstraction-based pages
+        if std::env::var("PANELKIT_USE_RENDERING").is_ok() {
+            self.logger.info("Using rendering abstraction-based pages");
+            
+            // Register Hello page with rendering abstraction
+            self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
+                .context("Failed to register hello page using rendering abstraction")?;
+            
+            // Register World page with rendering abstraction  
+            self.register_page("world", Box::new(world_rendering_page::WorldRenderingPage::new()))
+                .context("Failed to register world page using rendering abstraction")?;
+        } else {
+            self.logger.info("Using standard transition-based pages");
+            // NOTE: This code path is being maintained as a fallback but is considered deprecated.
+            // All environments should be using PANELKIT_USE_RENDERING=1.
+            
+            // Register Hello page with transition capabilities
+            self.register_page("hello", Box::new(hello_transition_page::HelloTransitionPage::new()))
                 .context("Failed to register hello page")?;
             
-            // Register World page with LVGL
-            self.register_page("world", Box::new(lvgl_pages::WorldPage::new()))
+            // Register World page with transition capabilities
+            self.register_page("world", Box::new(world_transition_page::WorldTransitionPage::new()))
                 .context("Failed to register world page")?;
-        }
-        
-        #[cfg(not(feature = "use_lvgl"))]
-        {
-            // Check for PANELKIT_USE_RENDERING env variable 
-            // to enable the rendering abstraction-based pages
-            if std::env::var("PANELKIT_USE_RENDERING").is_ok() {
-                self.logger.info("Using rendering abstraction-based pages");
-                
-                // Register Hello page with rendering abstraction
-                self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
-                    .context("Failed to register hello page using rendering abstraction")?;
-                
-                // Register World page with rendering abstraction  
-                self.register_page("world", Box::new(world_rendering_page::WorldRenderingPage::new()))
-                    .context("Failed to register world page using rendering abstraction")?;
-            } else {
-                self.logger.info("Using standard transition-based pages");
-                
-                // Register Hello page with transition capabilities
-                self.register_page("hello", Box::new(hello_transition_page::HelloTransitionPage::new()))
-                    .context("Failed to register hello page")?;
-                
-                // Register World page with transition capabilities
-                self.register_page("world", Box::new(world_transition_page::WorldTransitionPage::new()))
-                    .context("Failed to register world page")?;
-            }
         }
         
         // Start with the Hello page

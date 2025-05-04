@@ -1,6 +1,6 @@
 //! Rendering-based platform driver
 //!
-//! This module implements the PlatformDriver trait using the new rendering abstraction.
+//! This module implements the PlatformDriver trait using the rendering abstraction.
 
 use anyhow::Result;
 use crate::platform::{PlatformDriver, GraphicsContext};
@@ -8,6 +8,11 @@ use crate::platform::graphics::{Color, Point, Rectangle};
 use crate::rendering::RenderingBackend;
 use crate::event::Event;
 use std::time::Duration;
+
+// Store current color in thread_local storage for GraphicsContext compatibility
+thread_local! {
+    static CURRENT_COLOR: std::cell::RefCell<Color> = std::cell::RefCell::new(Color::black());
+}
 
 /// Platform driver implementation that uses the rendering abstraction
 pub struct RenderingPlatformDriver {
@@ -47,21 +52,12 @@ impl RenderingGraphicsContext {
 impl GraphicsContext for RenderingGraphicsContext {
     fn clear(&mut self, color: Color) -> Result<()> {
         // Convert from graphics::Color to rendering::primitives::Color
-        let primitives_color = crate::rendering::primitives::Color {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-            a: 255,
-        };
+        let primitives_color = crate::rendering::primitives::Color::from_graphics(color);
         self.backend.clear(primitives_color)
     }
     
     fn set_draw_color(&mut self, color: Color) -> Result<()> {
-        // Store current color in thread_local storage for compatibility with legacy GraphicsContext
-        thread_local! {
-            static CURRENT_COLOR: std::cell::RefCell<Color> = std::cell::RefCell::new(Color::black());
-        }
-        
+        // Store current color in thread_local storage
         CURRENT_COLOR.with(|c| {
             *c.borrow_mut() = color;
         });
@@ -71,87 +67,48 @@ impl GraphicsContext for RenderingGraphicsContext {
     
     fn fill_rect(&mut self, rect: Rectangle) -> Result<()> {
         // Get current color from thread_local storage
-        thread_local! {
-            static CURRENT_COLOR: std::cell::RefCell<Color> = std::cell::RefCell::new(Color::black());
-        }
-        
         let color = CURRENT_COLOR.with(|c| *c.borrow());
         
-        // Convert from graphics::Rectangle/Color to rendering::primitives::Rectangle/Color
-        let primitives_rect = crate::rendering::primitives::Rectangle {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-        };
-        
-        let primitives_color = crate::rendering::primitives::Color {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-            a: 255,
-        };
+        // Convert using our conversion methods
+        let primitives_rect = crate::rendering::primitives::Rectangle::from_graphics(rect);
+        let primitives_color = crate::rendering::primitives::Color::from_graphics(color);
         
         self.backend.fill_rect(primitives_rect, primitives_color)
     }
     
     fn draw_rect(&mut self, rect: Rectangle) -> Result<()> {
         // Get current color from thread_local storage
-        thread_local! {
-            static CURRENT_COLOR: std::cell::RefCell<Color> = std::cell::RefCell::new(Color::black());
-        }
-        
         let color = CURRENT_COLOR.with(|c| *c.borrow());
         
-        // Convert from graphics::Rectangle/Color to rendering::primitives::Rectangle/Color
-        let primitives_rect = crate::rendering::primitives::Rectangle {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-        };
-        
-        let primitives_color = crate::rendering::primitives::Color {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-            a: 255,
-        };
+        // Convert using our conversion methods
+        let primitives_rect = crate::rendering::primitives::Rectangle::from_graphics(rect);
+        let primitives_color = crate::rendering::primitives::Color::from_graphics(color);
         
         self.backend.draw_rect(primitives_rect, primitives_color)
     }
     
     fn draw_line(&mut self, start: Point, end: Point) -> Result<()> {
         // Get current color from thread_local storage
-        thread_local! {
-            static CURRENT_COLOR: std::cell::RefCell<Color> = std::cell::RefCell::new(Color::black());
-        }
-        
         let color = CURRENT_COLOR.with(|c| *c.borrow());
         
-        // Convert from graphics::Point/Color to rendering::primitives::Point/Color
-        let primitives_start = crate::rendering::primitives::Point {
-            x: start.x,
-            y: start.y,
-        };
-        
-        let primitives_end = crate::rendering::primitives::Point {
-            x: end.x,
-            y: end.y,
-        };
-        
-        let primitives_color = crate::rendering::primitives::Color {
-            r: color.r,
-            g: color.g,
-            b: color.b,
-            a: 255,
-        };
+        // Convert using our conversion methods
+        let primitives_start = crate::rendering::primitives::Point::from_graphics(start);
+        let primitives_end = crate::rendering::primitives::Point::from_graphics(end);
+        let primitives_color = crate::rendering::primitives::Color::from_graphics(color);
         
         self.backend.draw_line(primitives_start, primitives_end, primitives_color)
     }
     
     fn dimensions(&self) -> (u32, u32) {
         self.backend.dimensions()
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
@@ -163,7 +120,8 @@ impl PlatformDriver for RenderingPlatformDriver {
         self.rendering_backend.init(width, height)?;
         
         // Clear with gray background initially
-        self.rendering_backend.clear(crate::platform::Color::rgb(100, 100, 100))?;
+        let rendering_color = crate::rendering::primitives::Color::rgb(100, 100, 100);
+        self.rendering_backend.clear(rendering_color)?;
         self.rendering_backend.present()?;
         
         log::info!("Initialized rendering platform driver with dimensions {}x{}", width, height);
