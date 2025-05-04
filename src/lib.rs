@@ -6,6 +6,9 @@ pub mod event;
 pub mod platform;
 pub mod state;
 pub mod ui;
+
+use anyhow::{Result, Context};
+
 /// Application configuration
 pub struct AppConfig {
     /// Display width
@@ -30,106 +33,75 @@ pub struct Application {
     event_broker: event::EventBroker,
     state_manager: state::StateManager,
     ui_manager: ui::UIManager,
-    #[cfg(feature = "simulator")]
-    platform_driver: Box<dyn platform::Driver>,
-    #[cfg(not(feature = "simulator"))]
-    display_driver: Box<dyn platform::DisplayDriver>,
-    #[cfg(not(feature = "simulator"))]
-    input_driver: Box<dyn platform::InputDriver>,
+    platform_driver: Box<dyn platform::PlatformDriver>,
     running: bool,
 }
 
 impl Application {
     /// Create a new application with the given configuration
-    pub fn new(config: AppConfig) -> anyhow::Result<Self> {
+    pub fn new(config: AppConfig) -> Result<Self> {
         let event_broker = event::EventBroker::new();
         
         let state_manager = state::StateManager::new(
             config.state_path.as_deref()
-        )?;
+        ).context("Failed to initialize state manager")?;
         
         let ui_manager = ui::UIManager::new();
         
-        // Create platform drivers
-        #[cfg(feature = "simulator")]
-        {
-            let platform_driver = platform::PlatformFactory::create_driver()?;
-            
-            Ok(Self {
-                config,
-                event_broker,
-                state_manager,
-                ui_manager,
-                platform_driver,
-                running: false,
-            })
-        }
+        // Create platform driver using the factory
+        let platform_driver = platform::PlatformFactory::create()
+            .context("Failed to create platform driver")?;
         
-        #[cfg(not(feature = "simulator"))]
-        {
-            let display_driver = platform::PlatformFactory::create_display_driver();
-            let input_driver = platform::PlatformFactory::create_input_driver();
-            
-            Ok(Self {
-                config,
-                event_broker,
-                state_manager,
-                ui_manager,
-                display_driver,
-                input_driver,
-                running: false,
-            })
-        }
+        Ok(Self {
+            config,
+            event_broker,
+            state_manager,
+            ui_manager,
+            platform_driver,
+            running: false,
+        })
     }
     
     /// Initialize the application
-    pub fn init(&mut self) -> anyhow::Result<()> {
-        // Initialize platform components
-        #[cfg(feature = "simulator")]
-        {
-            self.platform_driver.init(self.config.width, self.config.height)?;
-            self.platform_driver.init_input()?;
-            
-            // Get the canvas from the SDL driver and pass it to the UI manager
-            if let Some(sdl_driver) = self.platform_driver.as_any().downcast_ref::<platform::sdl_driver::SDLDriver>() {
-                let canvas = sdl_driver.get_canvas();
-                self.ui_manager.set_canvas(canvas)?;
+    pub fn init(&mut self) -> Result<()> {
+        // Initialize platform driver
+        self.platform_driver.init(self.config.width, self.config.height)
+            .context("Failed to initialize platform driver")?;
+        
+        // Get graphics context and set it for UI rendering
+        if let Some(context) = self.platform_driver.graphics_context() {
+            // Check if we have an SDL graphics context and pass it to the UI
+            if let Some(sdl_context) = context.as_any().downcast_ref::<platform::sdl_driver::SDLGraphicsContext>() {
+                self.ui_manager.set_canvas(sdl_context.canvas())
+                    .context("Failed to set SDL canvas for UI manager")?;
             }
         }
         
-        #[cfg(not(feature = "simulator"))]
-        {
-            self.display_driver.init(self.config.width, self.config.height)?;
-            self.input_driver.init()?;
-        }
-        
         // Load state
-        self.state_manager.load_all()?;
+        self.state_manager.load_all()
+            .context("Failed to load application state")?;
         
         // Initialize UI
-        self.ui_manager.init()?;
+        self.ui_manager.init()
+            .context("Failed to initialize UI system")?;
         
         Ok(())
     }
     
     /// Run the application main loop
-    pub fn run(&mut self) -> anyhow::Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         self.running = true;
         
         log::info!("Starting main application loop");
         
         while self.running {
             // Poll for input events
-            #[cfg(feature = "simulator")]
-            let events = self.platform_driver.poll_events()?;
-            
-            #[cfg(not(feature = "simulator"))]
-            let events = self.input_driver.poll_events()?;
+            let events = self.platform_driver.poll_events()
+                .context("Failed to poll for input events")?;
             
             // Process events
             for event in events {
-                // Check for quit events in simulator mode
-                #[cfg(feature = "simulator")]
+                // Check for quit events
                 if let event::Event::Custom { event_type, .. } = &event {
                     if event_type == "quit" {
                         log::info!("Received quit event, exiting application");
@@ -139,21 +111,26 @@ impl Application {
                 
                 log::debug!("Processing event: {:?}", event);
                 self.event_broker.publish("input", event.clone());
-                self.ui_manager.process_event(&event)?;
+                
+                match self.ui_manager.process_event(&event) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        log::error!("Error processing event in UI: {:#}", e);
+                        // Continue running despite errors in event handling
+                    }
+                }
             }
             
             // Render UI
-            self.ui_manager.render()?;
-            
-            // Flush display
-            #[cfg(feature = "simulator")]
-            {
-                self.platform_driver.flush(&[])?;
+            if let Err(e) = self.ui_manager.render() {
+                log::error!("Error rendering UI: {:#}", e);
+                // Continue rendering despite errors
             }
             
-            #[cfg(not(feature = "simulator"))]
-            {
-                self.display_driver.flush(&[])?;
+            // Present to display
+            if let Err(e) = self.platform_driver.present() {
+                log::error!("Error presenting to display: {:#}", e);
+                // Continue running despite display errors
             }
             
             // Sleep to maintain reasonable framerate
@@ -170,15 +147,7 @@ impl Application {
     
     /// Clean up resources
     pub fn cleanup(&mut self) {
-        #[cfg(feature = "simulator")]
-        {
-            self.platform_driver.cleanup();
-        }
-        
-        #[cfg(not(feature = "simulator"))]
-        {
-            self.display_driver.cleanup();
-            self.input_driver.cleanup();
-        }
+        self.platform_driver.cleanup();
+        log::info!("Application resources cleaned up");
     }
 }

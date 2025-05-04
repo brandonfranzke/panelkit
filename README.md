@@ -1,79 +1,147 @@
 # PanelKit
 
-A compact, always-on graphical user interface for embedded Linux environments with touch input.
+A compact, always-on graphical user interface framework for embedded Linux environments with touch input.
 
 ## Overview
 
-PanelKit is designed as a self-contained appliance-like UI system for embedded devices, specifically targeting Raspberry Pi CM4/CM5 with capacitive touchscreens. It operates directly on the framebuffer without a window manager or desktop environment.
+PanelKit is designed as a self-contained appliance-like UI system for embedded devices, specifically targeting Raspberry Pi CM4/CM5 with capacitive touchscreens. It operates directly on the framebuffer without requiring a window manager or desktop environment.
 
 ### Features
 
-- Fullscreen operation without window manager
-- Paged UI model with touch navigation
-- Component-based architecture with trait abstractions
-- Event-driven design with pub/sub pattern
-- Platform abstraction for display and input handling
-- Direct SDL2 rendering for development/simulation
-- Cross-platform development for macOS and Linux
-- Cross-compilation for ARM target hardware
-- Clean, modular codebase written in Rust
+- **Cross-Platform Development**: Develop on macOS/Linux, deploy to embedded targets
+- **Unified Interface**: Single, coherent API across development and production
+- **Event-Driven Architecture**: Robust pub/sub system for component communication
+- **Page-Based Navigation**: Structured UI organization with navigation
+- **Platform Abstraction**: Clean separation between UI logic and hardware specifics
+- **Safe Typing**: Type-safe downcasting for platform-specific features
+- **Comprehensive Error Handling**: Context-rich errors with recovery paths
+- **Modular Design**: Clean component separation with well-defined interfaces
+- **Containerized Builds**: Docker-based cross-compilation for target hardware
 
 ### Current Status
 
-- Basic architecture and abstractions implemented
-- Working SDL2-based demo UI with touch event handling
-- Cross-platform support for macOS without X11/XQuartz
-- Trait-based platform abstraction with downcasting
-- Containerized build environment for consistent development
-- Cross-compilation for Raspberry Pi targets
-- Deployment scripts and systemd service integration
+PanelKit is in active development with:
 
-## Development
+- Core application architecture and runtime implemented
+- Unified platform driver interface with SDL2 and mock implementations
+- UI manager with page navigation and safe component access
+- Event system with typed events and pub/sub messaging
+- State management framework with serialization support
+- Build system for both local development and target deployment
+- Proper error handling with context and recovery
+
+## Getting Started
 
 ### Requirements
 
-- Docker (for containerized builds)
-- SDL2 libraries (installed automatically for macOS if needed)
-- SSH access to target device (for deployment)
+- Rust (install with `brew install rust`)
+- SDL2 libraries (install with `brew install sdl2`)
+- Docker (only for cross-compilation to Raspberry Pi)
 
-No local Rust toolchain or build tools are required as all compilation occurs within containers. The macOS build target will automatically install SDL2 dependencies via Homebrew if needed.
+Verify all dependencies are installed with:
+
+```bash
+make check-deps
+```
+
+### Quick Start
+
+Build and run the application on your development machine:
+
+```bash
+# Build for local development
+make dev
+
+# Run the application
+make run
+```
+
+Deploy to a Raspberry Pi:
+
+```bash
+# Cross-compile for ARM
+make target
+
+# Deploy to the target device
+make deploy TARGET_HOST=raspberrypi.local TARGET_USER=pi
+```
 
 ### Architecture
 
 PanelKit follows a layered architecture with clean separation of concerns:
 
-- **UI Components**: Pages and widgets for user interface elements
-- **Event System**: Pub/sub pattern for communication between components
-- **State Management**: Centralized state with optional persistence
-- **Platform Abstraction**: Cross-platform display and input drivers
-- **Build System**: Containerized cross-compilation for multiple targets
+```
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│  Application  │     │  UI Manager   │     │  Pages        │
+│  - Core loop  │◄───►│  - Navigation │◄───►│  - Content    │
+│  - Lifecycle  │     │  - Layout     │     │  - Interaction│
+└───────┬───────┘     └───────┬───────┘     └───────────────┘
+        │                     │
+        ▼                     ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ Event System  │     │Platform Driver │     │ State Manager │
+│ - Pub/sub     │◄───►│ - Display     │◄───►│ - Data store  │
+│ - Dispatching │     │ - Input       │     │ - Persistence │
+└───────────────┘     └───────────────┘     └───────────────┘
+```
+
+For more details, see the [Architecture Documentation](docs/ARCHITECTURE.md).
+
+## Development
 
 ### Building
 
-The project uses a containerized build environment:
+The project provides targets for both development and deployment:
 
 ```bash
-# Build the Docker containers
-make build-containers
+# Local development build
+make dev
 
-# Build for local testing in Docker
-make local
+# Run the development build
+make run
 
 # Cross-compile for Raspberry Pi
 make target
 
-# Build for macOS (compile in Docker, run natively on macOS)
-make build-mac
-make run-mac
-
-# Deploy to default target device
+# Deploy to target device
 make deploy
 
-# Transfer to custom target
-./scripts/transfer.sh --host=192.168.1.100 --user=pi
+# Set up as a systemd service
+make install-service
+
+# Clean build artifacts
+make clean
 ```
 
-See [Build Guide](docs/BUILD.md) for more detailed instructions.
+For detailed build options, run `make help`.
+
+### Creating Custom Pages
+
+Extend the `Page` trait to create custom UI screens:
+
+```rust
+use panelkit::ui::Page;
+
+struct MyCustomPage {
+    // Page state
+}
+
+impl Page for MyCustomPage {
+    fn init(&mut self) -> anyhow::Result<()> {
+        // Initialize page
+        Ok(())
+    }
+    
+    fn render(&self) -> anyhow::Result<()> {
+        // Render page content
+        Ok(())
+    }
+    
+    // ... other trait methods
+}
+```
+
+See the [API Documentation](docs/API.md) for more details.
 
 ### Project Structure
 
@@ -81,37 +149,25 @@ See [Build Guide](docs/BUILD.md) for more detailed instructions.
 panelkit/
 ├── src/              # Rust source code
 │   ├── ui/           # UI components and rendering
-│   │   ├── simple_demo_page.rs # SDL2-based demo page
-│   │   └── hello_page.rs  # Simple text-based page
-│   ├── state/        # State management
-│   ├── platform/     # Platform-specific code
-│   │   ├── sdl_driver.rs     # SDL2 driver implementation (macOS, Linux)
-│   │   └── mock.rs           # Mock drivers for testing
+│   ├── platform/     # Platform abstraction
 │   ├── event/        # Event system
-│   ├── lib.rs        # Library interface
-│   └── main.rs       # Application entry point
-├── config/           # Configuration templates
+│   ├── state/        # State management
+│   ├── lib.rs        # Core application code
+│   └── main.rs       # Entry point
 ├── docs/             # Documentation
-│   ├── ARCHITECTURE.md  # System architecture
-│   ├── BUILD.md      # Build instructions
-│   ├── DESIGN_REVISIONS.md # Evolution of design decisions
-│   ├── COMPREHENSIVE_DESIGN.md # Full design details
-│   └── NEXT_STEPS.md # Development roadmap
+├── config/           # Configuration templates
+├── containers/       # Docker build environment
 ├── scripts/          # Helper scripts
-│   └── transfer.sh   # Binary transfer utility
-├── containers/       # Dockerfiles for build environments
-├── Makefile          # Main build orchestration
-└── Cargo.toml        # Rust package definition
+├── Makefile          # Build orchestration
+└── Cargo.toml        # Rust dependencies
 ```
 
-### Documentation
+## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) - Core architecture and components
+- [Architecture](docs/ARCHITECTURE.md) - System design and components
 - [Build Guide](docs/BUILD.md) - Detailed build and deployment instructions
-- [Comprehensive Design](docs/COMPREHENSIVE_DESIGN.md) - Detailed design decisions
-- [Design Revisions](docs/DESIGN_REVISIONS.md) - Evolution of the design decisions
+- [API Reference](docs/API.md) - Developer interface documentation
 - [Next Steps](docs/NEXT_STEPS.md) - Development roadmap
-- [macOS Cross-Compilation](docs/MAC_CROSS_COMPILATION.md) - Details on macOS build challenges
 
 ## License
 

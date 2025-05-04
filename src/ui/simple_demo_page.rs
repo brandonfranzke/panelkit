@@ -6,6 +6,7 @@ use crate::event::Event;
 use crate::ui::Page;
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
+use std::any::Any;
 
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -105,5 +106,13 @@ impl Page for SimpleDemoPage {
     fn on_deactivate(&mut self) -> Result<()> {
         log::info!("SimpleDemoPage deactivated");
         Ok(())
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }

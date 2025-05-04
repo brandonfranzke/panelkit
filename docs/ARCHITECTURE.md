@@ -1,67 +1,106 @@
 # PanelKit Architecture
 
-This document describes the overall architecture of the PanelKit embedded UI system.
+This document describes the core architecture of the PanelKit embedded UI system.
 
-## Overview
+## System Overview
 
-PanelKit is designed as a self-contained UI application for embedded Linux environments with touch input. It follows a modular, event-driven architecture with clean separation of concerns.
+PanelKit is a lightweight UI application designed for embedded Linux devices with touchscreens. It operates directly on the framebuffer or through SDL2 for development, without requiring a window manager or desktop environment.
+
+The architecture follows a modular design with clean separation of concerns:
+
+```
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│  Application  │     │  UI Manager   │     │  Pages        │
+│  - Core loop  │◄───►│  - Navigation │◄───►│  - Content    │
+│  - Lifecycle  │     │  - Layout     │     │  - Interaction│
+└───────┬───────┘     └───────┬───────┘     └───────────────┘
+        │                     │
+        ▼                     ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│ Event System  │     │Platform Driver │     │ State Manager │
+│ - Pub/sub     │◄───►│ - Display     │◄───►│ - Data store  │
+│ - Dispatching │     │ - Input       │     │ - Persistence │
+└───────────────┘     └───────────────┘     └───────────────┘
+```
 
 ## Core Components
 
-### 1. UI System
+### 1. Application (lib.rs)
 
-The UI system is responsible for rendering components to the display and handling user interactions:
+The central component that orchestrates the entire system:
+- Initializes all subsystems 
+- Manages the application lifecycle
+- Runs the main event loop
+- Connects the UI with platform drivers
 
-- **UI Manager**: Controls page navigation and widget hierarchy
-- **Page**: Represents a full-screen interface with multiple widgets
-- **Widget**: Individual UI elements (buttons, labels, etc.)
+### 2. UI System (ui/mod.rs)
 
-### 2. Event System
+Manages the user interface:
+- **UIManager**: Handles page navigation and layout
+- **Page trait**: Interface for all UI pages
+- **RenderContext**: Handles rendering differences between platforms 
+- **Safely typed**: Uses downcasting for type-safe access to concrete types
 
-The event system handles communication between components using a pub/sub pattern:
+### 3. Platform Abstraction (platform/mod.rs)
 
-- **Event Broker**: Central message dispatcher
-- **Event Types**: Structured event data (Touch, State changes, etc.)
-- **Event Subscribers**: Components that listen for specific events
+Provides unified hardware abstraction:
+- **PlatformDriver**: Core unified interface for all platforms
+- **GraphicsContext**: Abstract graphics handling for different platforms
+- **Implementation variants**:
+  - SDLDriver: For development and simulation
+  - MockDriver: For testing and headless operation
+  - (Future) FramebufferDriver: For embedded targets
 
-### 3. State Management
+### 4. Event System (event/mod.rs)
 
-The state management system maintains application state and configuration:
+Implements a robust event system:
+- **Publisher/subscriber pattern** for loose coupling between components
+- **Typed events** for strong type safety
+- **Centralized dispatching** for system-wide event propagation
 
-- **State Manager**: Handles state persistence and retrieval
-- **State Types**: Different categories of state (UI, settings, etc.)
-- **Persistence**: Optional persistence of state to storage
+### 5. State Management (state/mod.rs)
 
-### 4. Platform Abstraction
+Manages application state:
+- **State persistence** between application restarts
+- **In-memory caching** for performance
+- **Serialization** of configuration and state data
 
-The platform layer abstracts hardware-specific details:
+## Key Design Patterns
 
-- **Display Driver**: Handles rendering to the screen
-- **Input Driver**: Processes touch and other input events 
-- **Combined Driver**: Unified interface for platform services
-- **Platform Factory**: Creates appropriate driver implementations for each platform
+1. **Trait-based abstraction**: All platform-specific code is accessed through traits
+2. **Type-safe downcasting**: Components use `as_any` pattern for safe concrete type access
+3. **Publisher/subscriber**: Events are dispatched through a central broker
+4. **Factory pattern**: PlatformFactory creates appropriate driver implementations
+5. **Error propagation**: Contextual error handling with anyhow
 
-## Data Flow
+## Cross-Platform Strategy
 
-1. Input events are captured by the platform layer
-2. Events are published to the event system
-3. UI components subscribe to relevant events
-4. State changes are persisted as needed
-5. UI is re-rendered based on state changes
+PanelKit achieves cross-platform compatibility through multiple mechanisms:
 
-## Build System
+1. **Runtime polymorphism**: Platform implementations are selected at runtime
+2. **Feature-aware behavior**: UI components adapt to available platform capabilities
+3. **GraphicsContext abstraction**: Rendering adapts to underlying graphics system
+4. **Common event model**: Input from different sources maps to a unified event type
 
-The build system supports cross-platform development and cross-compilation:
+## Error Handling
 
-- **Containerized Builds**: All builds occur in Docker containers
-- **Makefile**: Central orchestration for all build workflows
-- **Feature Flags**: Conditional compilation for simulator vs. target
-- **Cross-Platform Support**: Building for macOS, Linux, and ARM targets
+The application uses a comprehensive error handling strategy:
+- **Contextual errors**: Each error includes its source context for easier debugging
+- **Graceful degradation**: Main loop continues despite non-critical errors
+- **Proper logging**: Errors are logged with appropriate severity levels
+- **Recovery paths**: Components can recover from recoverable errors
 
-## Deployment
+## Thread Safety
 
-The application is designed to run automatically on boot:
+PanelKit follows a primarily single-threaded design for simplicity and safety:
+- **Main UI thread**: Handles rendering and input processing
+- **Thread-safe components**: Core components use Arc/Mutex where needed
+- **Event-based communication**: Avoids complex thread synchronization
 
-- **Systemd Service**: Auto-starts the application
-- **Fullscreen Mode**: Runs without a window manager
-- **Error Handling**: Graceful recovery and logging
+## Future Extensibility
+
+The architecture is designed to be extended with:
+- New page types through the Page trait
+- New platform implementations via the PlatformDriver trait
+- Advanced input methods (gestures, multi-touch) through the event system
+- Additional storage backends through the state manager

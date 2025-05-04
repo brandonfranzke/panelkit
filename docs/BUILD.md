@@ -1,121 +1,89 @@
 # PanelKit Build Guide
 
-This document explains how to build, run, and deploy the PanelKit application.
+This document explains how to build, run, and deploy the PanelKit embedded UI system.
 
 ## Prerequisites
 
-- Docker (for containerized builds)
+- Rust (install with `brew install rust` on macOS or use rustup.rs)
+- SDL2 libraries (install with `brew install sdl2` on macOS)
+- Docker (only needed for cross-compilation to Raspberry Pi)
 - Make
-- SSH client (for deployment)
 
-## Build Environments
+## Build Approach
 
-PanelKit uses Docker containers for all builds to ensure consistency and avoid local toolchain dependencies:
+PanelKit uses a hybrid build approach:
 
-1. **Native Build Container (`Dockerfile.native`)**
-   - For building and running the simulator on Linux
-   - Contains Rust, SDL2, and other required libraries
-   - Used for local development and testing
+1. **Local Development Builds**
+   - Direct native compilation using local Rust toolchain
+   - Fast iteration, simple debugging, no containerization overhead
+   - Uses SDL2 for graphics rendering and input simulation
 
-2. **Cross-Compilation Container (`Dockerfile.cross`)**
-   - For cross-compiling to ARM targets (Raspberry Pi)
-   - Contains ARM toolchain and required libraries
-   - Used for building binaries for target deployment
+2. **Target Cross-Compilation**
+   - Uses Docker container for consistent cross-compilation environment
+   - Produces ARM binaries for deployment to Raspberry Pi
+   - Clean isolation of build dependencies
 
-## Common Build Commands
+## Development Workflow
 
-### Setting Up
+### Checking Dependencies
 
-Before building for the first time, create the Docker containers:
-
-```bash
-make build-containers
-```
-
-This creates the Docker images needed for building the application.
-
-### Development Builds
-
-You have several options for building and running the application for development:
-
-#### Local Docker Build
-
-To build for local development in Docker:
+Verify that all required dependencies are installed:
 
 ```bash
-make local
+make check-deps
 ```
 
-This builds the application with simulator features enabled inside the Docker container.
+### Building for Development
 
-#### macOS Native Build
-
-To build for macOS (compiled in Docker, runs natively on macOS):
+Build the application for local development:
 
 ```bash
-make build-mac    # Build the macOS version
-make run-mac      # Run the macOS version
+make dev
 ```
 
-This approach:
-- Builds in Docker containers but produces a macOS-compatible binary
-- Requires SDL2 libraries installed via Homebrew 
-- Runs natively on macOS without requiring X11/XQuartz
-- Provides full UI functionality with SDL2 rendering
+This builds the application with simulator features enabled directly on your machine.
 
-#### Target Build (For Actual Deployment)
+### Running the Application
 
-For deploying to the target hardware:
+Run the development build:
 
 ```bash
-make target       # Cross-compile for ARM
-make deploy       # Deploy to default target device
+make run
 ```
 
-This builds and deploys the full application to the Raspberry Pi target device.
+This starts the application with a graphical UI for testing.
 
-### Cross-Compiling for Target
+### Cross-Compiling for Raspberry Pi
 
-To build for the Raspberry Pi target:
+Build for the Raspberry Pi target:
 
 ```bash
 make target
 ```
 
-This cross-compiles the application for ARM architecture and places the binary in the `build/` directory.
+This builds the Docker container (if needed) and cross-compiles the application for ARM architecture. The binary is placed in the `build/` directory.
 
 ## Deployment
 
-### Deploying to Default Target
+### Deploying to Target Device
 
-To deploy to the default target device (defined by TARGET_HOST, TARGET_USER, and TARGET_DIR variables):
+Deploy to the target Raspberry Pi:
 
 ```bash
 make deploy
 ```
 
-This builds and copies the binary to the target device using SSH.
+This uses the default settings for target hostname (`raspberrypi.local`), username (`pi`), and directory (`/home/pi/panelkit`).
 
-### Deploying to Custom Target
-
-For more flexibility in deployment, use the transfer script:
+You can customize these settings:
 
 ```bash
-# Build for target first
-make target
-
-# Transfer to a specific device
-./scripts/transfer.sh --host=192.168.1.100 --user=pi --dir=/home/pi/apps
+make deploy TARGET_HOST=mypi.local TARGET_USER=admin TARGET_DIR=/opt/panelkit
 ```
 
-Options:
-- `--host` - Hostname or IP address of the target device
-- `--user` - Username on the target device
-- `--dir` - Directory on the target device to install to
+### Setting Up Auto-Start Service
 
-### Creating Service for Auto-Start
-
-To create a systemd service for auto-starting on boot:
+Create a systemd service for auto-starting on boot:
 
 ```bash
 make create-service
@@ -124,87 +92,94 @@ make install-service
 
 This creates a systemd service file and installs it on the target device.
 
+## Project Structure
+
+```
+panelkit/
+├── src/                # Rust source code
+│   ├── ui/             # UI components and rendering
+│   │   ├── mod.rs      # UI manager and Page trait
+│   │   └── *_page.rs   # Page implementations
+│   ├── platform/       # Platform abstraction
+│   │   ├── mod.rs      # Driver interfaces
+│   │   ├── sdl_driver.rs # SDL2 implementation
+│   │   └── mock.rs     # Mock implementation
+│   ├── event/          # Event system
+│   ├── state/          # State management
+│   ├── lib.rs          # Application implementation
+│   └── main.rs         # Entry point
+├── docs/               # Documentation
+├── config/             # Configuration files
+├── containers/         # Docker build environments
+├── scripts/            # Helper scripts
+├── Makefile            # Build orchestration
+└── Cargo.toml          # Rust dependencies
+```
+
+## Advanced Usage
+
+### Custom Dimensions
+
+You can specify custom screen dimensions:
+
+```bash
+./build/panelkit-macos --dimensions 640x480
+```
+
+### Debug Logging
+
+Enable detailed logging with:
+
+```bash
+RUST_LOG=debug ./build/panelkit-macos
+```
+
+### Clean Build
+
+Remove all build artifacts:
+
+```bash
+make clean
+```
+
 ## Feature Flags
 
 PanelKit uses feature flags to control compilation:
 
-- `simulator` - Enables SDL2-based simulation for desktop development
-- `target` - Enables optimizations and features for target hardware
-
-## Build Directory Structure
-
-The build system creates the following structure:
-
-```
-build/
-├── panelkit        # Native Linux binary (for simulation)
-├── panelkit-mac    # macOS-compatible binary
-├── panelkit-arm    # ARM binary (for Raspberry Pi)
-└── panelkit.service # Generated systemd service file
-```
+- `simulator`: Enables SDL2-based simulation for desktop development
+- `target`: Enables optimizations for target hardware
 
 ## Troubleshooting
 
-### macOS Build Issues
+### SDL2 Library Issues
 
-If you have problems with the macOS build:
+If you encounter SDL2 library loading errors:
 
-1. Check that SDL2 libraries are installed:
+1. Verify SDL2 is properly installed:
    ```bash
-   brew install sdl2 sdl2_ttf sdl2_image
+   brew list sdl2
    ```
 
-2. Make sure the binary has execute permissions:
+2. Check DYLD paths with:
    ```bash
-   chmod +x build/panelkit-mac
+   DYLD_PRINT_LIBRARIES=1 ./build/panelkit-macos
    ```
-
-3. Check for these specific errors:
-   - `dyld: Library not loaded`: Missing SDL2 libraries
-   - `permission denied`: The binary doesn't have execute permissions
 
 ### Cross-Compilation Issues
 
-If cross-compilation fails:
+Common cross-compilation problems:
 
-1. Ensure the Docker containers were built correctly
-2. Check that the ARM toolchain is properly installed in the Docker container
-3. Verify that any libraries used have ARM versions available
+1. **Missing Docker**: Ensure Docker is running
+2. **ARM Toolchain**: The Docker container should include all needed tools
+3. **Disk Space**: Docker builds require sufficient disk space
 
 ### Deployment Issues
 
 If deployment fails:
 
-1. Ensure SSH access to the target device works
-2. Check that the user has write permissions to the target directory
-3. Verify that the ARM binary was built successfully
-4. Check the SSH keys and authentication method
-
-## Build Configuration
-
-You can customize the build by setting environment variables:
-
-- `TARGET_HOST` - Hostname or IP address of target device (default: raspberrypi.local)
-- `TARGET_USER` - Username on target device (default: pi)
-- `TARGET_DIR` - Directory on target device (default: /home/$TARGET_USER/panelkit)
-
-Example:
-
-```bash
-TARGET_HOST=mypi.local TARGET_USER=admin make deploy
-```
-
-## Architecture-Specific Notes
-
-### Development Machine (x86_64/ARM64)
-
-- Builds occur in Docker containers
-- macOS builds with SDL2 for native execution
-- No X11/XQuartz dependencies required
-
-### Target Device (ARM)
-
-- Binary is cross-compiled for ARM architecture
-- Requires framebuffer driver on target
-- Requires touch input driver on target
-- Autostart through systemd
+1. Verify SSH connectivity:
+   ```bash
+   ssh [TARGET_USER]@[TARGET_HOST]
+   ```
+2. Check file permissions on target device
+3. Verify network connectivity and firewall settings

@@ -1,129 +1,67 @@
 //! SDL2-based display and input driver
 //!
-//! This module provides SDL2 implementations for display rendering and input handling.
+//! This module provides SDL2 implementation for the PanelKit platform interface.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{DisplayDriver, InputDriver};
+use crate::platform::{GraphicsContext, PlatformDriver};
+use crate::platform::{DisplayDriver, InputDriver, Driver}; // Legacy traits
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use sdl2::event::Event as SdlEvent;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use std::any::Any;
 
-/// SDL2-based display driver
+/// SDL2 rendering context
+pub struct SDLGraphicsContext {
+    canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>,
+}
+
+impl SDLGraphicsContext {
+    /// Create a new SDL graphics context
+    pub fn new(canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>) -> Self {
+        Self { canvas }
+    }
+    
+    /// Get the canvas for rendering
+    pub fn canvas(&self) -> Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>> {
+        self.canvas.clone()
+    }
+}
+
+impl GraphicsContext for SDLGraphicsContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+/// SDL2-based platform driver
 pub struct SDLDriver {
     sdl_context: sdl2::Sdl,
     canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>,
+    graphics_context: SDLGraphicsContext,
     width: u32,
     height: u32,
     last_touch_point: (i32, i32),
     is_pressed: bool,
 }
 
-// Implement the combined Driver trait
-impl crate::platform::Driver for SDLDriver {
-    fn init(&mut self, _width: u32, _height: u32) -> Result<()> {
-        // Initialize SDL
-        self.clear(0, 0, 0)?;
-        
-        // Present the canvas
-        {
-            let mut canvas = self.canvas.lock().unwrap();
-            canvas.present();
-        }
-        
-        log::info!("SDL display initialized with dimensions: {}x{}", self.width, self.height);
-        Ok(())
-    }
-    
-    fn flush(&mut self, _buffer: &[u8]) -> Result<()> {
-        // Present the canvas
-        let mut canvas = self.canvas.lock().unwrap();
-        canvas.present();
-        Ok(())
-    }
-    
-    fn dimensions(&self) -> (u32, u32) {
-        (self.width, self.height)
-    }
-    
-    fn init_input(&mut self) -> Result<()> {
-        log::info!("SDL input driver initialized");
-        Ok(())
-    }
-    
-    fn poll_events(&mut self) -> Result<Vec<Event>> {
-        let mut events = Vec::new();
-        let mut event_pump = self.sdl_context.event_pump().unwrap();
-        
-        for sdl_event in event_pump.poll_iter() {
-            match sdl_event {
-                SdlEvent::Quit {..} | 
-                SdlEvent::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    events.push(Event::Custom { 
-                        event_type: "quit".to_string(), 
-                        payload: "".to_string() 
-                    });
-                },
-                SdlEvent::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
-                    self.update_touch(x, y, true);
-                    events.push(Event::Touch { 
-                        x, 
-                        y, 
-                        action: TouchAction::Press 
-                    });
-                },
-                SdlEvent::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
-                    self.update_touch(x, y, false);
-                    events.push(Event::Touch { 
-                        x, 
-                        y, 
-                        action: TouchAction::Release 
-                    });
-                },
-                SdlEvent::MouseMotion { x, y, mousestate, .. } => {
-                    if mousestate.left() {
-                        self.update_touch(x, y, true);
-                        events.push(Event::Touch { 
-                            x, 
-                            y, 
-                            action: TouchAction::Move 
-                        });
-                    }
-                },
-                _ => {}
-            }
-        }
-        
-        // Small sleep to avoid using too much CPU
-        std::thread::sleep(Duration::from_millis(10));
-        
-        Ok(events)
-    }
-    
-    fn cleanup(&mut self) {
-        log::info!("SDL driver cleaned up");
-    }
-    
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-
 impl SDLDriver {
     /// Create a new SDL driver
     pub fn new(width: u32, height: u32, title: &str) -> Result<Self> {
-        let sdl_context = sdl2::init().map_err(|e| anyhow::anyhow!("SDL init error: {}", e))?;
+        let sdl_context = sdl2::init()
+            .context("Failed to initialize SDL2")?;
+            
         let video_subsystem = sdl_context
             .video()
-            .map_err(|e| anyhow::anyhow!("SDL video subsystem error: {}", e))?;
+            .context("Failed to initialize SDL2 video subsystem")?;
 
         // Use different SDL window settings for macOS vs other platforms
         #[cfg(target_os = "macos")]
@@ -132,24 +70,28 @@ impl SDLDriver {
             .position_centered()
             .allow_highdpi() // Enable Retina display support
             .build()
-            .map_err(|e| anyhow::anyhow!("SDL window error on macOS: {}", e))?;
+            .context("Failed to create SDL2 window on macOS")?;
 
         #[cfg(not(target_os = "macos"))]
         let window = video_subsystem
             .window(title, width, height)
             .position_centered()
             .build()
-            .map_err(|e| anyhow::anyhow!("SDL window error: {}", e))?;
+            .context("Failed to create SDL2 window")?;
 
         let canvas = window
             .into_canvas()
             .accelerated()
             .build()
-            .map_err(|e| anyhow::anyhow!("SDL canvas error: {}", e))?;
+            .context("Failed to create SDL2 canvas")?;
+
+        let canvas_arc = Arc::new(Mutex::new(canvas));
+        let graphics_context = SDLGraphicsContext::new(canvas_arc.clone());
 
         Ok(Self {
             sdl_context,
-            canvas: Arc::new(Mutex::new(canvas)),
+            canvas: canvas_arc,
+            graphics_context,
             width,
             height,
             last_touch_point: (0, 0),
@@ -170,61 +112,38 @@ impl SDLDriver {
 
     /// Clear the screen with a specific color
     pub fn clear(&mut self, r: u8, g: u8, b: u8) -> Result<()> {
-        let mut canvas = self.canvas.lock().unwrap();
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+            
         canvas.set_draw_color(Color::RGB(r, g, b));
         canvas.clear();
         Ok(())
     }
 }
 
-impl DisplayDriver for SDLDriver {
+// Implement the unified PlatformDriver trait
+impl PlatformDriver for SDLDriver {
     fn init(&mut self, _width: u32, _height: u32) -> Result<()> {
         // Initialize SDL
-        self.clear(0, 0, 0)?;
+        self.clear(0, 0, 0)
+            .context("Failed to clear SDL display during initialization")?;
         
         // Present the canvas
         {
-            let mut canvas = self.canvas.lock().unwrap();
+            let mut canvas = self.canvas.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
             canvas.present();
         }
         
-        log::info!("SDL display initialized with dimensions: {}x{}", self.width, self.height);
-        Ok(())
-    }
-    
-    fn flush(&mut self, _buffer: &[u8]) -> Result<()> {
-        // Present the canvas
-        let mut canvas = self.canvas.lock().unwrap();
-        canvas.present();
-        Ok(())
-    }
-    
-    fn dimensions(&self) -> (u32, u32) {
-        (self.width, self.height)
-    }
-    
-    fn cleanup(&mut self) {
-        log::info!("SDL display cleaned up");
-    }
-    
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
-
-impl InputDriver for SDLDriver {
-    fn init(&mut self) -> Result<()> {
-        log::info!("SDL input driver initialized");
+        log::info!("SDL platform initialized with dimensions: {}x{}", self.width, self.height);
         Ok(())
     }
     
     fn poll_events(&mut self) -> Result<Vec<Event>> {
         let mut events = Vec::new();
-        let mut event_pump = self.sdl_context.event_pump().unwrap();
+        let mut event_pump = self.sdl_context.event_pump()
+            .context("Failed to get SDL event pump")?;
         
         for sdl_event in event_pump.poll_iter() {
             match sdl_event {
@@ -271,8 +190,54 @@ impl InputDriver for SDLDriver {
         Ok(events)
     }
     
+    fn present(&mut self) -> Result<()> {
+        // Present the canvas
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex during present: {}", e))?;
+            
+        canvas.present();
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+    
+    fn graphics_context(&self) -> Option<&dyn GraphicsContext> {
+        Some(&self.graphics_context)
+    }
+    
     fn cleanup(&mut self) {
-        log::info!("SDL input driver cleaned up");
+        log::info!("SDL platform cleaned up");
+    }
+}
+
+// Legacy trait implementations for backward compatibility
+
+impl Driver for SDLDriver {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        <Self as PlatformDriver>::init(self, width, height)
+    }
+    
+    fn flush(&mut self, _buffer: &[u8]) -> Result<()> {
+        self.present()
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        <Self as PlatformDriver>::dimensions(self)
+    }
+    
+    fn init_input(&mut self) -> Result<()> {
+        // No specific input initialization needed for SDL
+        Ok(())
+    }
+    
+    fn poll_events(&mut self) -> Result<Vec<Event>> {
+        <Self as PlatformDriver>::poll_events(self)
+    }
+    
+    fn cleanup(&mut self) {
+        <Self as PlatformDriver>::cleanup(self)
     }
     
     fn as_any(&self) -> &dyn std::any::Any {
@@ -284,3 +249,51 @@ impl InputDriver for SDLDriver {
     }
 }
 
+impl DisplayDriver for SDLDriver {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        <Self as PlatformDriver>::init(self, width, height)
+    }
+    
+    fn flush(&mut self, _buffer: &[u8]) -> Result<()> {
+        self.present()
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        <Self as PlatformDriver>::dimensions(self)
+    }
+    
+    fn cleanup(&mut self) {
+        <Self as PlatformDriver>::cleanup(self)
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+impl InputDriver for SDLDriver {
+    fn init(&mut self) -> Result<()> {
+        // No specific input initialization needed for SDL
+        Ok(())
+    }
+    
+    fn poll_events(&mut self) -> Result<Vec<Event>> {
+        <Self as PlatformDriver>::poll_events(self)
+    }
+    
+    fn cleanup(&mut self) {
+        <Self as PlatformDriver>::cleanup(self)
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
