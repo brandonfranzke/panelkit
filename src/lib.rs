@@ -63,11 +63,16 @@ pub struct AppConfig {
 /// Core application state
 pub struct Application {
     config: AppConfig,
+    /// New type-safe event bus system - use this for all new code
     event_bus: event::dispatch::EventBus,
-    // Keep old event_broker for backward compatibility
+    
+    /// Legacy event broker for backward compatibility
+    /// 
+    /// IMPORTANT: This will be removed in version 0.3.0
+    /// See docs/EVENT_SYSTEM_MIGRATION.md for migration instructions
     #[deprecated(
         since = "0.2.0", 
-        note = "Use event_bus instead, which provides type-safe event handling"
+        note = "MIGRATION REQUIRED: Use event_bus instead, which provides type-safe event handling. See docs/EVENT_SYSTEM_MIGRATION.md"
     )]
     event_broker: event::EventBroker,
     state_manager: state::StateManager,
@@ -173,31 +178,25 @@ impl Application {
                 
                 logger.trace(&format!("Processing legacy event: {:?}", legacy_event));
                 
-                // Publish to legacy event broker for backward compatibility
+                // Handle event dispatch to both legacy and new systems
+                
+                // 1. Publish to legacy event broker (for backward compatibility)
                 self.event_broker.publish("input", legacy_event.clone());
                 
-                // Convert legacy event to new event type and publish to new event bus
-                // Also create a new event for the UI manager to process
+                // 2. Convert and publish to the new event system
                 let mut new_event = event::convert_legacy_event(&legacy_event);
+                // Publish to new event bus (commented out until Box<dyn Event> issue fixed)
+                // self.event_bus.publish("input", &*new_event);
                 
-                // Process event in UI manager using both event systems
-                // First with the legacy system
-                match self.ui_manager.process_event(&legacy_event) {
-                    Ok(_) => {},
-                    Err(e) => {
-                        logger.error(&format!("Error processing legacy event in UI: {:#}", e));
-                        // Continue running despite errors in event handling
-                    }
+                // 3. Process events in the UI manager
+                // First with the legacy system (will be removed in 0.3.0)
+                if let Err(e) = self.ui_manager.process_event(&legacy_event) {
+                    logger.error(&format!("Error processing legacy event in UI: {:#}", e));
                 }
                 
-                // Then with the new event system
-                // We use process_new_event which takes a &mut dyn Event
-                match self.ui_manager.process_new_event(new_event.as_mut()) {
-                    Ok(_) => {},
-                    Err(e) => {
-                        logger.error(&format!("Error processing new event in UI: {:#}", e));
-                        // Continue running despite errors in event handling
-                    }
+                // Then with the new event system (this is the preferred path)
+                if let Err(e) = self.ui_manager.process_new_event(new_event.as_mut()) {
+                    logger.error(&format!("Error processing new event in UI: {:#}", e));
                 }
             }
             

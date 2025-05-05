@@ -10,7 +10,7 @@ mod legacy {
     
     #[deprecated(
         since = "0.2.0",
-        note = "Use the new event types from the types module instead"
+        note = "MIGRATION REQUIRED: Use the new Event trait and specific event types (TouchEvent, KeyboardEvent, etc.) from the types module instead. Will be removed in version 0.3.0."
     )]
     #[derive(Debug, Clone)]
     pub enum Event {
@@ -50,7 +50,7 @@ mod legacy {
 
     #[deprecated(
         since = "0.2.0",
-        note = "Use TouchAction from the types module instead"
+        note = "MIGRATION REQUIRED: Use TouchAction from the types module instead. Map Press → Down, Release → Up. Will be removed in version 0.3.0."
     )]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum TouchAction {
@@ -131,7 +131,7 @@ pub fn convert_legacy_event(event: &LegacyEvent) -> Box<dyn Event> {
 /// Legacy event broker for backward compatibility
 #[deprecated(
     since = "0.2.0",
-    note = "Use the EventBus from the dispatch module instead"
+    note = "MIGRATION REQUIRED: Use the EventBus from the dispatch module instead for type-safe event handling. Will be removed in version 0.3.0."
 )]
 pub struct EventBroker {
     subscribers: Arc<Mutex<HashMap<String, Vec<Sender<LegacyEvent>>>>>,
