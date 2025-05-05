@@ -68,7 +68,7 @@ The current implementation provides:
   - Memory usage monitoring
 
 - **Thread Safety Improvements**
-  - Thread-safe platform abstractions (GraphicsContext, PlatformDriver)
+  - Thread-safe platform abstractions (RenderingContext, PlatformDriver)
   - Background processing capabilities
   - Proper thread management for non-UI operations
 
