@@ -67,9 +67,9 @@ pub enum PlatformError {
     #[error("SDL error: {0}")]
     SDL(String),
     
-    /// Graphics context errors
-    #[error("Graphics context error: {0}")]
-    GraphicsContext(String),
+    /// Rendering context errors
+    #[error("Rendering context error: {0}")]
+    RenderingContext(String),
     
     /// Input handling errors
     #[error("Input error: {0}")]
