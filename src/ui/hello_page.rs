@@ -2,7 +2,7 @@
 //!
 //! This is a minimal example page that displays "Hello, World!" text.
 
-use crate::event::{EnumEvent as Event, EnumTouchAction};
+use crate::event::{Event, TouchEvent, TouchAction, EventType};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Color, Point, Rectangle};
@@ -97,29 +97,29 @@ impl Page for HelloPage {
         Ok(())
     }
     
-    fn handle_event(&mut self, event: &crate::event::EnumEvent) -> Result<Option<String>> {
-        match event {
-            Event::Touch { x, y, action } => {
-                self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", action, x, y));
-                
-                // Check if counter area was clicked
-                if *x >= self.counter_box.x && 
-                   *x <= self.counter_box.x + self.counter_box.width as i32 &&
-                   *y >= self.counter_box.y && 
-                   *y <= self.counter_box.y + self.counter_box.height as i32 {
-                    self.counter += 1;
-                    self.logger.info(&format!("Counter incremented to: {}", self.counter));
-                }
-                
-                // Check if right arrow was clicked (for navigation)
-                let arrow_bounds = Rectangle::new(670, 210, 30, 60);
-                if *x >= arrow_bounds.x && 
-                   *x <= arrow_bounds.x + arrow_bounds.width as i32 &&
-                   *y >= arrow_bounds.y && 
-                   *y <= arrow_bounds.y + arrow_bounds.height as i32 &&
-                   matches!(action, crate::event::EnumTouchAction::Press) {
-                    self.logger.info("Right arrow clicked, navigating to Demo page");
-                    return Ok(Some("demo".to_string()));
+    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
+        match event.event_type() {
+            EventType::Touch => {
+                if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
+                    self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", 
+                        touch_event.action, touch_event.position.x, touch_event.position.y));
+                    
+                    let position = touch_event.position;
+                    
+                    // Check if counter area was clicked
+                    if self.counter_box.contains(&position) && touch_event.action == TouchAction::Down {
+                        self.counter += 1;
+                        self.logger.info(&format!("Counter incremented to: {}", self.counter));
+                        touch_event.mark_handled();
+                    }
+                    
+                    // Check if right arrow was clicked (for navigation)
+                    let arrow_bounds = Rectangle::new(670, 210, 30, 60);
+                    if arrow_bounds.contains(&position) && touch_event.action == TouchAction::Down {
+                        self.logger.info("Right arrow clicked, navigating to Demo page");
+                        touch_event.mark_handled();
+                        return Ok(Some("demo".to_string()));
+                    }
                 }
             }
             _ => {}

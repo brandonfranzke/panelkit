@@ -2,7 +2,7 @@
 //!
 //! This is a simplified demo page using our component system.
 
-use crate::event::{EnumEvent as Event, EnumTouchAction};
+use crate::event::{Event, TouchEvent, TouchAction, EventType};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Color, Point, Rectangle};
@@ -158,44 +158,42 @@ impl Page for SimpleDemoPage {
         Ok(())
     }
     
-    fn handle_event(&mut self, event: &crate::event::EnumEvent) -> Result<Option<String>> {
-        match event {
-            Event::Touch { x, y, action } => {
-                self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", action, x, y));
-                
-                // Check if button was clicked
-                if *x >= self.button_bounds.x && 
-                   *x <= self.button_bounds.x + self.button_bounds.width as i32 &&
-                   *y >= self.button_bounds.y && 
-                   *y <= self.button_bounds.y + self.button_bounds.height as i32 &&
-                   matches!(action, crate::event::EnumTouchAction::Press) {
-                    self.counter += 1;
-                    self.logger.info(&format!("Button clicked! Counter: {}", self.counter));
-                }
-                
-                // Check if slider was clicked/moved
-                if *x >= self.slider_bounds.x && 
-                   *x <= self.slider_bounds.x + self.slider_bounds.width as i32 &&
-                   *y >= self.slider_bounds.y && 
-                   *y <= self.slider_bounds.y + self.slider_bounds.height as i32 {
-                    // Update slider value based on x position
-                    let new_value = (*x - self.slider_bounds.x) as u32;
-                    if new_value <= self.slider_bounds.width {
-                        self.slider_value = new_value;
-                        self.logger.debug(&format!("Slider value: {}/{}", 
-                            self.slider_value, self.slider_bounds.width));
+    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
+        match event.event_type() {
+            EventType::Touch => {
+                if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
+                    self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", 
+                        touch_event.action, touch_event.position.x, touch_event.position.y));
+                    
+                    let position = touch_event.position;
+                    
+                    // Check if button was clicked
+                    if self.button_bounds.contains(&position) && touch_event.action == TouchAction::Down {
+                        self.counter += 1;
+                        self.logger.info(&format!("Button clicked! Counter: {}", self.counter));
+                        touch_event.mark_handled();
                     }
-                }
-                
-                // Check if left arrow was clicked (for navigation)
-                let arrow_bounds = Rectangle::new(100, 210, 30, 60);
-                if *x >= arrow_bounds.x && 
-                   *x <= arrow_bounds.x + arrow_bounds.width as i32 &&
-                   *y >= arrow_bounds.y && 
-                   *y <= arrow_bounds.y + arrow_bounds.height as i32 &&
-                   matches!(action, crate::event::EnumTouchAction::Press) {
-                    self.logger.info("Left arrow clicked, navigating to Hello page");
-                    return Ok(Some("hello".to_string()));
+                    
+                    // Check if slider was clicked/moved
+                    if self.slider_bounds.contains(&position) && 
+                       (touch_event.action == TouchAction::Down || touch_event.action == TouchAction::Move) {
+                        // Update slider value based on x position
+                        let new_value = (position.x - self.slider_bounds.x) as u32;
+                        if new_value <= self.slider_bounds.width {
+                            self.slider_value = new_value;
+                            self.logger.debug(&format!("Slider value: {}/{}", 
+                                self.slider_value, self.slider_bounds.width));
+                            touch_event.mark_handled();
+                        }
+                    }
+                    
+                    // Check if left arrow was clicked (for navigation)
+                    let arrow_bounds = Rectangle::new(100, 210, 30, 60);
+                    if arrow_bounds.contains(&position) && touch_event.action == TouchAction::Down {
+                        self.logger.info("Left arrow clicked, navigating to Hello page");
+                        touch_event.mark_handled();
+                        return Ok(Some("hello".to_string()));
+                    }
                 }
             }
             _ => {}

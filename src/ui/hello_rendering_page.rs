@@ -2,7 +2,7 @@
 //!
 //! This module provides a "Hello" page for the application.
 
-use crate::event::{Event, TouchEvent, EventType, CustomEvent, TouchAction, EnumEvent};
+use crate::event::{Event, TouchEvent, EventType, CustomEvent, TouchAction};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Point, Rectangle, Color, TextStyle, FontSize, TextAlignment};
@@ -139,17 +139,6 @@ impl Page for HelloRenderingPage {
         
         self.logger.trace("HelloRenderingPage rendering complete");
         Ok(())
-    }
-    
-    #[deprecated(
-        since = "0.2.0",
-        note = "Use handle_new_event instead which provides type-safe event processing. Will be removed in version 0.3.0."
-    )]
-    fn handle_event(&mut self, event: &crate::event::EnumEvent) -> Result<Option<String>> {
-        // Forward to trait-based event handler by converting to the trait-based event type
-        // This avoids duplicating logic and ensures both handlers work the same
-        let mut trait_event = crate::event::convert_enum_to_trait_event(event);
-        self.handle_new_event(&mut *trait_event)
     }
     
     fn on_activate(&mut self) -> Result<()> {
