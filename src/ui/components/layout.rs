@@ -4,7 +4,8 @@
 
 use crate::primitives::{RenderingContext, Rectangle, Color, Point};
 use crate::ui::components::{ColoredRectangle, ComponentBase};
-use crate::ui::traits::{Component, Positioned, Contains, Renderable};
+use crate::ui::traits::{Component, Positioned, Contains, Renderable, Container as ContainerTrait};
+use crate::event::{Event, TouchEvent, KeyboardEvent};
 use anyhow::Result;
 
 /// A container for grouping multiple UI components
@@ -12,6 +13,8 @@ pub struct Container {
     base: ComponentBase,
     components: Vec<Box<dyn Component>>,
     background: Option<ColoredRectangle>,
+    focused: bool,
+    focused_index: Option<usize>,
 }
 
 impl Container {
@@ -21,6 +24,8 @@ impl Container {
             base: ComponentBase::with_bounds(x, y, width, height),
             components: Vec::new(),
             background: None,
+            focused: false,
+            focused_index: None,
         }
     }
     
@@ -28,11 +33,6 @@ impl Container {
     pub fn with_background(mut self, color_rect: ColoredRectangle) -> Self {
         self.background = Some(color_rect);
         self
-    }
-    
-    /// Add a component to the container
-    pub fn add<T: Component + 'static>(&mut self, component: T) {
-        self.components.push(Box::new(component));
     }
 }
 
@@ -84,6 +84,34 @@ impl Component for Container {
     
     fn is_visible(&self) -> bool {
         self.base.visible
+    }
+    
+    fn is_focused(&self) -> bool {
+        self.focused
+    }
+    
+    fn set_focused(&mut self, focused: bool) {
+        self.focused = focused;
+        
+        // If this container is focused, make sure the currently focused child is also focused
+        if let Some(index) = self.focused_index {
+            if index < self.components.len() {
+                for (i, child) in self.components.iter_mut().enumerate() {
+                    child.set_focused(focused && i == index);
+                }
+            }
+        }
+    }
+    
+    fn on_key_event(&mut self, event: &mut KeyboardEvent) -> Result<bool> {
+        // If we have a focused child, delegate to it
+        if let Some(index) = self.focused_index {
+            if index < self.components.len() {
+                return self.components[index].on_key_event(event);
+            }
+        }
+        
+        Ok(false)
     }
 }
 
@@ -143,5 +171,28 @@ impl Component for TitleBar {
     
     fn is_visible(&self) -> bool {
         self.container.is_visible()
+    }
+    
+    fn is_focused(&self) -> bool {
+        self.container.is_focused()
+    }
+    
+    fn set_focused(&mut self, focused: bool) {
+        self.container.set_focused(focused);
+    }
+}
+
+// Implement the Container trait for our Container struct
+impl ContainerTrait for Container {
+    fn add_child<T: Component + 'static>(&mut self, child: T) {
+        self.components.push(Box::new(child));
+    }
+    
+    fn children(&self) -> &[Box<dyn Component>] {
+        &self.components
+    }
+    
+    fn children_mut(&mut self) -> &mut [Box<dyn Component>] {
+        &mut self.components
     }
 }

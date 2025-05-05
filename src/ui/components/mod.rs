@@ -41,8 +41,8 @@ impl Positioned for ComponentBase {
 
 impl Contains for ComponentBase {}
 
-// Re-export traits for convenience
-pub use crate::ui::traits::{Focusable, Touchable};
+// Traits are now integrated into Component trait directly
+// No need to re-export anything here
 
 /// A basic colored rectangle component
 pub struct ColoredRectangle {

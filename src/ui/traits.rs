@@ -3,7 +3,11 @@
 //! This module defines the core traits for UI components and behaviors.
 
 use crate::primitives::{RenderingContext, Rectangle, Point};
+use crate::event::{
+    Event, TouchEvent, KeyboardEvent, EventType, TouchAction, EventHandler
+};
 use anyhow::Result;
+use std::any::Any;
 
 /// Trait for objects that can be positioned on screen
 pub trait Positioned {
@@ -44,7 +48,7 @@ pub trait Renderable {
 /// 2. Can determine if they contain a point (Contains)
 /// 3. Can be rendered (Renderable)
 /// 4. Can be interacted with
-pub trait Component: Positioned + Contains + Renderable {
+pub trait Component: Positioned + Contains + Renderable + EventHandler {
     /// Set whether the component is enabled (can receive input)
     fn set_enabled(&mut self, enabled: bool);
     
@@ -56,28 +60,153 @@ pub trait Component: Positioned + Contains + Renderable {
     
     /// Check if the component is visible
     fn is_visible(&self) -> bool;
-}
 
-/// Trait for components that can be focused
-pub trait Focusable: Component {
+    /// Process an event specifically for this component
+    fn process_event(&mut self, event: &mut dyn Event) -> Result<bool> {
+        if !self.is_enabled() || !self.is_visible() {
+            return Ok(false);
+        }
+
+        match event.event_type() {
+            EventType::Touch => {
+                if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
+                    match touch_event.action {
+                        TouchAction::Down => {
+                            if self.contains(&touch_event.position) {
+                                let result = self.on_touch_down(touch_event)?;
+                                if result {
+                                    touch_event.mark_handled();
+                                }
+                                return Ok(result);
+                            }
+                        },
+                        TouchAction::Move => {
+                            let result = self.on_touch_move(touch_event)?;
+                            if result {
+                                touch_event.mark_handled();
+                            }
+                            return Ok(result);
+                        },
+                        TouchAction::Up => {
+                            let result = self.on_touch_up(touch_event)?;
+                            if result {
+                                touch_event.mark_handled();
+                            }
+                            return Ok(result);
+                        },
+                        TouchAction::LongPress => {
+                            if self.contains(&touch_event.position) {
+                                let result = self.on_touch_long_press(touch_event)?;
+                                if result {
+                                    touch_event.mark_handled();
+                                }
+                                return Ok(result);
+                            }
+                        },
+                        TouchAction::Gesture(_) => {
+                            if self.contains(&touch_event.position) {
+                                let result = self.on_gesture(touch_event)?;
+                                if result {
+                                    touch_event.mark_handled();
+                                }
+                                return Ok(result);
+                            }
+                        }
+                    }
+                }
+            },
+            EventType::Keyboard => {
+                if let Some(key_event) = event.as_any_mut().downcast_mut::<KeyboardEvent>() {
+                    if self.is_focused() {
+                        let result = self.on_key_event(key_event)?;
+                        if result {
+                            key_event.mark_handled();
+                        }
+                        return Ok(result);
+                    }
+                }
+            },
+            _ => {}
+        }
+        
+        Ok(false)
+    }
+
+    /// Handle a touch down event
+    fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        Ok(false)
+    }
+    
+    /// Handle a touch move event
+    fn on_touch_move(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        Ok(false)
+    }
+    
+    /// Handle a touch up event
+    fn on_touch_up(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        Ok(false)
+    }
+    
+    /// Handle a long press event
+    fn on_touch_long_press(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        Ok(false)
+    }
+    
+    /// Handle a gesture event
+    fn on_gesture(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        Ok(false)
+    }
+    
+    /// Handle a key event
+    fn on_key_event(&mut self, event: &mut KeyboardEvent) -> Result<bool> {
+        Ok(false)
+    }
+    
+    /// Check if the component has focus
+    fn is_focused(&self) -> bool {
+        false
+    }
+    
     /// Set focus state
-    fn set_focused(&mut self, focused: bool);
-    
-    /// Check if focused
-    fn is_focused(&self) -> bool;
-    
-    /// Handle keyboard input when focused
-    fn handle_key_event(&mut self, key_code: u32, pressed: bool) -> Result<bool>;
+    fn set_focused(&mut self, focused: bool) { }
 }
 
-/// Trait for components that can handle touch input
-pub trait Touchable: Component {
-    /// Handle touch down event
-    fn on_touch_down(&mut self, point: &Point) -> Result<bool>;
+/// Implementation of EventHandler for all Components
+impl<T: Component> EventHandler for T {
+    fn handle_event(&mut self, event: &mut dyn Event) -> Result<bool> {
+        self.process_event(event)
+    }
+}
+
+/// A container of components that can have children
+pub trait Container: Component {
+    /// Add a child component
+    fn add_child<T: Component + 'static>(&mut self, child: T);
     
-    /// Handle touch move event
-    fn on_touch_move(&mut self, point: &Point) -> Result<bool>;
+    /// Access all children
+    fn children(&self) -> &[Box<dyn Component>];
     
-    /// Handle touch up event
-    fn on_touch_up(&mut self, point: &Point) -> Result<bool>;
+    /// Access all children mutably
+    fn children_mut(&mut self) -> &mut [Box<dyn Component>];
+    
+    /// Propagate events to children
+    fn propagate_to_children(&mut self, event: &mut dyn Event) -> Result<bool> {
+        // For touch events, propagate to children in reverse order (top to bottom visually)
+        // This ensures that components "on top" get events first
+        let mut children = self.children_mut();
+        let children_len = children.len();
+        
+        for i in (0..children_len).rev() {
+            let child = &mut children[i];
+            
+            if child.is_visible() && child.is_enabled() {
+                let handled = child.handle_event(event)?;
+                if handled || event.is_handled() {
+                    return Ok(true);
+                }
+            }
+        }
+        
+        Ok(false)
+    }
 }

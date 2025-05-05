@@ -4,7 +4,8 @@
 
 use crate::primitives::{RenderingContext, Color, Point, Rectangle};
 use crate::ui::components::{ComponentBase};
-use crate::ui::traits::{Component, Positioned, Contains, Renderable, Touchable};
+use crate::ui::traits::{Component, Positioned, Contains, Renderable};
+use crate::event::{Event, TouchEvent, EventType};
 use anyhow::Result;
 
 /// A simple button component
@@ -131,40 +132,37 @@ impl Component for Button {
     }
 }
 
-impl Touchable for Button {
-    fn on_touch_down(&mut self, point: &Point) -> Result<bool> {
-        if !self.is_enabled() || !self.is_visible() {
-            return Ok(false);
-        }
-        
-        if self.contains(point) {
-            self.pressed = true;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+// Override Component's touch event methods
+impl Button {
+    /// Handle a touch down event
+    fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        // No need to check enabled/visible - Component trait already does this
+        self.pressed = true;
+        Ok(true)
     }
     
-    fn on_touch_move(&mut self, point: &Point) -> Result<bool> {
-        if !self.is_enabled() || !self.is_visible() || !self.pressed {
+    /// Handle a touch move event
+    fn on_touch_move(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        if !self.pressed {
             return Ok(false);
         }
         
         // Update visual pressed state based on whether the touch is still within the button
-        let inside = self.contains(point);
+        let inside = self.contains(&event.position);
         self.pressed = inside;
         Ok(inside)
     }
     
-    fn on_touch_up(&mut self, point: &Point) -> Result<bool> {
-        if !self.is_enabled() || !self.is_visible() || !self.pressed {
+    /// Handle a touch up event
+    fn on_touch_up(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        if !self.pressed {
             return Ok(false);
         }
         
         self.pressed = false;
         
         // Only trigger the click if the touch was released inside the button
-        if self.contains(point) {
+        if self.contains(&event.position) {
             self.handle_click()
         } else {
             Ok(false)
