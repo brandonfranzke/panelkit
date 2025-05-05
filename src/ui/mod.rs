@@ -8,7 +8,7 @@ use anyhow::{Result, Context};
 use crate::error::UIError;
 use crate::RenderingContext;
 use crate::logging;
-use crate::event::{Event, EventHandler};
+use crate::event::Event;
 
 // Core trait definitions
 pub mod traits;

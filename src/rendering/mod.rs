@@ -3,9 +3,9 @@
 //! This module provides a clean abstraction over different rendering backends,
 //! allowing the UI to be independent of the underlying graphics implementation.
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use crate::TargetPlatform;
-use crate::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface};
+use crate::primitives::RenderingContext;
 
 pub mod sdl_backend;
 pub mod fb_backend;

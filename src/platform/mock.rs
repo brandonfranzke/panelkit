@@ -4,7 +4,7 @@
 
 use crate::event::{Event, TouchEvent, TouchAction};
 use crate::platform::PlatformDriver;
-use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
+use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface};
 use anyhow::Result;
 use std::time::{Duration, Instant};
 use std::any::Any;
@@ -72,12 +72,12 @@ impl RenderingContext for MockRenderingContext {
         Ok(())
     }
     
-    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+    fn draw_text(&mut self, text: &str, position: Point, _style: TextStyle) -> Result<()> {
         log::trace!("Mock draw text: '{}' at ({}, {})", text, position.x, position.y);
         Ok(())
     }
     
-    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+    fn draw_button(&mut self, rect: Rectangle, text: &str, _bg_color: Color, _text_color: Color, _border_color: Color) -> Result<()> {
         log::trace!("Mock draw button: '{}' at ({}, {}, {}, {})", 
             text, rect.x, rect.y, rect.width, rect.height);
         Ok(())
@@ -119,22 +119,22 @@ impl Surface for MockSurface {
         (self.width, self.height)
     }
     
-    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+    fn fill_rect(&mut self, rect: Rectangle, _color: Color) -> Result<()> {
         log::trace!("Mock surface fill rect at ({}, {}, {}, {})", rect.x, rect.y, rect.width, rect.height);
         Ok(())
     }
     
-    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+    fn draw_rect(&mut self, rect: Rectangle, _color: Color) -> Result<()> {
         log::trace!("Mock surface draw rect at ({}, {}, {}, {})", rect.x, rect.y, rect.width, rect.height);
         Ok(())
     }
     
-    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
+    fn draw_line(&mut self, start: Point, end: Point, _color: Color) -> Result<()> {
         log::trace!("Mock surface draw line from ({}, {}) to ({}, {})", start.x, start.y, end.x, end.y);
         Ok(())
     }
     
-    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+    fn draw_text(&mut self, text: &str, position: Point, _style: TextStyle) -> Result<()> {
         log::trace!("Mock surface draw text: '{}' at ({}, {})", text, position.x, position.y);
         Ok(())
     }
@@ -193,7 +193,7 @@ impl PlatformDriver for MockDriver {
     
     fn poll_events(&mut self) -> Result<Vec<Box<dyn Event>>> {
         let now = Instant::now();
-        let mut events = Vec::new();
+        let mut events: Vec<Box<dyn Event>> = Vec::new();
         
         if now.duration_since(self.last_event) >= self.event_interval {
             // Update mock touch position
@@ -212,10 +212,11 @@ impl PlatformDriver for MockDriver {
             }
             
             // Create touch event using the new event system
-            events.push(Box::new(TouchEvent::new(
+            let touch_event: Box<dyn Event> = Box::new(TouchEvent::new(
                 TouchAction::Down,
                 Point::new(self.x, self.y)
-            )));
+            ));
+            events.push(touch_event);
             
             self.last_event = now;
             log::debug!("Generated mock touch event at ({}, {})", self.x, self.y);

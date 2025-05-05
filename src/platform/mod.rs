@@ -2,10 +2,10 @@
 //!
 //! This module provides platform-specific implementations for display, input, and timing.
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use crate::TargetPlatform;
-use crate::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, Surface};
-use crate::event::{Event, TouchEvent, KeyboardEvent, SystemEvent};
+use crate::primitives::RenderingContext;
+use crate::event::Event;
 
 // Include platform implementations
 pub mod mock;

@@ -15,7 +15,8 @@ pub mod ui;
 pub use error::{Error, Result, AnyhowResult}; 
 
 // Re-export primitives for convenience
-pub use primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface, Renderable};
+pub use primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface};
+pub use ui::traits::Renderable;
 
 // Continue to use anyhow for context in implementation
 use error::Context;

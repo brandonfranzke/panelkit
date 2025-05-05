@@ -87,28 +87,29 @@ impl EventBus {
     }
     
     /// Publish an event to a specific topic
-    pub fn publish<E: Event + Send + 'static>(&self, topic: &str, event: E) -> Result<()> {
+    pub fn publish<E: Event + Send + Clone + 'static>(&self, topic: &str, event: E) -> Result<()> {
         if let Some(senders) = self.senders.get(topic) {
             if senders.is_empty() {
                 return Ok(());
             }
             
-            // Box the event once
-            let boxed_event: Box<dyn Event + Send> = Box::new(event);
+            // For the case where we only have one subscriber, do a direct send
+            if senders.len() == 1 {
+                return senders[0].send(Box::new(event)).map_err(|e| anyhow::anyhow!("{}", e));
+            }
             
-            // Send clones to all subscribers except the last one
-            let last_index = senders.len() - 1;
-            
+            // Create clones for all subscribers but the last one
             for (i, sender) in senders.iter().enumerate() {
-                if i < last_index {
-                    // Clone the event for all but the last subscriber
-                    let cloned_event = boxed_event.clone_event();
-                    sender.send(cloned_event)?;
-                } else {
-                    // Use the original event for the last subscriber
-                    sender.send(boxed_event)?;
+                if i < senders.len() - 1 {
+                    // Clone for all but the last subscriber
+                    let cloned_event = event.clone();
+                    sender.send(Box::new(cloned_event))?;
                 }
             }
+            
+            // Send the original event to the last subscriber
+            let last_sender = &senders[senders.len() - 1];
+            last_sender.send(Box::new(event))?;
         }
         
         Ok(())
@@ -121,19 +122,23 @@ impl EventBus {
                 return Ok(());
             }
             
-            // Send clones to all subscribers except the last one
-            let last_index = senders.len() - 1;
+            // For the case where we only have one subscriber, do a direct send
+            if senders.len() == 1 {
+                return senders[0].send(event).map_err(|e| anyhow::anyhow!("{}", e));
+            }
             
+            // Otherwise, handle multiple subscribers by sending clones to all but the last one
             for (i, sender) in senders.iter().enumerate() {
-                if i < last_index {
-                    // Clone the event for all but the last subscriber
+                if i < senders.len() - 1 {
+                    // Clone for all but the last subscriber
                     let cloned_event = event.clone_event();
                     sender.send(cloned_event)?;
-                } else {
-                    // Use the original event for the last subscriber to avoid another clone
-                    sender.send(event)?;
                 }
             }
+            
+            // Send the original event to the last subscriber
+            let last_sender = &senders[senders.len() - 1];
+            last_sender.send(event)?;
         }
         
         Ok(())

@@ -4,7 +4,7 @@
 
 use crate::event::{Event, TouchEvent, KeyboardEvent, CustomEvent, SystemEvent, TouchAction, SystemEventType};
 use crate::platform::PlatformDriver;
-use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
+use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface};
 
 use anyhow::Result;
 use sdl2::event::Event as SdlEvent;
@@ -117,13 +117,13 @@ impl RenderingContext for SDLRenderingContext {
         Ok(())
     }
     
-    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+    fn draw_text(&mut self, _text: &str, _position: Point, _style: TextStyle) -> Result<()> {
         // Not implemented in basic SDL
         log::warn!("Text rendering not implemented in SDL driver");
         Ok(())
     }
     
-    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+    fn draw_button(&mut self, rect: Rectangle, _text: &str, bg_color: Color, _text_color: Color, border_color: Color) -> Result<()> {
         // Simple implementation - draw filled rectangle with border
         self.fill_rect(rect, bg_color)?;
         self.draw_rect(rect, border_color)?;
@@ -294,7 +294,7 @@ impl PlatformDriver for SDLDriver {
                         self.update_touch(x, y, true);
                         
                         // Create a move event with previous position
-                        let mut touch_event = TouchEvent::new_move(
+                        let touch_event = TouchEvent::new_move(
                             Point::new(x, y),
                             prev_point
                         );

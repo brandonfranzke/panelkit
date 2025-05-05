@@ -4,7 +4,7 @@
 //! access for embedded targets. Currently this is a stub implementation.
 
 use anyhow::Result;
-use crate::primitives::{Color, Point, Rectangle, TextStyle, RenderingContext, Surface, FontSize, TextAlignment};
+use crate::primitives::{Color, Point, Rectangle, TextStyle, RenderingContext, Surface};
 use std::any::Any;
 
 /// Framebuffer implementation of the RenderingContext trait

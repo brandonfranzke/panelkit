@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use crate::platform::PlatformDriver;
-use crate::primitives::{RenderingContext, Color, Point, Rectangle};
+use crate::primitives::{RenderingContext, Color};
 use crate::event::Event;
 use crate::TargetPlatform;
 use std::time::Duration;
