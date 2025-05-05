@@ -172,10 +172,8 @@ impl EventBroker {
         // Also convert and publish to the new event system
         if let Ok(mut event_bus) = self.event_bus.lock() {
             let new_event = convert_legacy_event(&event);
-            // Currently Box<dyn Event> doesn't implement Event itself
-            // We'll need to implement this properly in the future
-            // For now we'll skip the event_bus publish step
-            // let _ = event_bus.publish(topic, new_event);
+            // Use the publish_boxed method that accepts Box<dyn Event> directly
+            let _ = event_bus.publish_boxed(topic, new_event);
         }
     }
     

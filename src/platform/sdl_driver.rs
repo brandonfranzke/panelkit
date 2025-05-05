@@ -2,7 +2,7 @@
 //!
 //! This module provides SDL2 implementation for the PanelKit platform interface.
 
-use crate::event::{LegacyEvent, LegacyTouchAction};
+use crate::event::{Event, TouchEvent, KeyboardEvent, CustomEvent, SystemEvent, TouchAction, SystemEventType};
 use crate::platform::PlatformDriver;
 use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
 
@@ -247,8 +247,8 @@ impl PlatformDriver for SDLDriver {
         Ok(())
     }
     
-    fn poll_events(&mut self) -> Result<Vec<LegacyEvent>> {
-        let mut events = Vec::new();
+    fn poll_events(&mut self) -> Result<Vec<Box<dyn Event>>> {
+        let mut events: Vec<Box<dyn Event>> = Vec::new();
         let mut event_pump = self.sdl_context.event_pump()
             .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
         
@@ -256,48 +256,59 @@ impl PlatformDriver for SDLDriver {
             match sdl_event {
                 SdlEvent::Quit {..} | 
                 SdlEvent::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    events.push(LegacyEvent::Custom { 
-                        event_type: "quit".to_string(), 
-                        payload: "".to_string() 
-                    });
+                    events.push(Box::new(CustomEvent::new("quit", "")));
                 },
                 SdlEvent::KeyDown { keycode: Some(Keycode::Right), .. } => {
-                    events.push(LegacyEvent::Custom { 
-                        event_type: "next_page".to_string(), 
-                        payload: "".to_string() 
-                    });
+                    events.push(Box::new(CustomEvent::new("next_page", "")));
                 },
                 SdlEvent::KeyDown { keycode: Some(Keycode::Left), .. } => {
-                    events.push(LegacyEvent::Custom { 
-                        event_type: "prev_page".to_string(), 
-                        payload: "".to_string() 
-                    });
+                    events.push(Box::new(CustomEvent::new("prev_page", "")));
+                },
+                SdlEvent::KeyDown { keycode: Some(keycode), .. } => {
+                    // For other key down events, use KeyboardEvent
+                    let key_code = keycode as u32;
+                    events.push(Box::new(KeyboardEvent::new(key_code, true)));
+                },
+                SdlEvent::KeyUp { keycode: Some(keycode), .. } => {
+                    // Key up events
+                    let key_code = keycode as u32;
+                    events.push(Box::new(KeyboardEvent::new(key_code, false)));
                 },
                 SdlEvent::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
                     self.update_touch(x, y, true);
-                    events.push(LegacyEvent::Touch { 
-                        x, 
-                        y, 
-                        action: LegacyTouchAction::Press 
-                    });
+                    events.push(Box::new(TouchEvent::new(
+                        TouchAction::Down,
+                        Point::new(x, y)
+                    )));
                 },
                 SdlEvent::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
                     self.update_touch(x, y, false);
-                    events.push(LegacyEvent::Touch { 
-                        x, 
-                        y, 
-                        action: LegacyTouchAction::Up 
-                    });
+                    events.push(Box::new(TouchEvent::new(
+                        TouchAction::Up,
+                        Point::new(x, y)
+                    )));
                 },
                 SdlEvent::MouseMotion { x, y, mousestate, .. } => {
                     if mousestate.left() {
+                        let prev_point = Point::new(self.last_touch_point.0, self.last_touch_point.1);
                         self.update_touch(x, y, true);
-                        events.push(LegacyEvent::Touch { 
-                            x, 
-                            y, 
-                            action: LegacyTouchAction::Move 
-                        });
+                        
+                        // Create a move event with previous position
+                        let mut touch_event = TouchEvent::new_move(
+                            Point::new(x, y),
+                            prev_point
+                        );
+                        events.push(Box::new(touch_event));
                     }
+                },
+                SdlEvent::Window { win_event: sdl2::event::WindowEvent::Resized(w, h), .. } => {
+                    // Handle window resize event
+                    events.push(Box::new(SystemEvent::new(
+                        SystemEventType::Resize {
+                            width: w as u32,
+                            height: h as u32,
+                        }
+                    )));
                 },
                 _ => {}
             }

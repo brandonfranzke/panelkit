@@ -29,6 +29,33 @@ pub trait Event: Debug + Sync {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
+// Implement Event for Box<dyn Event> to allow boxed events to be used as events
+impl<T: Event + ?Sized> Event for Box<T> {
+    fn event_type(&self) -> EventType {
+        self.as_ref().event_type()
+    }
+    
+    fn is_handled(&self) -> bool {
+        self.as_ref().is_handled()
+    }
+    
+    fn mark_handled(&mut self) {
+        self.as_mut().mark_handled()
+    }
+    
+    fn should_propagate(&self) -> bool {
+        self.as_ref().should_propagate()
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        self.as_ref().as_any()
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self.as_mut().as_any_mut()
+    }
+}
+
 /// Event phase in the propagation cycle
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventPhase {
@@ -404,5 +431,33 @@ impl Event for CustomEvent {
     
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+/// Implement Event trait for boxed event objects
+/// This allows Box<dyn Event> to be used directly as an Event
+impl<T: Event + ?Sized> Event for Box<T> {
+    fn event_type(&self) -> EventType {
+        (**self).event_type()
+    }
+    
+    fn is_handled(&self) -> bool {
+        (**self).is_handled()
+    }
+    
+    fn mark_handled(&mut self) {
+        (**self).mark_handled()
+    }
+    
+    fn should_propagate(&self) -> bool {
+        (**self).should_propagate()
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        (**self).as_any()
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        (**self).as_any_mut()
     }
 }

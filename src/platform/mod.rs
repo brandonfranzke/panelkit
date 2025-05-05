@@ -5,6 +5,7 @@
 use anyhow::{Result, Context};
 use crate::TargetPlatform;
 use crate::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, Surface};
+use crate::event::{Event, TouchEvent, KeyboardEvent, SystemEvent};
 
 // Include platform implementations
 pub mod mock;
@@ -17,7 +18,9 @@ pub trait PlatformDriver {
     fn init(&mut self, width: u32, height: u32) -> Result<()>;
     
     /// Poll for input events
-    fn poll_events(&mut self) -> Result<Vec<crate::event::LegacyEvent>>;
+    /// 
+    /// Returns a vector of boxed Event trait objects
+    fn poll_events(&mut self) -> Result<Vec<Box<dyn Event>>>;
     
     /// Present rendered content to the display
     fn present(&mut self) -> Result<()>;

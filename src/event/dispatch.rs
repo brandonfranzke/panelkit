@@ -89,11 +89,29 @@ impl EventBus {
     /// Publish an event to a specific topic
     pub fn publish<E: Event + Send + 'static>(&self, topic: &str, event: E) -> Result<()> {
         if let Some(senders) = self.senders.get(topic) {
-            // We can only send to the first sender because we can't clone events anymore
-            // In a real system, we'd need to create multiple event instances
+            // Only send to the first subscriber for now, since we can't clone events
+            // In a real application, we'd need to implement Clone for events or use other mechanisms
             if let Some(first_sender) = senders.first() {
                 let boxed_event: Box<dyn Event + Send> = Box::new(event);
                 first_sender.send(boxed_event)?;
+            }
+            
+            // A more complete implementation would use a mechanism to share events:
+            // 1. Add Clone to Event trait (not always feasible)
+            // 2. Use Rc<RefCell<dyn Event>> (not thread-safe)
+            // 3. Use Arc<Mutex<dyn Event>> (thread-safe but more overhead)
+            // 4. Provide a explicit clone_event() method in the Event trait
+        }
+        
+        Ok(())
+    }
+    
+    /// Publish an already boxed event to a specific topic
+    pub fn publish_boxed(&self, topic: &str, event: Box<dyn Event + Send>) -> Result<()> {
+        if let Some(senders) = self.senders.get(topic) {
+            // Only send to the first subscriber for now
+            if let Some(first_sender) = senders.first() {
+                first_sender.send(event)?;
             }
         }
         
