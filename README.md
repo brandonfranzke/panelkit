@@ -108,7 +108,7 @@ For more details, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
 ### Building
 
-The project provides simplified targets for development and deployment:
+The project provides build targets for development and deployment:
 
 ```bash
 # Development build (with runtime platform detection)

@@ -1,5 +1,5 @@
-# PanelKit Makefile - Simplified Build System
-# Provides streamlined workflows for local development and Raspberry Pi deployment
+# PanelKit Makefile - Build System
+# Provides workflows for local development and Raspberry Pi deployment
 
 # Project variables
 PROJECT_NAME := panelkit

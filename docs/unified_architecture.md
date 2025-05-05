@@ -1,40 +1,12 @@
-# PanelKit Unified Architecture
+# PanelKit Architecture
 
-This document outlines the architectural improvements made to PanelKit, focusing on the transition from compile-time feature flags to runtime polymorphism and the unification of the rendering architecture.
+This document describes the runtime polymorphism approach and unified rendering architecture used in PanelKit.
 
-## Core Architecture Changes
+## Core Architecture
 
-### 1. Runtime Polymorphism vs. Compile-Time Feature Flags
+### 1. Runtime Polymorphism for Platform Selection
 
-#### Previous Approach
-
-Previously, PanelKit relied heavily on Rust's conditional compilation via feature flags:
-
-```rust
-#[cfg(feature = "host")]
-{
-    // Host-specific implementation
-    let backend = sdl_backend::SDLBackend::new(title)?;
-    return Ok(Box::new(backend));
-}
-
-#[cfg(feature = "embedded")]
-{
-    // Embedded-specific implementation
-    let backend = fb_backend::FramebufferBackend::new()?;
-    return Ok(Box::new(backend));
-}
-```
-
-This approach had several limitations:
-- Required recompilation for different target platforms
-- Code paths were statically determined at build time
-- Made testing across platforms more difficult
-- Created complex build configurations
-
-#### Current Approach
-
-The architecture now uses runtime polymorphism through trait objects:
+PanelKit uses runtime polymorphism through trait objects for platform selection and rendering backends:
 
 ```rust
 pub fn create_for_platform(title: &str, platform: TargetPlatform) -> Result<Box<dyn RenderingContext>> {
@@ -53,35 +25,13 @@ pub fn create_for_platform(title: &str, platform: TargetPlatform) -> Result<Box<
 }
 ```
 
-Benefits of this approach:
+Key features of this approach:
 - Dynamic selection of the appropriate implementation at runtime
-- Simplified build process with a single binary that can adapt to different environments
-- Easier testing across platform variants
-- Better error handling with graceful fallbacks
+- Single binary that can adapt to different environments
+- Testing across platform variants with the same binary
+- Error handling with graceful fallbacks
 
 ### 2. Unified Platform Driver Interface
-
-#### Previous Approach
-
-The previous architecture separated display and input functionality:
-
-```rust
-pub trait DisplayDriver {
-    fn init(&mut self, width: u32, height: u32) -> Result<()>;
-    fn present(&mut self) -> Result<()>;
-    // ...
-}
-
-pub trait InputDriver {
-    fn init_input(&mut self) -> Result<()>;
-    fn poll_events(&mut self) -> Result<Vec<Event>>;
-    // ...
-}
-```
-
-This created composition challenges and type system limitations with trait objects.
-
-#### Current Approach
 
 Now, a single `PlatformDriver` trait unifies all platform-specific functionality:
 
@@ -96,39 +46,15 @@ pub trait PlatformDriver {
 }
 ```
 
-Benefits:
-- Cleaner interface with a single trait for platform functionality
-- Simplified component interactions
-- Better alignment with the single responsibility principle
-- Easier to implement for new platforms
+Features:
+- Single trait for platform functionality
+- Coherent component interactions
+- Clear responsibility boundaries
+- Extensible for new platforms
 
 ### 3. Rendering Abstraction Layer
 
-#### Previous Approach
-
-UI rendering previously had direct dependencies on backend-specific APIs and parallel type hierarchies:
-
-```rust
-// GraphicsContext in platform module
-pub trait GraphicsContext {
-    fn clear(&mut self, color: graphics::Color) -> Result<()>;
-    fn fill_rect(&mut self, rect: graphics::Rectangle) -> Result<()>;
-    // ...
-}
-
-// RenderingBackend in rendering module
-pub trait RenderingBackend {
-    fn clear(&mut self, color: primitives::Color) -> Result<()>;
-    fn fill_rect(&mut self, rect: primitives::Rectangle, color: primitives::Color) -> Result<()>;
-    // ...
-}
-```
-
-This created tight coupling between UI components and rendering backends, as well as requiring complex conversions between different type systems.
-
-#### Current Approach
-
-A new unified rendering abstraction layer decouples UI from specific rendering implementations:
+The rendering abstraction layer decouples UI from specific rendering implementations:
 
 ```rust
 pub trait RenderingContext {
@@ -249,7 +175,7 @@ This provides:
 
 ## Graceful Fallbacks
 
-The new architecture implements graceful fallbacks when preferred backends are unavailable:
+The architecture implements graceful fallbacks when preferred backends are unavailable:
 
 ```rust
 match rendering_driver::RenderingPlatformDriver::new(app_title, width, height) {
