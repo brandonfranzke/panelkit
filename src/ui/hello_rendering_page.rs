@@ -2,7 +2,7 @@
 //!
 //! This module provides a "Hello" page for the application.
 
-use crate::event::{LegacyEvent as Event, Event as NewEvent, TouchEvent, EventType, CustomEvent, TouchAction};
+use crate::event::{Event, TouchEvent, EventType, CustomEvent, TouchAction, LegacyEvent};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Point, Rectangle, Color, TextStyle, FontSize, TextAlignment};
@@ -141,38 +141,15 @@ impl Page for HelloRenderingPage {
         Ok(())
     }
     
+    #[deprecated(
+        since = "0.2.0",
+        note = "MIGRATION REQUIRED: Use handle_new_event instead. Will be removed in version 0.3.0."
+    )]
     fn handle_event(&mut self, event: &crate::event::LegacyEvent) -> Result<Option<String>> {
-        match event {
-            Event::Touch { x, y, action: _ } => {
-                // Check if the user clicked the next button
-                if self.button_area.contains(&Point::new(*x, *y)) {
-                    self.logger.info("Next button clicked, navigating to World page");
-                    return Ok(Some("world".to_string()));
-                }
-                
-                // Check if the user clicked the arrow
-                let arrow_bounds = Rectangle::new(
-                    self.width as i32 - 130,
-                    self.height as i32 / 2 - 40,
-                    50,
-                    80
-                );
-                
-                if arrow_bounds.contains(&Point::new(*x, *y)) {
-                    self.logger.info("Navigation arrow clicked, navigating to World page");
-                    return Ok(Some("world".to_string()));
-                }
-            },
-            Event::Custom { event_type, .. } => {
-                if event_type == "next_page" {
-                    self.logger.info("Received next_page event, navigating to World page");
-                    return Ok(Some("world".to_string()));
-                }
-            },
-            _ => {}
-        }
-        
-        Ok(None)
+        // Forward to new_event handler by converting to the new event type
+        // This avoids duplicating logic and ensures both handlers work the same
+        let mut new_event = crate::event::convert_legacy_event(event);
+        self.handle_new_event(&mut *new_event)
     }
     
     fn on_activate(&mut self) -> Result<()> {

@@ -155,48 +155,93 @@ impl Application {
         logger.info("Starting main application loop");
         
         while self.running {
-            // Poll for input events
+            // Poll for input events - now returns Vec<Box<dyn Event>> directly
             let events = self.platform_driver.poll_events()
                 .context("Failed to poll for input events")?;
             
-            // Process events
-            for legacy_event in events {
+            // Process events using the new event system
+            for mut event in events {
                 // Check for system events
-                match &legacy_event {
-                    event::LegacyEvent::Custom { event_type, .. } if event_type == "quit" => {
+                if let Some(custom_event) = event.as_any().downcast_ref::<event::CustomEvent>() {
+                    if custom_event.name == "quit" {
                         logger.info("Received quit event, exiting application");
                         self.running = false;
-                    },
-                    event::LegacyEvent::Navigate { page_id } => {
-                        logger.info(&format!("Received navigation event to page: {}", page_id));
-                        if let Err(e) = self.ui_manager.navigate_to(page_id) {
-                            logger.error(&format!("Failed to navigate to page '{}': {}", page_id, e));
-                        }
-                    },
-                    _ => {}
+                    }
                 }
                 
-                logger.trace(&format!("Processing legacy event: {:?}", legacy_event));
-                
-                // Handle event dispatch to both legacy and new systems
-                
-                // 1. Publish to legacy event broker (for backward compatibility)
-                self.event_broker.publish("input", legacy_event.clone());
-                
-                // 2. Convert and publish to the new event system
-                let mut new_event = event::convert_legacy_event(&legacy_event);
-                // Publish to new event bus (commented out until Box<dyn Event> issue fixed)
-                // self.event_bus.publish("input", &*new_event);
-                
-                // 3. Process events in the UI manager
-                // First with the legacy system (will be removed in 0.3.0)
-                if let Err(e) = self.ui_manager.process_event(&legacy_event) {
-                    logger.error(&format!("Error processing legacy event in UI: {:#}", e));
+                // Publish to the new event bus
+                let event_clone = event.clone_event();
+                if let Err(e) = self.event_bus.publish_boxed("input", event_clone) {
+                    logger.error(&format!("Error publishing event to event bus: {:#}", e));
                 }
                 
-                // Then with the new event system (this is the preferred path)
-                if let Err(e) = self.ui_manager.process_new_event(new_event.as_mut()) {
-                    logger.error(&format!("Error processing new event in UI: {:#}", e));
+                // For backward compatibility, also publish to legacy event broker
+                #[allow(deprecated)]
+                {
+                    // Convert new event to legacy event for old code
+                    match event.event_type() {
+                        event::EventType::Touch => {
+                            if let Some(touch_event) = event.as_any().downcast_ref::<event::TouchEvent>() {
+                                let legacy_action = match touch_event.action {
+                                    event::TouchAction::Down => event::LegacyTouchAction::Press,
+                                    event::TouchAction::Up => event::LegacyTouchAction::Up,
+                                    event::TouchAction::Move => event::LegacyTouchAction::Move,
+                                    event::TouchAction::LongPress => event::LegacyTouchAction::LongPress,
+                                    event::TouchAction::Gesture(ref gesture) => {
+                                        if let event::GestureType::Swipe(dir) = gesture {
+                                            event::LegacyTouchAction::Swipe(*dir)
+                                        } else {
+                                            event::LegacyTouchAction::Move
+                                        }
+                                    }
+                                };
+                                
+                                let legacy_event = event::LegacyEvent::Touch {
+                                    x: touch_event.position.x,
+                                    y: touch_event.position.y,
+                                    action: legacy_action,
+                                };
+                                
+                                self.event_broker.publish("input", legacy_event);
+                                
+                                // Also process the legacy event in the UI manager (will be removed in 0.3.0)
+                                if let Err(e) = self.ui_manager.process_event(&legacy_event) {
+                                    logger.error(&format!("Error processing legacy event in UI: {:#}", e));
+                                }
+                            }
+                        },
+                        event::EventType::Custom => {
+                            if let Some(custom_event) = event.as_any().downcast_ref::<event::CustomEvent>() {
+                                let legacy_event = event::LegacyEvent::Custom {
+                                    event_type: custom_event.name.clone(),
+                                    payload: custom_event.payload.clone(),
+                                };
+                                
+                                // Handle navigation events specially
+                                if custom_event.name.starts_with("navigate:") {
+                                    if let Some(page_id) = custom_event.name.strip_prefix("navigate:") {
+                                        logger.info(&format!("Received navigation event to page: {}", page_id));
+                                        if let Err(e) = self.ui_manager.navigate_to(page_id) {
+                                            logger.error(&format!("Failed to navigate to page '{}': {}", page_id, e));
+                                        }
+                                    }
+                                }
+                                
+                                self.event_broker.publish("input", legacy_event.clone());
+                                
+                                // Also process the legacy event in the UI manager (will be removed in 0.3.0)
+                                if let Err(e) = self.ui_manager.process_event(&legacy_event) {
+                                    logger.error(&format!("Error processing legacy event in UI: {:#}", e));
+                                }
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+                
+                // Process with the new event system directly (preferred path)
+                if let Err(e) = self.ui_manager.process_new_event(event.as_mut()) {
+                    logger.error(&format!("Error processing event in UI: {:#}", e));
                 }
             }
             

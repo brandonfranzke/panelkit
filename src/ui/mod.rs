@@ -36,24 +36,62 @@ pub trait Page {
     /// Returns a navigation event if the page wants to navigate
     /// 
     /// This method is being kept for backward compatibility during the transition.
+    #[deprecated(
+        since = "0.2.0",
+        note = "MIGRATION REQUIRED: Use handle_new_event instead. Will be removed in version 0.3.0."
+    )]
     fn handle_event(&mut self, event: &LegacyEvent) -> Result<Option<String>>;
     
     /// Handle new event system events
     /// Returns a navigation event if the page wants to navigate
     fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
-        // Default implementation calls the legacy method for backward compatibility
-        // Pages can override this method to handle new events directly
+        // Default implementation for backward compatibility
+        // Pages should override this method to handle new events directly
         
-        // Since each event type needs different conversion logic and we can't clone the 
-        // dynamic event, the default implementation just returns None.
-        // Pages that want to use the new event system should override this method.
+        // Now that we have proper event cloning, we can implement a better default:
+        // Convert to legacy event and call handle_event
+        #[allow(deprecated)]
         match event.event_type() {
-            _ => Ok(None)
+            crate::event::EventType::Touch => {
+                if let Some(touch_event) = event.as_any().downcast_ref::<crate::event::TouchEvent>() {
+                    let legacy_action = match touch_event.action {
+                        crate::event::TouchAction::Down => crate::event::LegacyTouchAction::Press,
+                        crate::event::TouchAction::Up => crate::event::LegacyTouchAction::Up,
+                        crate::event::TouchAction::Move => crate::event::LegacyTouchAction::Move,
+                        crate::event::TouchAction::LongPress => crate::event::LegacyTouchAction::LongPress,
+                        crate::event::TouchAction::Gesture(ref gesture) => {
+                            if let crate::event::GestureType::Swipe(dir) = gesture {
+                                crate::event::LegacyTouchAction::Swipe(*dir)
+                            } else {
+                                crate::event::LegacyTouchAction::Move
+                            }
+                        }
+                    };
+                    
+                    let legacy_event = LegacyEvent::Touch {
+                        x: touch_event.position.x,
+                        y: touch_event.position.y,
+                        action: legacy_action,
+                    };
+                    
+                    return self.handle_event(&legacy_event);
+                }
+            },
+            crate::event::EventType::Custom => {
+                if let Some(custom_event) = event.as_any().downcast_ref::<crate::event::CustomEvent>() {
+                    let legacy_event = LegacyEvent::Custom {
+                        event_type: custom_event.name.clone(),
+                        payload: custom_event.payload.clone(),
+                    };
+                    
+                    return self.handle_event(&legacy_event);
+                }
+            },
+            _ => {}
         }
         
-        // This would be the ideal implementation if we could create a LegacyEvent from any Event
-        // But that's not easily possible with the current design
-        // self.handle_event(&legacy_event)
+        // If we couldn't convert or handle the event, return None
+        Ok(None)
     }
     
     /// Called when this page becomes active
@@ -167,10 +205,15 @@ impl UIManager {
     }
     
     /// Process an event in the UI system (legacy version)
+    #[deprecated(
+        since = "0.2.0",
+        note = "MIGRATION REQUIRED: Use process_new_event instead. Will be removed in version 0.3.0."
+    )]
     pub fn process_event(&mut self, event: &LegacyEvent) -> Result<()> {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {
                 // Handle the event and check for navigation requests
+                #[allow(deprecated)]
                 let navigation = page.handle_event(event)
                     .with_context(|| format!("Failed to process legacy event in page '{}'", page_id))?;
                 
