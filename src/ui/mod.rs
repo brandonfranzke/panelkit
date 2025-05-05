@@ -9,6 +9,9 @@ use crate::error::UIError;
 use crate::RenderingContext;
 use crate::logging;
 
+// Core trait definitions
+pub mod traits;
+
 // Export UI components
 pub mod components;
 

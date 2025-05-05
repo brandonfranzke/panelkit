@@ -2,14 +2,15 @@
 //!
 //! This module provides layout elements for arranging components.
 
-use crate::primitives::{RenderingContext, Renderable, Rectangle, Color};
-use crate::ui::components::{ColoredRectangle, UIComponent};
+use crate::primitives::{RenderingContext, Rectangle, Color, Point};
+use crate::ui::components::{ColoredRectangle, ComponentBase};
+use crate::ui::traits::{Component, Positioned, Contains, Renderable};
 use anyhow::Result;
 
 /// A container for grouping multiple UI components
 pub struct Container {
-    bounds: Rectangle,
-    components: Vec<Box<dyn UIComponent>>,
+    base: ComponentBase,
+    components: Vec<Box<dyn Component>>,
     background: Option<ColoredRectangle>,
 }
 
@@ -17,7 +18,7 @@ impl Container {
     /// Create a new container
     pub fn new(x: i32, y: i32, width: u32, height: u32) -> Self {
         Self {
-            bounds: Rectangle::new(x, y, width, height),
+            base: ComponentBase::with_bounds(x, y, width, height),
             components: Vec::new(),
             background: None,
         }
@@ -30,13 +31,25 @@ impl Container {
     }
     
     /// Add a component to the container
-    pub fn add<T: UIComponent + 'static>(&mut self, component: T) {
+    pub fn add<T: Component + 'static>(&mut self, component: T) {
         self.components.push(Box::new(component));
     }
 }
 
+impl Positioned for Container {
+    fn bounds(&self) -> Rectangle {
+        self.base.bounds()
+    }
+}
+
+impl Contains for Container {}
+
 impl Renderable for Container {
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        if !self.is_visible() {
+            return Ok(());
+        }
+        
         // Draw background if set
         if let Some(ref bg) = self.background {
             bg.render(ctx)?;
@@ -51,9 +64,26 @@ impl Renderable for Container {
     }
 }
 
-impl UIComponent for Container {
-    fn bounds(&self) -> Rectangle {
-        self.bounds
+impl Component for Container {
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base.enabled = enabled;
+        
+        // Propagate to children
+        for component in &mut self.components {
+            component.set_enabled(enabled);
+        }
+    }
+    
+    fn is_enabled(&self) -> bool {
+        self.base.enabled
+    }
+    
+    fn set_visible(&mut self, visible: bool) {
+        self.base.visible = visible;
+    }
+    
+    fn is_visible(&self) -> bool {
+        self.base.visible
     }
 }
 
@@ -80,14 +110,38 @@ impl TitleBar {
     }
 }
 
+impl Positioned for TitleBar {
+    fn bounds(&self) -> Rectangle {
+        self.container.bounds()
+    }
+}
+
+impl Contains for TitleBar {}
+
 impl Renderable for TitleBar {
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        if !self.is_visible() {
+            return Ok(());
+        }
+        
         self.container.render(ctx)
     }
 }
 
-impl UIComponent for TitleBar {
-    fn bounds(&self) -> Rectangle {
-        self.container.bounds()
+impl Component for TitleBar {
+    fn set_enabled(&mut self, enabled: bool) {
+        self.container.set_enabled(enabled);
+    }
+    
+    fn is_enabled(&self) -> bool {
+        self.container.is_enabled()
+    }
+    
+    fn set_visible(&mut self, visible: bool) {
+        self.container.set_visible(visible);
+    }
+    
+    fn is_visible(&self) -> bool {
+        self.container.is_visible()
     }
 }

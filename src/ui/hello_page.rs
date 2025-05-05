@@ -5,7 +5,8 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::primitives::{RenderingContext, Renderable, Color, Point, Rectangle};
+use crate::primitives::{RenderingContext, Color, Point, Rectangle};
+use crate::ui::traits::Renderable;
 use crate::ui::components::{layout::TitleBar, text::Text, text::TextAlign, ColoredRectangle};
 use anyhow::Result;
 use std::any::Any;

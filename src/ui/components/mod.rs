@@ -2,31 +2,51 @@
 //!
 //! This module provides reusable UI components for building pages.
 
-use crate::primitives::{RenderingContext, Renderable, Rectangle, Point, Color};
+use crate::primitives::{RenderingContext, Rectangle, Point, Color};
+use crate::ui::traits::{Positioned, Contains, Renderable, Component};
 use anyhow::Result;
 
 pub mod button;
 pub mod text;
 pub mod layout;
 
-/// Represents a basic UI element that can be rendered to a rendering context
-pub trait UIComponent: Renderable {
-    /// Get the bounding rectangle of this component
-    fn bounds(&self) -> Rectangle;
+/// Base implementation of Component for simpler components
+pub struct ComponentBase {
+    bounds: Rectangle,
+    enabled: bool,
+    visible: bool,
+}
+
+impl ComponentBase {
+    /// Create a new component base
+    pub fn new(bounds: Rectangle) -> Self {
+        Self {
+            bounds,
+            enabled: true,
+            visible: true,
+        }
+    }
     
-    /// Check if a point is inside this component
-    fn contains(&self, point: Point) -> bool {
-        let bounds = self.bounds();
-        point.x >= bounds.x && 
-        point.x < bounds.x + bounds.width as i32 &&
-        point.y >= bounds.y && 
-        point.y < bounds.y + bounds.height as i32
+    /// Create a new component base with position and size
+    pub fn with_bounds(x: i32, y: i32, width: u32, height: u32) -> Self {
+        Self::new(Rectangle::new(x, y, width, height))
     }
 }
 
+impl Positioned for ComponentBase {
+    fn bounds(&self) -> Rectangle {
+        self.bounds
+    }
+}
+
+impl Contains for ComponentBase {}
+
+// Re-export traits for convenience
+pub use crate::ui::traits::{Focusable, Touchable};
+
 /// A basic colored rectangle component
 pub struct ColoredRectangle {
-    bounds: Rectangle,
+    base: ComponentBase,
     color: Color,
     filled: bool,
 }
@@ -35,7 +55,7 @@ impl ColoredRectangle {
     /// Create a new colored rectangle
     pub fn new(x: i32, y: i32, width: u32, height: u32, color: Color, filled: bool) -> Self {
         Self {
-            bounds: Rectangle::new(x, y, width, height),
+            base: ComponentBase::with_bounds(x, y, width, height),
             color,
             filled,
         }
@@ -52,21 +72,45 @@ impl ColoredRectangle {
     }
 }
 
+impl Positioned for ColoredRectangle {
+    fn bounds(&self) -> Rectangle {
+        self.base.bounds()
+    }
+}
+
+impl Contains for ColoredRectangle {}
+
 impl Renderable for ColoredRectangle {
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        if !self.base.visible {
+            return Ok(());
+        }
+        
         if self.filled {
-            ctx.fill_rect(self.bounds, self.color)?;
+            ctx.fill_rect(self.bounds(), self.color)?;
         } else {
-            ctx.draw_rect(self.bounds, self.color)?;
+            ctx.draw_rect(self.bounds(), self.color)?;
         }
         
         Ok(())
     }
 }
 
-impl UIComponent for ColoredRectangle {
-    fn bounds(&self) -> Rectangle {
-        self.bounds
+impl Component for ColoredRectangle {
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base.enabled = enabled;
+    }
+    
+    fn is_enabled(&self) -> bool {
+        self.base.enabled
+    }
+    
+    fn set_visible(&mut self, visible: bool) {
+        self.base.visible = visible;
+    }
+    
+    fn is_visible(&self) -> bool {
+        self.base.visible
     }
 }
 
@@ -75,6 +119,8 @@ pub struct Line {
     start: Point,
     end: Point,
     color: Color,
+    enabled: bool,
+    visible: bool,
 }
 
 impl Line {
@@ -84,19 +130,13 @@ impl Line {
             start: Point::new(start_x, start_y),
             end: Point::new(end_x, end_y),
             color,
+            enabled: true,
+            visible: true,
         }
     }
 }
 
-impl Renderable for Line {
-    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
-        ctx.draw_line(self.start, self.end, self.color)?;
-        Ok(())
-    }
-}
-
-// Calculate approximate bounding box for a line
-impl UIComponent for Line {
+impl Positioned for Line {
     fn bounds(&self) -> Rectangle {
         let min_x = self.start.x.min(self.end.x);
         let min_y = self.start.y.min(self.end.y);
@@ -104,5 +144,36 @@ impl UIComponent for Line {
         let height = (self.start.y - self.end.y).abs() as u32;
         
         Rectangle::new(min_x, min_y, width, height)
+    }
+}
+
+impl Contains for Line {}
+
+impl Renderable for Line {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        if !self.visible {
+            return Ok(());
+        }
+        
+        ctx.draw_line(self.start, self.end, self.color)?;
+        Ok(())
+    }
+}
+
+impl Component for Line {
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+    
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+    
+    fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+    
+    fn is_visible(&self) -> bool {
+        self.visible
     }
 }

@@ -2,8 +2,9 @@
 //!
 //! This module provides a simple text rendering component using basic shapes.
 
-use crate::primitives::{RenderingContext, Renderable, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
-use crate::ui::components::{ColoredRectangle, UIComponent};
+use crate::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
+use crate::ui::components::{ColoredRectangle, ComponentBase};
+use crate::ui::traits::{Component, Positioned, Contains, Renderable};
 use anyhow::Result;
 
 /// Text alignment options
@@ -16,8 +17,7 @@ pub enum TextAlign {
 
 /// A simple text component that renders text using primitive shapes
 pub struct Text {
-    x: i32,
-    y: i32,
+    base: ComponentBase,
     text: String,
     color: Color,
     background_color: Option<Color>,
@@ -29,9 +29,12 @@ pub struct Text {
 impl Text {
     /// Create a new text component
     pub fn new(x: i32, y: i32, text: &str, color: Color) -> Self {
+        // Create initial dimensions based on text
+        let width = text.len() as u32 * 6; // Simple approximation
+        let height = 16; // Default height
+        
         Self {
-            x,
-            y,
+            base: ComponentBase::with_bounds(x, y, width, height),
             text: text.to_string(),
             color,
             background_color: None,
@@ -80,33 +83,53 @@ impl Text {
     fn calc_height(&self) -> u32 {
         self.font_size + 4
     }
-}
-
-impl Renderable for Text {
-    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+    
+    /// Calculate the effective bounds based on alignment and dynamic size
+    fn effective_bounds(&self) -> Rectangle {
         let text_width = self.calc_width();
         let text_height = self.calc_height();
+        let bounds = self.base.bounds();
         
         // Calculate x position based on alignment
         let x = match self.align {
-            TextAlign::Left => self.x,
-            TextAlign::Center => self.x - (text_width as i32 / 2),
-            TextAlign::Right => self.x - text_width as i32,
+            TextAlign::Left => bounds.x,
+            TextAlign::Center => bounds.x - (text_width as i32 / 2),
+            TextAlign::Right => bounds.x - text_width as i32,
         };
+        
+        Rectangle::new(x, bounds.y, text_width, text_height)
+    }
+}
+
+impl Positioned for Text {
+    fn bounds(&self) -> Rectangle {
+        self.effective_bounds()
+    }
+}
+
+impl Contains for Text {}
+
+impl Renderable for Text {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        if !self.is_visible() {
+            return Ok(());
+        }
+        
+        let bounds = self.bounds();
         
         // Draw background if specified
         if let Some(bg_color) = self.background_color {
             ColoredRectangle::filled(
-                x, 
-                self.y, 
-                text_width, 
-                text_height, 
+                bounds.x, 
+                bounds.y, 
+                bounds.width, 
+                bounds.height, 
                 bg_color
             ).render(ctx)?;
         }
         
         // Use the rendering context's text drawing capability
-        let position = Point::new(x, self.y);
+        let position = Point::new(bounds.x, bounds.y);
         let text_alignment = match self.align {
             TextAlign::Left => TextAlignment::Left,
             TextAlign::Center => TextAlignment::Center,
@@ -131,19 +154,21 @@ impl Renderable for Text {
     }
 }
 
-impl UIComponent for Text {
-    fn bounds(&self) -> Rectangle {
-        let text_width = self.calc_width();
-        let text_height = self.calc_height();
-        
-        // Calculate x position based on alignment
-        let x = match self.align {
-            TextAlign::Left => self.x,
-            TextAlign::Center => self.x - (text_width as i32 / 2),
-            TextAlign::Right => self.x - text_width as i32,
-        };
-        
-        Rectangle::new(x, self.y, text_width, text_height)
+impl Component for Text {
+    fn set_enabled(&mut self, enabled: bool) {
+        self.base.enabled = enabled;
+    }
+    
+    fn is_enabled(&self) -> bool {
+        self.base.enabled
+    }
+    
+    fn set_visible(&mut self, visible: bool) {
+        self.base.visible = visible;
+    }
+    
+    fn is_visible(&self) -> bool {
+        self.base.visible
     }
 }
 
