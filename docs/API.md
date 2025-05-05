@@ -238,21 +238,6 @@ impl EventHandler for MyComponent {
 }
 ```
 
-### Enum-based Events (Deprecated)
-
-For backward compatibility, an enum-based event system is also provided:
-
-```rust
-// Deprecated: Use trait-based events instead
-pub enum EnumEvent {
-    Touch { x: i32, y: i32, action: EnumTouchAction },
-    Key { key: String, pressed: bool },
-    // Other event types...
-}
-
-// Convert between event systems
-let trait_event = convert_enum_to_trait_event(&enum_event);
-```
 
 See `docs/EVENT_SYSTEM.md` for detailed documentation on the event system.
 

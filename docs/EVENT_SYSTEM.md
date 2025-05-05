@@ -282,32 +282,6 @@ EventPropagator::propagate(
 )?;
 ```
 
-## Deprecated Enum-Based Events
-
-For backward compatibility, the system includes an enum-based event representation that is being phased out:
-
-```rust
-#[deprecated(
-    since = "0.2.0",
-    note = "Use the trait-based Event interface and specific event types for better type safety and event propagation."
-)]
-pub enum EnumEvent {
-    Touch { x: i32, y: i32, action: EnumTouchAction },
-    Key { key: String, pressed: bool },
-    // Other event types...
-}
-```
-
-## Conversion Between Event Systems
-
-The system provides conversion functions to bridge between the enum-based and trait-based approaches:
-
-```rust
-/// Converts enum-based events to trait-based event types
-pub fn convert_enum_to_trait_event(event: &EnumEvent) -> Box<dyn Event> {
-    // Conversion implementation...
-}
-```
 
 ## Best Practices
 
