@@ -11,7 +11,7 @@ PanelKit is designed as a self-contained appliance-like UI system for embedded d
 - **Cross-Platform Development**: Develop on macOS/Linux, deploy to embedded targets
 - **Runtime Platform Detection**: Automatically detects and adapts to the current platform
 - **Unified Rendering Interface**: Single, coherent API across development and production
-- **Event-Driven Architecture**: Robust pub/sub system for component communication
+- **Advanced Event System**: Type-safe, trait-based events with proper propagation phases
 - **Page-Based Navigation**: Structured UI organization with navigation
 - **Platform Abstraction**: Clean separation between UI logic and hardware specifics
 - **Safe Typing**: Type-safe downcasting for platform-specific features
@@ -29,7 +29,7 @@ PanelKit is in active development with:
 - Consolidated rendering primitives and abstraction layer
 - Pluggable rendering backends (SDL2, framebuffer) with automatic detection
 - UI manager with page navigation and safe component access
-- Event system with typed events and pub/sub messaging
+- Comprehensive event system with trait-based events, propagation phases, and thread safety
 - State management framework with serialization support
 - Build system for both host development and embedded deployment
 - Comprehensive error handling with context and recovery
@@ -87,8 +87,8 @@ PanelKit follows a layered architecture with clean separation of concerns:
         ▼                     ▼
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
 │ Event System  │     │Platform Driver │     │ State Manager │
-│ - Pub/sub     │◄───►│ - Display     │◄───►│ - Data store  │
-│ - Dispatching │     │ - Input       │     │ - Persistence │
+│ - Type-safe   │◄───►│ - Display     │◄───►│ - Data store  │
+│ - Propagation │     │ - Input       │     │ - Persistence │
 └───────────────┘     └───────┬───────┘     └───────────────┘
                               │
                               ▼

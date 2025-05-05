@@ -55,12 +55,16 @@ Provides unified hardware abstraction:
 
 The platform abstraction layer uses runtime polymorphism to select the appropriate implementation based on the detected platform or explicit configuration.
 
-### 4. Event System (event/mod.rs)
+### 4. Event System (event/mod.rs, event/types.rs, event/dispatch.rs)
 
 Implements a robust event system:
 - **Publisher/subscriber pattern** for loose coupling between components
-- **Typed events** for strong type safety
-- **Centralized dispatching** for system-wide event propagation
+- **Trait-based events** for strong type safety
+- **Event propagation phases** (capturing, at-target, bubbling) for proper event flow
+- **Event downcasting** through the Any trait for type-safe event handling
+- **EventHandler trait** directly integrated with the Component trait
+- **Centralized event dispatching** for system-wide propagation
+- **Thread-safe events** with Sync bound for concurrent processing
 
 ### 5. State Management (state/mod.rs)
 
