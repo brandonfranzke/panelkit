@@ -189,23 +189,10 @@ pub trait Container: Component {
     fn children_mut(&mut self) -> &mut [Box<dyn Component>];
     
     /// Propagate events to children
-    fn propagate_to_children(&mut self, event: &mut dyn Event) -> Result<bool> {
-        // For touch events, propagate to children in reverse order (top to bottom visually)
-        // This ensures that components "on top" get events first
-        let children = self.children_mut();
-        let children_len = children.len();
-        
-        for i in (0..children_len).rev() {
-            let child = &mut children[i];
-            
-            if child.is_visible() && child.is_enabled() {
-                let handled = child.handle_event(event)?;
-                if handled || event.is_handled() {
-                    return Ok(true);
-                }
-            }
-        }
-        
-        Ok(false)
-    }
+    /// 
+    /// This method should implement the event propagation phases:
+    /// 1. Capturing: From container down to target (parent to child)
+    /// 2. At Target: Processing at the target element
+    /// 3. Bubbling: From target up to container (child to parent)
+    fn propagate_to_children(&mut self, event: &mut dyn Event) -> Result<bool>;
 }

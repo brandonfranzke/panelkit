@@ -89,18 +89,26 @@ impl EventBus {
     /// Publish an event to a specific topic
     pub fn publish<E: Event + Send + 'static>(&self, topic: &str, event: E) -> Result<()> {
         if let Some(senders) = self.senders.get(topic) {
-            // Only send to the first subscriber for now, since we can't clone events
-            // In a real application, we'd need to implement Clone for events or use other mechanisms
-            if let Some(first_sender) = senders.first() {
-                let boxed_event: Box<dyn Event + Send> = Box::new(event);
-                first_sender.send(boxed_event)?;
+            if senders.is_empty() {
+                return Ok(());
             }
             
-            // A more complete implementation would use a mechanism to share events:
-            // 1. Add Clone to Event trait (not always feasible)
-            // 2. Use Rc<RefCell<dyn Event>> (not thread-safe)
-            // 3. Use Arc<Mutex<dyn Event>> (thread-safe but more overhead)
-            // 4. Provide a explicit clone_event() method in the Event trait
+            // Box the event once
+            let boxed_event: Box<dyn Event + Send> = Box::new(event);
+            
+            // Send clones to all subscribers except the last one
+            let last_index = senders.len() - 1;
+            
+            for (i, sender) in senders.iter().enumerate() {
+                if i < last_index {
+                    // Clone the event for all but the last subscriber
+                    let cloned_event = boxed_event.clone_event();
+                    sender.send(cloned_event)?;
+                } else {
+                    // Use the original event for the last subscriber
+                    sender.send(boxed_event)?;
+                }
+            }
         }
         
         Ok(())
@@ -109,9 +117,22 @@ impl EventBus {
     /// Publish an already boxed event to a specific topic
     pub fn publish_boxed(&self, topic: &str, event: Box<dyn Event + Send>) -> Result<()> {
         if let Some(senders) = self.senders.get(topic) {
-            // Only send to the first subscriber for now
-            if let Some(first_sender) = senders.first() {
-                first_sender.send(event)?;
+            if senders.is_empty() {
+                return Ok(());
+            }
+            
+            // Send clones to all subscribers except the last one
+            let last_index = senders.len() - 1;
+            
+            for (i, sender) in senders.iter().enumerate() {
+                if i < last_index {
+                    // Clone the event for all but the last subscriber
+                    let cloned_event = event.clone_event();
+                    sender.send(cloned_event)?;
+                } else {
+                    // Use the original event for the last subscriber to avoid another clone
+                    sender.send(event)?;
+                }
             }
         }
         

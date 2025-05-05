@@ -57,17 +57,8 @@ impl PlatformDriver for RenderingPlatformDriver {
     fn poll_events(&mut self) -> Result<Vec<Box<dyn Event>>> {
         // If our backend is SDL, we can get events from it directly via downcasting
         if let Some(sdl_backend) = self.rendering_context.as_any_mut().downcast_mut::<crate::rendering::sdl_backend::SDLBackend>() {
-            // For now, we need to convert the legacy events to new event types
-            // In the future, SDLBackend will be updated to return Box<dyn Event> directly
-            let legacy_events = sdl_backend.poll_events()?;
-            let mut events: Vec<Box<dyn Event>> = Vec::new();
-            
-            // Convert legacy events to new event types
-            for legacy_event in legacy_events {
-                events.push(crate::event::convert_legacy_event(&legacy_event));
-            }
-            
-            return Ok(events);
+            // SDLBackend now returns Box<dyn Event> directly
+            return sdl_backend.poll_events();
         }
         
         // For other backends, we'd need to implement platform-specific event handling

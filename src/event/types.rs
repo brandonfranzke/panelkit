@@ -27,6 +27,11 @@ pub trait Event: Debug + Sync {
     
     /// Convert to Any for downcasting
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    
+    /// Create a deep clone of the event
+    /// 
+    /// This method allows events to be cloned even though they don't implement Clone trait
+    fn clone_event(&self) -> Box<dyn Event + Send>;
 }
 
 // Implement Event for Box<dyn Event> to allow boxed events to be used as events
@@ -53,6 +58,10 @@ impl<T: Event + ?Sized> Event for Box<T> {
     
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self.as_mut().as_any_mut()
+    }
+    
+    fn clone_event(&self) -> Box<dyn Event + Send> {
+        self.as_ref().clone_event()
     }
 }
 
@@ -239,6 +248,15 @@ impl Event for TouchEvent {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    
+    fn clone_event(&self) -> Box<dyn Event + Send> {
+        Box::new(TouchEvent {
+            data: self.data.clone(),
+            action: self.action,
+            position: self.position,
+            previous_position: self.previous_position,
+        })
+    }
 }
 
 /// Keyboard event information
@@ -316,6 +334,15 @@ impl Event for KeyboardEvent {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    
+    fn clone_event(&self) -> Box<dyn Event + Send> {
+        Box::new(KeyboardEvent {
+            data: self.data.clone(),
+            key_code: self.key_code,
+            pressed: self.pressed,
+            modifiers: self.modifiers,
+        })
+    }
 }
 
 /// System event information
@@ -386,6 +413,13 @@ impl Event for SystemEvent {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    
+    fn clone_event(&self) -> Box<dyn Event + Send> {
+        Box::new(SystemEvent {
+            data: self.data.clone(),
+            system_type: self.system_type.clone(),
+        })
+    }
 }
 
 /// Custom application event
@@ -432,32 +466,13 @@ impl Event for CustomEvent {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    
+    fn clone_event(&self) -> Box<dyn Event + Send> {
+        Box::new(CustomEvent {
+            data: self.data.clone(),
+            name: self.name.clone(),
+            payload: self.payload.clone(),
+        })
+    }
 }
 
-/// Implement Event trait for boxed event objects
-/// This allows Box<dyn Event> to be used directly as an Event
-impl<T: Event + ?Sized> Event for Box<T> {
-    fn event_type(&self) -> EventType {
-        (**self).event_type()
-    }
-    
-    fn is_handled(&self) -> bool {
-        (**self).is_handled()
-    }
-    
-    fn mark_handled(&mut self) {
-        (**self).mark_handled()
-    }
-    
-    fn should_propagate(&self) -> bool {
-        (**self).should_propagate()
-    }
-    
-    fn as_any(&self) -> &dyn Any {
-        (**self).as_any()
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        (**self).as_any_mut()
-    }
-}

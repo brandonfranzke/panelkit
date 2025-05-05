@@ -5,6 +5,7 @@
 
 use anyhow::{Result, Context, bail};
 use crate::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface};
+use crate::event::{Event, TouchEvent, KeyboardEvent, CustomEvent, SystemEvent, TouchAction, SystemEventType};
 use std::any::Any;
 
 // Conditionally include SDL2 if the feature is available
@@ -85,46 +86,36 @@ impl SDLBackend {
     }
     
     /// Poll for events and convert them to PanelKit events
-    pub fn poll_events(&self) -> Result<Vec<crate::event::LegacyEvent>> {
+    pub fn poll_events(&self) -> Result<Vec<Box<dyn Event>>> {
         let mut event_pump = self.sdl_context.event_pump()
             .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
             
-        let mut events = Vec::new();
+        let mut events: Vec<Box<dyn Event>> = Vec::new();
         
         for event in event_pump.poll_iter() {
             match event {
                 SdlEvent::Quit {..} => {
                     // Map quit event to a custom event
-                    events.push(crate::event::LegacyEvent::Custom {
-                        event_type: "quit".to_string(),
-                        payload: String::new(),
-                    });
+                    events.push(Box::new(CustomEvent::new("quit", "")));
                 },
                 SdlEvent::KeyDown { keycode: Some(key), .. } => {
                     // Map key events
-                    let key_str = format!("{:?}", key).to_lowercase();
-                    events.push(crate::event::LegacyEvent::Key {
-                        key: key_str,
-                        pressed: true,
-                    });
+                    let key_code = key as u32;
+                    events.push(Box::new(KeyboardEvent::new(key_code, true)));
                 },
                 SdlEvent::KeyUp { keycode: Some(key), .. } => {
                     // Map key events
-                    let key_str = format!("{:?}", key).to_lowercase();
-                    events.push(crate::event::LegacyEvent::Key {
-                        key: key_str,
-                        pressed: false,
-                    });
+                    let key_code = key as u32;
+                    events.push(Box::new(KeyboardEvent::new(key_code, false)));
                 },
                 SdlEvent::MouseButtonDown { x, y, mouse_btn, .. } => {
                     // Map mouse events to touch events for simplicity
                     match mouse_btn {
                         sdl2::mouse::MouseButton::Left => {
-                            events.push(crate::event::LegacyEvent::Touch {
-                                x,
-                                y,
-                                action: crate::event::LegacyTouchAction::Press,
-                            });
+                            events.push(Box::new(TouchEvent::new(
+                                TouchAction::Down,
+                                Point::new(x, y)
+                            )));
                         },
                         _ => {}
                     }
@@ -133,11 +124,10 @@ impl SDLBackend {
                     // Map mouse events to touch events for simplicity
                     match mouse_btn {
                         sdl2::mouse::MouseButton::Left => {
-                            events.push(crate::event::LegacyEvent::Touch {
-                                x,
-                                y,
-                                action: crate::event::LegacyTouchAction::Up,
-                            });
+                            events.push(Box::new(TouchEvent::new(
+                                TouchAction::Up,
+                                Point::new(x, y)
+                            )));
                         },
                         _ => {}
                     }
@@ -145,12 +135,20 @@ impl SDLBackend {
                 SdlEvent::MouseMotion { x, y, mousestate, .. } => {
                     // If mouse button is pressed, send a Move event
                     if mousestate.left() {
-                        events.push(crate::event::LegacyEvent::Touch {
-                            x,
-                            y,
-                            action: crate::event::LegacyTouchAction::Move,
-                        });
+                        events.push(Box::new(TouchEvent::new(
+                            TouchAction::Move,
+                            Point::new(x, y)
+                        )));
                     }
+                },
+                SdlEvent::Window { win_event: sdl2::event::WindowEvent::Resized(w, h), .. } => {
+                    // Handle window resize events
+                    events.push(Box::new(SystemEvent::new(
+                        SystemEventType::Resize {
+                            width: w as u32,
+                            height: h as u32
+                        }
+                    )));
                 },
                 _ => {}
             }
@@ -191,7 +189,7 @@ impl SDLBackend {
     }
     
     /// Poll for events (stub implementation)
-    pub fn poll_events(&self) -> Result<Vec<crate::event::LegacyEvent>> {
+    pub fn poll_events(&self) -> Result<Vec<Box<dyn Event>>> {
         Ok(Vec::new())
     }
 }

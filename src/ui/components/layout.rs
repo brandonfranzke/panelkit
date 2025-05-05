@@ -76,6 +76,89 @@ impl ContainerTrait for Container {
     fn children_mut(&mut self) -> &mut [Box<dyn Component>] {
         &mut self.components
     }
+    
+    fn propagate_to_children(&mut self, event: &mut dyn Event) -> Result<bool> {
+        // Set the event phase to capturing first
+        if let Some(event_data) = event.as_any_mut().downcast_mut::<crate::event::EventData>() {
+            event_data.set_phase(crate::event::EventPhase::Capturing);
+        }
+
+        // Capturing phase: propagate down from parent to children
+        // Process in reverse order (top components get events first)
+        let children = self.children_mut();
+        let children_len = children.len();
+        
+        // Find the target component (the one that contains the point for touch events)
+        let mut target_index = None;
+        if let Some(touch_event) = event.as_any_mut().downcast_mut::<crate::event::TouchEvent>() {
+            for i in (0..children_len).rev() {
+                let child = &children[i];
+                if child.is_visible() && child.is_enabled() && child.contains(&touch_event.position) {
+                    target_index = Some(i);
+                    break;
+                }
+            }
+        }
+        
+        // Capturing phase: propagate to all ancestors of the target
+        let mut handled = false;
+        if let Some(target_idx) = target_index {
+            // Process all components before the target in reverse order (capturing)
+            for i in (0..target_idx).rev() {
+                let child = &mut children[i];
+                if child.is_visible() && child.is_enabled() {
+                    handled = child.handle_event(event)? || event.is_handled();
+                    if handled {
+                        return Ok(true);
+                    }
+                }
+            }
+            
+            // At target phase
+            if let Some(event_data) = event.as_any_mut().downcast_mut::<crate::event::EventData>() {
+                event_data.set_phase(crate::event::EventPhase::AtTarget);
+            }
+            
+            let target = &mut children[target_idx];
+            if target.is_visible() && target.is_enabled() {
+                handled = target.handle_event(event)? || event.is_handled();
+                if handled {
+                    return Ok(true);
+                }
+            }
+            
+            // Bubbling phase
+            if let Some(event_data) = event.as_any_mut().downcast_mut::<crate::event::EventData>() {
+                event_data.set_phase(crate::event::EventPhase::Bubbling);
+            }
+            
+            // Process all components after the target
+            for i in (target_idx+1)..children_len {
+                let child = &mut children[i];
+                if child.is_visible() && child.is_enabled() {
+                    handled = child.handle_event(event)? || event.is_handled();
+                    if handled {
+                        return Ok(true);
+                    }
+                }
+            }
+            
+            return Ok(handled);
+        } else {
+            // No target found, just try all components in reverse order
+            for i in (0..children_len).rev() {
+                let child = &mut children[i];
+                if child.is_visible() && child.is_enabled() {
+                    handled = child.handle_event(event)? || event.is_handled();
+                    if handled {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        
+        Ok(handled)
+    }
 }
 
 impl Component for Container {
