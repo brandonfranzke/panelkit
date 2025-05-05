@@ -42,10 +42,6 @@ pub struct PlatformFactory;
 impl PlatformFactory {
     /// Create a platform driver based on the specified target platform
     pub fn create(target_platform: TargetPlatform) -> Result<Box<dyn PlatformDriver>> {
-        // Default dimensions - these should be overridden by application config
-        // or auto-detected when possible
-        let default_width = 800;
-        let default_height = 480;
         let app_title = "PanelKit";
         
         // IMPORTANT: Only use one driver implementation - don't try to create multiples
@@ -63,7 +59,8 @@ impl PlatformFactory {
         match platform {
             TargetPlatform::Host => {
                 // Try to create rendering driver with SDL2 backend
-                Self::create_host_driver(app_title, default_width, default_height)
+                // Note: Initial dimensions will be set by the Application during init()
+                Self::create_host_driver(app_title, 800, 480)
             },
             TargetPlatform::Embedded => {
                 // Create embedded driver or fallback to mock
@@ -102,9 +99,19 @@ impl PlatformFactory {
     }
     
     /// Create a driver for embedded targets
+    /// 
+    /// # Future Improvements
+    /// 
+    /// This is currently a placeholder that uses a mock driver.
+    /// In the future, this should be enhanced to:
+    /// - Implement a proper framebuffer driver for embedded Linux
+    /// - Support various touch input devices (using evdev or similar)
+    /// - Auto-detect display capabilities and dimensions
+    /// - Support hardware-accelerated rendering where available
+    /// - Provide better error reporting for embedded devices
     fn create_embedded_driver() -> Result<Box<dyn PlatformDriver>> {
-        // TODO: In the future, implement proper framebuffer driver here
-        // For now, use mock driver as a placeholder
+        // Currently using mock driver as placeholder until proper framebuffer
+        // implementation is completed
         let mock_driver = mock::MockDriver::new();
         log::info!("Initialized mock platform driver for embedded target");
         

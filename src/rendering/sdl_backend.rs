@@ -1,50 +1,91 @@
 //! SDL2-based rendering backend
 //!
 //! This module implements the RenderingContext trait using SDL2 for host development.
-//! This backend is only fully functional when compiled with the 'sdl2' feature.
+//! It uses runtime detection rather than compile-time feature flags.
 
 use anyhow::{Result, Context, bail};
 use crate::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface};
 use crate::event::{Event, TouchEvent, KeyboardEvent, CustomEvent, SystemEvent, TouchAction, SystemEventType};
 use std::any::Any;
+use std::path::Path;
 
-// Conditionally include SDL2 if the feature is available
-#[cfg(feature = "sdl2")]
-use {
-    sdl2::event::Event as SdlEvent,
-    sdl2::pixels::Color as SdlColor,
-    sdl2::rect::{Point as SdlPoint, Rect as SdlRect},
-    sdl2::render::Canvas,
-    sdl2::ttf::{Font, Sdl2TtfContext},
-    sdl2::video::Window,
-    std::path::Path,
-    std::sync::{Arc, Mutex},
-};
-
-// Define different versions of the backend based on SDL2 availability
-#[cfg(feature = "sdl2")]
 /// SDL2 implementation of the RenderingContext trait
 pub struct SDLBackend {
-    sdl_context: sdl2::Sdl,
-    canvas: Arc<Mutex<Canvas<Window>>>,
-    ttf_context: Sdl2TtfContext,
+    // When SDL2 is available, these fields will be populated
+    sdl_available: bool,
+    width: u32,
+    height: u32,
+    #[allow(dead_code)] // May not be used in all code paths
     font_path: String,
-    width: u32,
-    height: u32,
+    
+    // These fields are Option types and will be None when SDL2 is not available
+    sdl_context: Option<sdl2::Sdl>,
+    canvas: Option<std::sync::Arc<std::sync::Mutex<sdl2::render::Canvas<sdl2::video::Window>>>>,
+    ttf_context: Option<sdl2::ttf::Sdl2TtfContext>,
 }
 
-#[cfg(not(feature = "sdl2"))]
-/// Stub implementation when SDL2 is not available
-pub struct SDLBackend {
-    width: u32,
-    height: u32,
-}
-
-// Implementation for when SDL2 is available
-#[cfg(feature = "sdl2")]
 impl SDLBackend {
     /// Create a new SDL backend with the given window title
     pub fn new(title: &str) -> Result<Self> {
+        // Check if SDL2 is available at runtime
+        let sdl_available = Self::is_sdl_available();
+        
+        if !sdl_available {
+            log::warn!("SDL2 is not available at runtime");
+            return Ok(Self {
+                sdl_available: false,
+                width: 800,
+                height: 480,
+                font_path: String::new(),
+                sdl_context: None,
+                canvas: None,
+                ttf_context: None,
+            });
+        }
+        
+        // Try to initialize SDL components
+        match Self::initialize_sdl(title) {
+            Ok((sdl_context, canvas, ttf_context, font_path)) => {
+                Ok(Self {
+                    sdl_available: true,
+                    width: 800,
+                    height: 480,
+                    font_path,
+                    sdl_context: Some(sdl_context),
+                    canvas: Some(std::sync::Arc::new(std::sync::Mutex::new(canvas))),
+                    ttf_context: Some(ttf_context),
+                })
+            },
+            Err(e) => {
+                log::warn!("Failed to initialize SDL2: {}", e);
+                Ok(Self {
+                    sdl_available: false,
+                    width: 800,
+                    height: 480,
+                    font_path: String::new(),
+                    sdl_context: None,
+                    canvas: None,
+                    ttf_context: None,
+                })
+            }
+        }
+    }
+    
+    /// Check if SDL2 is available at runtime
+    fn is_sdl_available() -> bool {
+        // Try to dynamically load SDL2
+        // This is a simplified check - in reality, we'd use the sdl2 crate's functionality
+        match sdl2::init() {
+            Ok(_) => true,
+            Err(e) => {
+                log::warn!("SDL2 not available: {}", e);
+                false
+            }
+        }
+    }
+    
+    /// Initialize SDL components
+    fn initialize_sdl(title: &str) -> Result<(sdl2::Sdl, sdl2::render::Canvas<sdl2::video::Window>, sdl2::ttf::Sdl2TtfContext, String)> {
         // Initialize SDL2
         let sdl_context = sdl2::init()
             .map_err(|e| anyhow::anyhow!("Failed to initialize SDL2: {}", e))?;
@@ -75,40 +116,40 @@ impl SDLBackend {
         // Find a usable font
         let font_path = find_system_font()?;
         
-        Ok(Self {
-            sdl_context,
-            canvas: Arc::new(Mutex::new(canvas)),
-            ttf_context,
-            font_path,
-            width: 800,
-            height: 480,
-        })
+        Ok((sdl_context, canvas, ttf_context, font_path))
     }
     
     /// Poll for events and convert them to PanelKit events
     pub fn poll_events(&self) -> Result<Vec<Box<dyn Event>>> {
-        let mut event_pump = self.sdl_context.event_pump()
+        // If SDL2 is not available, return an empty vec
+        if !self.sdl_available || self.sdl_context.is_none() {
+            return Ok(Vec::new());
+        }
+        
+        let sdl_context = self.sdl_context.as_ref().unwrap();
+        
+        let mut event_pump = sdl_context.event_pump()
             .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
             
         let mut events: Vec<Box<dyn Event>> = Vec::new();
         
         for event in event_pump.poll_iter() {
             match event {
-                SdlEvent::Quit {..} => {
+                sdl2::event::Event::Quit {..} => {
                     // Map quit event to a custom event
                     events.push(Box::new(CustomEvent::new("quit", "")));
                 },
-                SdlEvent::KeyDown { keycode: Some(key), .. } => {
+                sdl2::event::Event::KeyDown { keycode: Some(key), .. } => {
                     // Map key events
                     let key_code = key as u32;
                     events.push(Box::new(KeyboardEvent::new(key_code, true)));
                 },
-                SdlEvent::KeyUp { keycode: Some(key), .. } => {
+                sdl2::event::Event::KeyUp { keycode: Some(key), .. } => {
                     // Map key events
                     let key_code = key as u32;
                     events.push(Box::new(KeyboardEvent::new(key_code, false)));
                 },
-                SdlEvent::MouseButtonDown { x, y, mouse_btn, .. } => {
+                sdl2::event::Event::MouseButtonDown { x, y, mouse_btn, .. } => {
                     // Map mouse events to touch events for simplicity
                     match mouse_btn {
                         sdl2::mouse::MouseButton::Left => {
@@ -120,7 +161,7 @@ impl SDLBackend {
                         _ => {}
                     }
                 },
-                SdlEvent::MouseButtonUp { x, y, mouse_btn, .. } => {
+                sdl2::event::Event::MouseButtonUp { x, y, mouse_btn, .. } => {
                     // Map mouse events to touch events for simplicity
                     match mouse_btn {
                         sdl2::mouse::MouseButton::Left => {
@@ -132,7 +173,7 @@ impl SDLBackend {
                         _ => {}
                     }
                 },
-                SdlEvent::MouseMotion { x, y, mousestate, .. } => {
+                sdl2::event::Event::MouseMotion { x, y, mousestate, .. } => {
                     // If mouse button is pressed, send a Move event
                     if mousestate.left() {
                         events.push(Box::new(TouchEvent::new(
@@ -141,7 +182,7 @@ impl SDLBackend {
                         )));
                     }
                 },
-                SdlEvent::Window { win_event: sdl2::event::WindowEvent::Resized(w, h), .. } => {
+                sdl2::event::Event::Window { win_event: sdl2::event::WindowEvent::Resized(w, h), .. } => {
                     // Handle window resize events
                     events.push(Box::new(SystemEvent::new(
                         SystemEventType::Resize {
@@ -158,69 +199,72 @@ impl SDLBackend {
     }
     
     /// Convert a Color to an SDL Color
-    fn to_sdl_color(&self, color: Color) -> SdlColor {
-        SdlColor::RGBA(color.r, color.g, color.b, color.a)
+    fn to_sdl_color(&self, color: Color) -> sdl2::pixels::Color {
+        sdl2::pixels::Color::RGBA(color.r, color.g, color.b, color.a)
     }
     
     /// Convert a Point to an SDL Point
-    fn to_sdl_point(&self, point: Point) -> SdlPoint {
-        SdlPoint::new(point.x, point.y)
+    fn to_sdl_point(&self, point: Point) -> sdl2::rect::Point {
+        sdl2::rect::Point::new(point.x, point.y)
     }
     
     /// Convert a Rectangle to an SDL Rect
-    fn to_sdl_rect(&self, rect: Rectangle) -> SdlRect {
-        SdlRect::new(rect.x, rect.y, rect.width, rect.height)
+    fn to_sdl_rect(&self, rect: Rectangle) -> sdl2::rect::Rect {
+        sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)
     }
     
     /// Load a font with the requested size
-    fn load_font(&self, size: u16) -> Result<Font> {
-        self.ttf_context.load_font(&self.font_path, size)
-            .map_err(|e| anyhow::anyhow!("Failed to load font {} at size {}: {}", self.font_path, size, e))
+    fn load_font(&self, size: u16) -> Result<sdl2::ttf::Font> {
+        if let Some(ttf_context) = &self.ttf_context {
+            ttf_context.load_font(&self.font_path, size)
+                .map_err(|e| anyhow::anyhow!("Failed to load font {} at size {}: {}", self.font_path, size, e))
+        } else {
+            bail!("TTF context not available")
+        }
     }
 }
 
-#[cfg(not(feature = "sdl2"))]
-impl SDLBackend {
-    /// Create a new SDL backend with the given window title
-    pub fn new(_title: &str) -> Result<Self> {
-        // SDL2 is not available in this build
-        log::warn!("SDL2 is not available in this build");
-        bail!("SDL2 backend is not available in this build")
-    }
-    
-    /// Poll for events (stub implementation)
-    pub fn poll_events(&self) -> Result<Vec<Box<dyn Event>>> {
-        Ok(Vec::new())
-    }
-}
-
-#[cfg(feature = "sdl2")]
 impl RenderingContext for SDLBackend {
     fn init(&mut self, width: u32, height: u32) -> Result<()> {
         self.width = width;
         self.height = height;
         
+        if !self.sdl_available {
+            log::warn!("Using stub SDL backend - no real rendering will occur");
+            return Ok(());
+        }
+        
         // Try to resize the window (this may not work on all platforms)
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        let window = canvas.window_mut();
-        window.set_size(width, height)
-            .context("Failed to resize SDL window")?;
-            
-        // Initial clear to gray
-        canvas.set_draw_color(SdlColor::RGB(100, 100, 100));
-        canvas.clear();
-        canvas.present();
+        if let Some(canvas_arc) = &self.canvas {
+            let mut canvas = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            let window = canvas.window_mut();
+            window.set_size(width, height)
+                .context("Failed to resize SDL window")?;
+                
+            // Initial clear to gray
+            canvas.set_draw_color(sdl2::pixels::Color::RGB(100, 100, 100));
+            canvas.clear();
+            canvas.present();
+        }
         
         Ok(())
     }
     
     fn present(&mut self) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.present();
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: present called");
+            return Ok(());
+        }
+        
+        if let Some(canvas_arc) = &self.canvas {
+            let mut canvas = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            canvas.present();
+        }
+        
         Ok(())
     }
     
@@ -230,104 +274,145 @@ impl RenderingContext for SDLBackend {
     
     fn cleanup(&mut self) {
         // SDL2 will handle cleanup automatically when the context is dropped
+        log::trace!("SDL backend cleanup called");
     }
     
     fn clear(&mut self, color: Color) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.clear();
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: clear with color {:?}", color);
+            return Ok(());
+        }
+        
+        if let Some(canvas_arc) = &self.canvas {
+            let mut canvas = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            canvas.set_draw_color(self.to_sdl_color(color));
+            canvas.clear();
+        }
         
         Ok(())
     }
     
     fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.fill_rect(self.to_sdl_rect(rect))
-            .map_err(|e| anyhow::anyhow!("Failed to fill rectangle: {}", e))?;
-            
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: fill_rect at {:?} with color {:?}", rect, color);
+            return Ok(());
+        }
+        
+        if let Some(canvas_arc) = &self.canvas {
+            let mut canvas = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            canvas.set_draw_color(self.to_sdl_color(color));
+            canvas.fill_rect(self.to_sdl_rect(rect))
+                .map_err(|e| anyhow::anyhow!("Failed to fill rectangle: {}", e))?;
+        }
+        
         Ok(())
     }
     
     fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.draw_rect(self.to_sdl_rect(rect))
-            .map_err(|e| anyhow::anyhow!("Failed to draw rectangle: {}", e))?;
-            
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: draw_rect at {:?} with color {:?}", rect, color);
+            return Ok(());
+        }
+        
+        if let Some(canvas_arc) = &self.canvas {
+            let mut canvas = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            canvas.set_draw_color(self.to_sdl_color(color));
+            canvas.draw_rect(self.to_sdl_rect(rect))
+                .map_err(|e| anyhow::anyhow!("Failed to draw rectangle: {}", e))?;
+        }
+        
         Ok(())
     }
     
     fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.set_draw_color(self.to_sdl_color(color));
-        canvas.draw_line(self.to_sdl_point(start), self.to_sdl_point(end))
-            .map_err(|e| anyhow::anyhow!("Failed to draw line: {}", e))?;
-            
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: draw_line from {:?} to {:?} with color {:?}", start, end, color);
+            return Ok(());
+        }
+        
+        if let Some(canvas_arc) = &self.canvas {
+            let mut canvas = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            canvas.set_draw_color(self.to_sdl_color(color));
+            canvas.draw_line(self.to_sdl_point(start), self.to_sdl_point(end))
+                .map_err(|e| anyhow::anyhow!("Failed to draw line: {}", e))?;
+        }
+        
         Ok(())
     }
     
     fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
-        let canvas_lock = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        // Create texture creator
-        let texture_creator = canvas_lock.texture_creator();
-        
-        // Load font with appropriate style
-        let mut font = self.load_font(style.font_size.to_points())?;
-        
-        // Set font style
-        let mut sdl_font_style = sdl2::ttf::FontStyle::NORMAL;
-        if style.bold {
-            sdl_font_style = sdl_font_style | sdl2::ttf::FontStyle::BOLD;
-        }
-        if style.italic {
-            sdl_font_style = sdl_font_style | sdl2::ttf::FontStyle::ITALIC;
-        }
-        font.set_style(sdl_font_style);
-        
-        // Render text to surface
-        let surface = font.render(text)
-            .blended(self.to_sdl_color(style.color))
-            .map_err(|e| anyhow::anyhow!("Failed to render text to surface: {}", e))?;
-            
-        // Create texture from surface
-        let texture = texture_creator.create_texture_from_surface(&surface)
-            .map_err(|e| anyhow::anyhow!("Failed to create texture from text surface: {}", e))?;
-            
-        // Get text dimensions
-        let text_width = surface.width();
-        let text_height = surface.height();
-        
-        // Determine position based on alignment
-        let mut x = position.x;
-        match style.alignment {
-            TextAlignment::Left => {}
-            TextAlignment::Center => x -= (text_width / 2) as i32,
-            TextAlignment::Right => x -= text_width as i32,
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: draw_text '{}' at {:?}", text, position);
+            return Ok(());
         }
         
-        // Create destination rectangle
-        let dest_rect = SdlRect::new(x, position.y, text_width, text_height);
-        
-        // Draw the text
-        let mut canvas = canvas_lock;
-        canvas.copy(&texture, None, Some(dest_rect))
-            .map_err(|e| anyhow::anyhow!("Failed to copy text texture to canvas: {}", e))?;
+        if let Some(canvas_arc) = &self.canvas {
+            let canvas_lock = canvas_arc.lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+                
+            // Create texture creator
+            let texture_creator = canvas_lock.texture_creator();
             
+            // Load font with appropriate style
+            let mut font = self.load_font(style.font_size.to_points())?;
+            
+            // Set font style
+            let mut sdl_font_style = sdl2::ttf::FontStyle::NORMAL;
+            if style.bold {
+                sdl_font_style = sdl_font_style | sdl2::ttf::FontStyle::BOLD;
+            }
+            if style.italic {
+                sdl_font_style = sdl_font_style | sdl2::ttf::FontStyle::ITALIC;
+            }
+            font.set_style(sdl_font_style);
+            
+            // Render text to surface
+            let surface = font.render(text)
+                .blended(self.to_sdl_color(style.color))
+                .map_err(|e| anyhow::anyhow!("Failed to render text to surface: {}", e))?;
+                
+            // Create texture from surface
+            let texture = texture_creator.create_texture_from_surface(&surface)
+                .map_err(|e| anyhow::anyhow!("Failed to create texture from text surface: {}", e))?;
+                
+            // Get text dimensions
+            let text_width = surface.width();
+            let text_height = surface.height();
+            
+            // Determine position based on alignment
+            let mut x = position.x;
+            match style.alignment {
+                TextAlignment::Left => {}
+                TextAlignment::Center => x -= (text_width / 2) as i32,
+                TextAlignment::Right => x -= text_width as i32,
+            }
+            
+            // Create destination rectangle
+            let dest_rect = sdl2::rect::Rect::new(x, position.y, text_width, text_height);
+            
+            // Draw the text
+            let mut canvas = canvas_lock;
+            canvas.copy(&texture, None, Some(dest_rect))
+                .map_err(|e| anyhow::anyhow!("Failed to copy text texture to canvas: {}", e))?;
+        }
+        
         Ok(())
     }
     
     fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: draw_button '{}' at {:?}", text, rect);
+            return Ok(());
+        }
+        
         // Fill the button background
         self.fill_rect(rect, bg_color)?;
         
@@ -351,7 +436,12 @@ impl RenderingContext for SDLBackend {
     }
     
     fn create_surface(&mut self, width: u32, height: u32) -> Result<Box<dyn Surface>> {
-        // Create a simplified surface implementation
+        if !self.sdl_available {
+            log::trace!("Stub SDL backend: create_surface {}x{}", width, height);
+            bail!("Surface creation not supported in stub SDL backend");
+        }
+        
+        // Create a surface implementation
         let surface = SDLSurface::new(width, height);
         Ok(Box::new(surface))
     }
@@ -413,120 +503,6 @@ impl SDLSurface {
     }
 }
 
-#[cfg(not(feature = "sdl2"))]
-impl RenderingContext for SDLBackend {
-    fn init(&mut self, width: u32, height: u32) -> Result<()> {
-        self.width = width;
-        self.height = height;
-        log::warn!("Using stub SDL backend - no real rendering will occur");
-        Ok(())
-    }
-    
-    fn present(&mut self) -> Result<()> {
-        log::trace!("Stub SDL backend: present called");
-        Ok(())
-    }
-    
-    fn dimensions(&self) -> (u32, u32) {
-        (self.width, self.height)
-    }
-    
-    fn cleanup(&mut self) {
-        log::trace!("Stub SDL backend: cleanup called");
-    }
-    
-    fn clear(&mut self, color: Color) -> Result<()> {
-        log::trace!("Stub SDL backend: clear with color {:?}", color);
-        Ok(())
-    }
-    
-    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        log::trace!("Stub SDL backend: fill_rect at {:?} with color {:?}", rect, color);
-        Ok(())
-    }
-    
-    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        log::trace!("Stub SDL backend: draw_rect at {:?} with color {:?}", rect, color);
-        Ok(())
-    }
-    
-    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
-        log::trace!("Stub SDL backend: draw_line from {:?} to {:?} with color {:?}", start, end, color);
-        Ok(())
-    }
-    
-    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
-        log::trace!("Stub SDL backend: draw_text '{}' at {:?}", text, position);
-        Ok(())
-    }
-    
-    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
-        log::trace!("Stub SDL backend: draw_button '{}' at {:?}", text, rect);
-        Ok(())
-    }
-    
-    fn create_surface(&mut self, width: u32, height: u32) -> Result<Box<dyn Surface>> {
-        log::trace!("Stub SDL backend: create_surface {}x{}", width, height);
-        bail!("Surface creation not supported in stub SDL backend")
-    }
-    
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
-// Stub surface for when SDL2 is not available
-#[cfg(not(feature = "sdl2"))]
-pub struct SDLSurface {
-    width: u32,
-    height: u32,
-}
-
-#[cfg(not(feature = "sdl2"))]
-impl Surface for SDLSurface {
-    fn clear(&mut self, color: Color) -> Result<()> {
-        log::trace!("Stub SDL surface: clear with color {:?}", color);
-        Ok(())
-    }
-    
-    fn dimensions(&self) -> (u32, u32) {
-        (self.width, self.height)
-    }
-    
-    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        log::trace!("Stub SDL surface: fill_rect at {:?} with color {:?}", rect, color);
-        Ok(())
-    }
-    
-    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
-        log::trace!("Stub SDL surface: draw_rect at {:?} with color {:?}", rect, color);
-        Ok(())
-    }
-    
-    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
-        log::trace!("Stub SDL surface: draw_line from {:?} to {:?} with color {:?}", start, end, color);
-        Ok(())
-    }
-    
-    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
-        log::trace!("Stub SDL surface: draw_text '{}' at {:?}", text, position);
-        Ok(())
-    }
-    
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
-#[cfg(feature = "sdl2")]
 impl Surface for SDLSurface {
     fn clear(&mut self, color: Color) -> Result<()> {
         self.color = color;
@@ -681,12 +657,7 @@ impl Surface for SDLSurface {
 fn find_system_font() -> Result<String> {
     // Check for bundled fonts first
     if let Ok(path) = std::env::current_dir() {
-        let font_path = path.join("src/simple_ui/fonts/DejaVuSans.ttf");
-        if font_path.exists() {
-            return Ok(font_path.to_string_lossy().to_string());
-        }
-        
-        let font_path = path.join("src/simple_ui/assets/fonts/DejaVuSans.ttf");
+        let font_path = path.join("assets/fonts/DejaVuSans.ttf");
         if font_path.exists() {
             return Ok(font_path.to_string_lossy().to_string());
         }
