@@ -2,7 +2,8 @@
 //!
 //! This module provides platform-specific implementations for display, input, and timing.
 
-use anyhow::Result;
+use anyhow::{Result, Context};
+use crate::TargetPlatform;
 
 // Include platform implementations
 pub mod graphics;
@@ -39,8 +40,8 @@ pub trait PlatformDriver {
 pub struct PlatformFactory;
 
 impl PlatformFactory {
-    /// Create a platform driver based on the current environment
-    pub fn create() -> Result<Box<dyn PlatformDriver>> {
+    /// Create a platform driver based on the specified target platform
+    pub fn create(target_platform: TargetPlatform) -> Result<Box<dyn PlatformDriver>> {
         // Default dimensions - these should be overridden by application config
         // or auto-detected when possible
         let default_width = 800;
@@ -50,37 +51,74 @@ impl PlatformFactory {
         // IMPORTANT: Only use one driver implementation - don't try to create multiples
         // as SDL2 can only be initialized once per application
         
-        // Use rendering driver as the primary choice
-        #[cfg(feature = "host")]
-        {
-            // On host, use the rendering driver with SDL2 backend
-            match rendering_driver::RenderingPlatformDriver::new(app_title, default_width, default_height) {
-                Ok(driver) => {
-                    log::info!("Initialized rendering platform driver");
-                    return Ok(Box::new(driver));
-                },
-                Err(e) => {
-                    // Log the error but don't try a second SDL2 initialization
-                    log::error!("Failed to initialize rendering platform driver: {:?}", e);
-                    anyhow::bail!("Could not initialize platform driver");
-                }
+        // Auto-detect platform if requested
+        let platform = if target_platform == TargetPlatform::Auto {
+            Self::detect_platform()
+        } else {
+            target_platform
+        };
+        
+        log::info!("Creating platform driver for target: {:?}", platform);
+        
+        match platform {
+            TargetPlatform::Host => {
+                // Try to create rendering driver with SDL2 backend
+                Self::create_host_driver(app_title, default_width, default_height)
+            },
+            TargetPlatform::Embedded => {
+                // Create embedded driver or fallback to mock
+                Self::create_embedded_driver()
+            },
+            TargetPlatform::Auto => {
+                // This should be unreachable since we resolve Auto above
+                unreachable!("Auto platform should have been resolved")
             }
         }
+    }
+    
+    /// Detect the current platform
+    fn detect_platform() -> TargetPlatform {
+        // Check if we're likely on an embedded device
+        let is_embedded = cfg!(target_arch = "arm") || 
+                         std::env::var("PANELKIT_EMBEDDED").is_ok() ||
+                         std::path::Path::new("/dev/fb0").exists();
         
-        #[cfg(feature = "embedded")]
-        {
-            // For now, use mock driver for embedded feature
-            // This will be replaced with a proper framebuffer driver
-            let mock_driver = mock::MockDriver::new();
-            log::info!("Initialized mock platform driver for embedded target");
-            return Ok(Box::new(mock_driver));
+        if is_embedded {
+            log::info!("Auto-detected embedded platform");
+            TargetPlatform::Embedded
+        } else {
+            log::info!("Auto-detected host platform");
+            TargetPlatform::Host
         }
+    }
+    
+    /// Create a driver for host development
+    fn create_host_driver(app_title: &str, width: u32, height: u32) -> Result<Box<dyn PlatformDriver>> {
+        // Try to create a rendering platform driver (uses SDL2)
+        match rendering_driver::RenderingPlatformDriver::new(app_title, width, height) {
+            Ok(driver) => {
+                log::info!("Initialized rendering platform driver with SDL2 backend");
+                Ok(Box::new(driver))
+            },
+            Err(e) => {
+                // Log the error but provide a helpful message
+                log::error!("Failed to initialize SDL2 rendering driver: {:?}", e);
+                
+                // Fallback to mock driver if SDL2 initialization failed
+                log::warn!("Falling back to mock driver due to SDL2 initialization failure");
+                let mock_driver = mock::MockDriver::new();
+                Ok(Box::new(mock_driver))
+            }
+        }
+    }
+    
+    /// Create a driver for embedded targets
+    fn create_embedded_driver() -> Result<Box<dyn PlatformDriver>> {
+        // TODO: In the future, implement proper framebuffer driver here
+        // For now, use mock driver as a placeholder
+        let mock_driver = mock::MockDriver::new();
+        log::info!("Initialized mock platform driver for embedded target");
         
-        // This should be unreachable due to the cfg blocks above
-        #[allow(unreachable_code)]
-        {
-            let mock_driver = mock::MockDriver::new();
-            Ok(Box::new(mock_driver))
-        }
+        Ok(Box::new(mock_driver))
     }
 }

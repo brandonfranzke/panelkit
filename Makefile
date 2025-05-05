@@ -33,11 +33,13 @@ help:
 	@echo "  make host            - Build for host development environment"
 	@echo "  make run             - Run the host development build"
 	@echo "  make target          - Cross-compile for embedded target (Raspberry Pi)"
-	@echo "  make deploy          - Deploy to embedded target device"
+	@echo "  make unified         - Build unified version with all backends"
+	@echo "  make run-unified     - Run the unified build with auto-detection"
 	@echo "  make clean           - Clean build artifacts"
 	@echo ""
 	@echo "Deployment targets:"
-	@echo "  make deploy          - Deploy to Raspberry Pi (default settings)"
+	@echo "  make deploy          - Deploy to embedded target device (embedded-only build)"
+	@echo "  make deploy-unified  - Deploy unified build to target device (auto-detects platform)"
 	@echo "  make create-service  - Create systemd service file"
 	@echo "  make install-service - Install systemd service on target"
 	@echo ""
@@ -67,7 +69,7 @@ host: check-deps
 	@mkdir -p $(BUILD_DIR)
 	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
 		LIBRARY_PATH="/opt/homebrew/lib" \
-		cargo build --features host
+		cargo build --features with-sdl2
 	@cp target/debug/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@echo "✅ Host build complete: $(BUILD_DIR)/$(PROJECT_NAME)-macos"
@@ -75,17 +77,33 @@ host: check-deps
 # Run the host development build
 run: host
 	@echo "Running host development build..."
-	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos
+	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos --platform host
 
 # Cross-compile for embedded target
 target: build-container
 	@echo "Cross-compiling for embedded target..."
 	@mkdir -p $(BUILD_DIR)
 	@$(DOCKER_RUN) $(DOCKER_IMAGE) \
-		bash -c "cargo build --target=$(ARM_TARGET) --features embedded --release"
+		bash -c "cargo build --target=$(ARM_TARGET) --release"
 	@$(DOCKER_RUN) $(DOCKER_IMAGE) cp -r /src/target/$(ARM_TARGET)/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-arm
 	@echo "✅ Target build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
+
+# Build unified version with all backends
+unified: check-deps
+	@echo "Building unified version with all backends..."
+	@mkdir -p $(BUILD_DIR)
+	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
+		LIBRARY_PATH="/opt/homebrew/lib" \
+		cargo build --features with-sdl2 --release
+	@cp target/release/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-unified
+	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-unified
+	@echo "✅ Unified build complete: $(BUILD_DIR)/$(PROJECT_NAME)-unified"
+
+# Run the unified build with auto-detection
+run-unified: unified
+	@echo "Running unified build with auto-detection..."
+	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-unified --platform auto
 
 # Deploy to target device
 deploy: target
@@ -95,7 +113,17 @@ deploy: target
 	@scp $(BUILD_DIR)/$(PROJECT_NAME)-arm $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
 	@ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
 	@echo "✅ Deployed to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
-	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME)\""
+	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME) --platform embedded\""
+
+# Deploy unified build to target device
+deploy-unified: unified
+	@echo "Deploying unified build to target device..."
+	@ssh $(TARGET_USER)@$(TARGET_HOST) "mkdir -p $(TARGET_DIR)" || \
+		(echo "❌ Failed to connect to $(TARGET_HOST). Check your connection and try again." && exit 1)
+	@scp $(BUILD_DIR)/$(PROJECT_NAME)-unified $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
+	@ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
+	@echo "✅ Deployed unified build to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
+	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME) --platform auto\""
 
 # Create systemd service file for target
 create-service:

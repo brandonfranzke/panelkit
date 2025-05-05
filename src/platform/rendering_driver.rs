@@ -7,6 +7,7 @@ use crate::platform::{PlatformDriver, GraphicsContext};
 use crate::platform::graphics::{Color, Point, Rectangle};
 use crate::rendering::RenderingBackend;
 use crate::event::Event;
+use crate::TargetPlatform;
 use std::time::Duration;
 
 // Store current color in thread_local storage for GraphicsContext compatibility
@@ -25,7 +26,12 @@ pub struct RenderingPlatformDriver {
 impl RenderingPlatformDriver {
     /// Create a new rendering platform driver
     pub fn new(title: &str, width: u32, height: u32) -> Result<Self> {
-        let rendering_backend = crate::rendering::RenderingFactory::create(title)?;
+        Self::new_for_platform(title, width, height, TargetPlatform::Auto)
+    }
+    
+    /// Create a new rendering platform driver for a specific platform
+    pub fn new_for_platform(title: &str, width: u32, height: u32, platform: TargetPlatform) -> Result<Self> {
+        let rendering_backend = crate::rendering::RenderingFactory::create_for_platform(title, platform)?;
         
         Ok(Self {
             rendering_backend,

@@ -4,7 +4,7 @@
 
 use clap::{Parser, ValueEnum};
 use log::LevelFilter;
-use panelkit::{AppConfig, Application, logging};
+use panelkit::{AppConfig, Application, TargetPlatform, logging};
 use std::path::PathBuf;
 
 /// Represents available log levels for the application
@@ -25,6 +25,29 @@ impl From<LogLevel> for LevelFilter {
             LogLevel::Info => LevelFilter::Info,
             LogLevel::Warn => LevelFilter::Warn,
             LogLevel::Error => LevelFilter::Error,
+        }
+    }
+}
+
+/// Target platform options for the application
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum PlatformArg {
+    /// Run on the development host using SDL2
+    Host,
+    
+    /// Run on an embedded device using framebuffer
+    Embedded,
+    
+    /// Auto-detect platform based on environment
+    Auto,
+}
+
+impl From<PlatformArg> for TargetPlatform {
+    fn from(arg: PlatformArg) -> Self {
+        match arg {
+            PlatformArg::Host => TargetPlatform::Host,
+            PlatformArg::Embedded => TargetPlatform::Embedded,
+            PlatformArg::Auto => TargetPlatform::Auto,
         }
     }
 }
@@ -52,6 +75,10 @@ struct Args {
     /// Path to state database
     #[arg(short, long)]
     state_path: Option<PathBuf>,
+    
+    /// Target platform to use
+    #[arg(short, long, value_enum, default_value_t = PlatformArg::Auto)]
+    platform: PlatformArg,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -96,6 +123,7 @@ fn main() -> anyhow::Result<()> {
     };
     
     logger.info(&format!("Fullscreen mode: {}", fullscreen_setting));
+    logger.info(&format!("Platform: {:?}", args.platform));
     
     let config = AppConfig {
         width: dimensions.0,
@@ -103,6 +131,7 @@ fn main() -> anyhow::Result<()> {
         fullscreen: fullscreen_setting,
         state_path: args.state_path,
         log_level: args.log_level.into(),
+        target_platform: args.platform.into(),
     };
     
     // Initialize application

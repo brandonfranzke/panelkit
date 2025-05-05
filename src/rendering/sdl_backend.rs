@@ -1,20 +1,28 @@
 //! SDL2-based rendering backend
 //!
 //! This module implements the RenderingBackend trait using SDL2 for host development.
+//! This backend is only fully functional when compiled with the 'sdl2' feature.
 
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, bail};
 use crate::rendering::{RenderingBackend, Surface};
 use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
-use sdl2::event::Event as SdlEvent;
-use sdl2::pixels::Color as SdlColor;
-use sdl2::rect::{Point as SdlPoint, Rect as SdlRect};
-use sdl2::render::Canvas;
-use sdl2::ttf::{Font, Sdl2TtfContext};
-use sdl2::video::Window;
 use std::any::Any;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
 
+// Conditionally include SDL2 if the feature is available
+#[cfg(feature = "sdl2")]
+use {
+    sdl2::event::Event as SdlEvent,
+    sdl2::pixels::Color as SdlColor,
+    sdl2::rect::{Point as SdlPoint, Rect as SdlRect},
+    sdl2::render::Canvas,
+    sdl2::ttf::{Font, Sdl2TtfContext},
+    sdl2::video::Window,
+    std::path::Path,
+    std::sync::{Arc, Mutex},
+};
+
+// Define different versions of the backend based on SDL2 availability
+#[cfg(feature = "sdl2")]
 /// SDL2 implementation of the RenderingBackend trait
 pub struct SDLBackend {
     sdl_context: sdl2::Sdl,
@@ -25,6 +33,15 @@ pub struct SDLBackend {
     height: u32,
 }
 
+#[cfg(not(feature = "sdl2"))]
+/// Stub implementation when SDL2 is not available
+pub struct SDLBackend {
+    width: u32,
+    height: u32,
+}
+
+// Implementation for when SDL2 is available
+#[cfg(feature = "sdl2")]
 impl SDLBackend {
     /// Create a new SDL backend with the given window title
     pub fn new(title: &str) -> Result<Self> {
@@ -165,6 +182,22 @@ impl SDLBackend {
     }
 }
 
+#[cfg(not(feature = "sdl2"))]
+impl SDLBackend {
+    /// Create a new SDL backend with the given window title
+    pub fn new(_title: &str) -> Result<Self> {
+        // SDL2 is not available in this build
+        log::warn!("SDL2 is not available in this build");
+        bail!("SDL2 backend is not available in this build")
+    }
+    
+    /// Poll for events (stub implementation)
+    pub fn poll_events(&self) -> Result<Vec<crate::event::Event>> {
+        Ok(Vec::new())
+    }
+}
+
+#[cfg(feature = "sdl2")]
 impl RenderingBackend for SDLBackend {
     fn init(&mut self, width: u32, height: u32) -> Result<()> {
         self.width = width;
@@ -383,6 +416,120 @@ impl SDLSurface {
     }
 }
 
+#[cfg(not(feature = "sdl2"))]
+impl RenderingBackend for SDLBackend {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        self.width = width;
+        self.height = height;
+        log::warn!("Using stub SDL backend - no real rendering will occur");
+        Ok(())
+    }
+    
+    fn present(&mut self) -> Result<()> {
+        log::trace!("Stub SDL backend: present called");
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+    
+    fn cleanup(&mut self) {
+        log::trace!("Stub SDL backend: cleanup called");
+    }
+    
+    fn clear(&mut self, color: Color) -> Result<()> {
+        log::trace!("Stub SDL backend: clear with color {:?}", color);
+        Ok(())
+    }
+    
+    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Stub SDL backend: fill_rect at {:?} with color {:?}", rect, color);
+        Ok(())
+    }
+    
+    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Stub SDL backend: draw_rect at {:?} with color {:?}", rect, color);
+        Ok(())
+    }
+    
+    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
+        log::trace!("Stub SDL backend: draw_line from {:?} to {:?} with color {:?}", start, end, color);
+        Ok(())
+    }
+    
+    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+        log::trace!("Stub SDL backend: draw_text '{}' at {:?}", text, position);
+        Ok(())
+    }
+    
+    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+        log::trace!("Stub SDL backend: draw_button '{}' at {:?}", text, rect);
+        Ok(())
+    }
+    
+    fn create_surface(&mut self, width: u32, height: u32) -> Result<Box<dyn Surface>> {
+        log::trace!("Stub SDL backend: create_surface {}x{}", width, height);
+        bail!("Surface creation not supported in stub SDL backend")
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+// Stub surface for when SDL2 is not available
+#[cfg(not(feature = "sdl2"))]
+pub struct SDLSurface {
+    width: u32,
+    height: u32,
+}
+
+#[cfg(not(feature = "sdl2"))]
+impl Surface for SDLSurface {
+    fn clear(&mut self, color: Color) -> Result<()> {
+        log::trace!("Stub SDL surface: clear with color {:?}", color);
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+    
+    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Stub SDL surface: fill_rect at {:?} with color {:?}", rect, color);
+        Ok(())
+    }
+    
+    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Stub SDL surface: draw_rect at {:?} with color {:?}", rect, color);
+        Ok(())
+    }
+    
+    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
+        log::trace!("Stub SDL surface: draw_line from {:?} to {:?} with color {:?}", start, end, color);
+        Ok(())
+    }
+    
+    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+        log::trace!("Stub SDL surface: draw_text '{}' at {:?}", text, position);
+        Ok(())
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+#[cfg(feature = "sdl2")]
 impl Surface for SDLSurface {
     fn clear(&mut self, color: Color) -> Result<()> {
         self.color = color;

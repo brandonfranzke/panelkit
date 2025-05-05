@@ -3,8 +3,9 @@
 //! This module provides a clean abstraction over different rendering backends,
 //! allowing the UI to be independent of the underlying graphics implementation.
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use std::any::Any;
+use crate::TargetPlatform;
 
 pub mod primitives;
 pub mod sdl_backend;
@@ -93,22 +94,72 @@ pub struct RenderingFactory;
 impl RenderingFactory {
     /// Create a new rendering backend appropriate for the current environment
     pub fn create(title: &str) -> Result<Box<dyn RenderingBackend>> {
-        #[cfg(feature = "host")]
-        {
-            let backend = sdl_backend::SDLBackend::new(title)?;
-            return Ok(Box::new(backend));
-        }
+        Self::create_for_platform(title, TargetPlatform::Auto)
+    }
+    
+    /// Create a new rendering backend for a specific platform
+    pub fn create_for_platform(title: &str, platform: TargetPlatform) -> Result<Box<dyn RenderingBackend>> {
+        // Resolve auto platform
+        let target = if platform == TargetPlatform::Auto {
+            Self::detect_platform()
+        } else {
+            platform
+        };
         
-        #[cfg(feature = "embedded")]
-        {
-            let backend = fb_backend::FramebufferBackend::new()?;
-            return Ok(Box::new(backend));
-        }
+        log::info!("Creating rendering backend for target: {:?}", target);
         
-        // This should be unreachable due to the cfg blocks above
-        #[allow(unreachable_code)]
-        {
-            anyhow::bail!("No rendering backend available for current configuration")
+        match target {
+            TargetPlatform::Host => Self::create_sdl_backend(title),
+            TargetPlatform::Embedded => Self::create_fb_backend(),
+            TargetPlatform::Auto => unreachable!("Auto platform should have been resolved"),
+        }
+    }
+    
+    /// Detect the current platform
+    fn detect_platform() -> TargetPlatform {
+        // Check if we're likely on an embedded device
+        let is_embedded = cfg!(target_arch = "arm") || 
+                         std::env::var("PANELKIT_EMBEDDED").is_ok() ||
+                         std::path::Path::new("/dev/fb0").exists();
+        
+        if is_embedded {
+            log::info!("Auto-detected embedded platform for rendering");
+            TargetPlatform::Embedded
+        } else {
+            log::info!("Auto-detected host platform for rendering");
+            TargetPlatform::Host
+        }
+    }
+    
+    /// Create an SDL backend for host systems
+    fn create_sdl_backend(title: &str) -> Result<Box<dyn RenderingBackend>> {
+        // Try to create an SDL backend
+        match sdl_backend::SDLBackend::new(title) {
+            Ok(backend) => {
+                log::info!("Created SDL rendering backend");
+                Ok(Box::new(backend))
+            },
+            Err(e) => {
+                // Log failure and fallback to framebuffer
+                log::error!("Failed to create SDL backend: {:?}", e);
+                log::warn!("Falling back to framebuffer backend");
+                
+                Self::create_fb_backend()
+            }
+        }
+    }
+    
+    /// Create a framebuffer backend for embedded systems
+    fn create_fb_backend() -> Result<Box<dyn RenderingBackend>> {
+        match fb_backend::FramebufferBackend::new() {
+            Ok(backend) => {
+                log::info!("Created framebuffer rendering backend");
+                Ok(Box::new(backend))
+            },
+            Err(e) => {
+                log::error!("Failed to create framebuffer backend: {:?}", e);
+                anyhow::bail!("No available rendering backend")
+            }
         }
     }
 }

@@ -16,6 +16,25 @@ pub use error::{Error, Result, AnyhowResult};
 // Continue to use anyhow for context in implementation
 use error::Context;
 
+/// Target platform for the application
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TargetPlatform {
+    /// Run on the development host using SDL2
+    Host,
+    
+    /// Run on an embedded device using framebuffer
+    Embedded,
+    
+    /// Auto-detect platform based on environment
+    Auto,
+}
+
+impl Default for TargetPlatform {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 /// Application configuration
 pub struct AppConfig {
     /// Display width
@@ -32,6 +51,9 @@ pub struct AppConfig {
     
     /// Log level
     pub log_level: log::LevelFilter,
+    
+    /// Target platform to use
+    pub target_platform: TargetPlatform,
 }
 
 /// Core application state
@@ -58,8 +80,8 @@ impl Application {
         
         let ui_manager = ui::UIManager::new();
         
-        // Create platform driver using the factory
-        let platform_driver = platform::PlatformFactory::create()
+        // Create platform driver using the factory with specified target platform
+        let platform_driver = platform::PlatformFactory::create(config.target_platform)
             .context("Failed to create platform driver")?;
         
         Ok(Self {
