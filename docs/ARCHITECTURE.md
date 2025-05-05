@@ -39,8 +39,8 @@ Manages the user interface:
 - **UIManager**: Handles page navigation and layout
 - **Page trait**: Interface for all UI pages
 - **Safely typed**: Uses downcasting (`as_any/as_any_mut`) for type-safe access to concrete types
-- **Direct rendering**: Currently uses SDL2 Canvas directly (rather than a declarative approach)
-- **LVGL integration**: Originally planned but deferred due to integration challenges (see ARCHITECTURE_DECISIONS.md)
+- **Direct rendering**: Uses SDL2 Canvas for host systems and framebuffer for embedded targets
+- **Custom rendering abstraction**: Implements a unified rendering interface across backends
 
 ### 3. Platform Abstraction (platform/mod.rs)
 

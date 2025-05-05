@@ -14,7 +14,7 @@ PanelKit uses a layered architecture that provides proper isolation between UI l
 ├───────────────────────────────────────────┤
 │ Platform Abstraction (PlatformDriver)     │
 ├───────────────────────────────────────────┤
-│ Rendering Abstraction (RenderingBackend)  │
+│ Rendering Abstraction (RenderingContext)  │
 ├─────────────────────┬─────────────────────┤
 │ SDL2 Backend        │ Framebuffer Backend │
 │ (Host Development)  │ (Embedded Targets)  │
@@ -34,15 +34,15 @@ This layer provides a unified interface for all platform-specific operations:
 ```rust
 pub trait PlatformDriver {
     fn init(&mut self, width: u32, height: u32) -> Result<()>;
-    fn poll_events(&mut self) -> Result<Vec<crate::event::Event>>;
+    fn poll_events(&mut self) -> Result<Vec<Box<dyn Event>>>;
     fn present(&mut self) -> Result<()>;
     fn dimensions(&self) -> (u32, u32);
-    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>>;
+    fn create_rendering_context(&mut self) -> Result<Box<dyn RenderingContext>>;
     fn cleanup(&mut self);
 }
 ```
 
-### 2. Rendering Abstraction (`RenderingBackend`)
+### 2. Rendering Abstraction (`RenderingContext`)
 
 This abstraction layer provides high-level rendering operations without exposing backend-specific details:
 - Drawing primitives (rectangles, lines, text)
@@ -51,7 +51,7 @@ This abstraction layer provides high-level rendering operations without exposing
 - Screen management
 
 ```rust
-pub trait RenderingBackend {
+pub trait RenderingContext {
     fn init(&mut self, width: u32, height: u32) -> Result<()>;
     fn present(&mut self) -> Result<()>;
     fn dimensions(&self) -> (u32, u32);
@@ -119,17 +119,31 @@ pub struct RenderingPlatformDriver {
 
 This driver implements the `PlatformDriver` trait and delegates to the rendering backend for actual rendering operations.
 
-### 2. Rendering Graphics Context
+### 2. Rendering Context Implementation
 
-The `RenderingGraphicsContext` provides a compatibility layer that implements the `GraphicsContext` trait using the rendering backend:
+The rendering subsystem provides implementations of the `RenderingContext` trait:
 
 ```rust
-pub struct RenderingGraphicsContext {
-    pub backend: Box<dyn RenderingBackend>,
+// SDL Backend implementation
+pub struct SDLBackend {
+    sdl_context: sdl2::Sdl,
+    canvas: Arc<Mutex<Canvas<Window>>>,
+    ttf_context: Sdl2TtfContext,
+    font_path: String,
+    width: u32,
+    height: u32,
+}
+
+// Framebuffer Backend implementation
+pub struct FramebufferBackend {
+    width: u32,
+    height: u32,
+    logger: &'static crate::logging::ComponentLogger,
+    // These would be fully implemented for embedded targets
 }
 ```
 
-This allows UI components to use either the `GraphicsContext` interface or the rendering backend directly.
+This allows UI components to use the `RenderingContext` interface consistently across different rendering backends.
 
 ### 3. Rendering Factory
 
@@ -186,36 +200,49 @@ The UI manager and pages use the rendering abstraction uniformly:
 
 ```rust
 // UI Manager initialization
-self.logger.info("Initializing UI with rendering abstraction");
+self.logger.info("Initializing UI system");
 
-// Register Hello page using rendering abstraction
-self.register_page("hello", Box::new(HelloPage::new()))
+// Register Hello page
+self.register_page("hello", Box::new(hello_rendering_page::HelloRenderingPage::new()))
     .context("Failed to register hello page")?;
 
-// Register World page using rendering abstraction  
-self.register_page("world", Box::new(WorldPage::new()))
+// Register World page  
+self.register_page("world", Box::new(world_rendering_page::WorldRenderingPage::new()))
     .context("Failed to register world page")?;
 
 // Example page implementation using the rendering context
-impl Page for HelloPage {
-    fn render(&self, rendering_context: &mut dyn RenderingContext) -> Result<()> {
-        // Clear with background color
-        rendering_context.clear(Color::ui_background())?;
+impl Page for HelloRenderingPage {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        // Draw title bar
+        self.draw_title_bar(ctx)?;
+        
+        // Draw main content
+        self.draw_content(ctx)?;
+        
+        Ok(())
+    }
+
+    fn draw_title_bar(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        // Draw title background
+        ctx.clear(Color::rgb(240, 240, 240))?;
+        
+        // Draw title area
+        ctx.fill_rect(self.title_area, Color::rgb(30, 120, 60))?;
         
         // Draw title text
-        rendering_context.draw_text(
-            "Hello Page",
-            Point::new(10, 10),
-            TextStyle::new(Color::black()).with_size(FontSize::Large)
-        )?;
+        let title_position = Point::new(
+            self.title_area.x + (self.title_area.width as i32 / 2),
+            self.title_area.y + (self.title_area.height as i32 / 2) - 10
+        );
         
-        // Draw button
-        rendering_context.draw_button(
-            Rectangle::new(50, 50, 100, 40),
-            "Click Me",
-            Color::ui_accent(),
-            Color::white(),
-            Color::ui_accent()
+        ctx.draw_text("Hello Page", title_position, 
+            TextStyle {
+                font_size: FontSize::Large,
+                color: Color::rgb(255, 255, 255),
+                alignment: TextAlignment::Center,
+                bold: false,
+                italic: false,
+            }
         )?;
         
         Ok(())
@@ -282,5 +309,6 @@ The rendering architecture provides several advantages:
 2. Clean abstraction boundaries between UI and rendering code
 3. Complete control over the rendering pipeline
 4. Flexible backend implementation options
+5. Consistent interface for UI components regardless of backend
 
-This architectural approach provides a solid foundation that can evolve into a production-ready embedded UI framework.
+This architectural approach provides a solid foundation that can evolve into a production-ready embedded UI framework with the flexibility to support different rendering backends as needed for various target platforms.

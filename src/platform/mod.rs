@@ -11,6 +11,7 @@ use crate::event::{Event, TouchEvent, KeyboardEvent, SystemEvent};
 pub mod mock;
 pub mod sdl_driver;
 pub mod rendering_driver;
+pub mod detection;
 
 /// Unified platform driver interface that handles both display and input
 pub trait PlatformDriver {
@@ -77,18 +78,7 @@ impl PlatformFactory {
     
     /// Detect the current platform
     fn detect_platform() -> TargetPlatform {
-        // Check if we're likely on an embedded device
-        let is_embedded = cfg!(target_arch = "arm") || 
-                         std::env::var("PANELKIT_EMBEDDED").is_ok() ||
-                         std::path::Path::new("/dev/fb0").exists();
-        
-        if is_embedded {
-            log::info!("Auto-detected embedded platform");
-            TargetPlatform::Embedded
-        } else {
-            log::info!("Auto-detected host platform");
-            TargetPlatform::Host
-        }
+        detection::detect_platform()
     }
     
     /// Create a driver for host development

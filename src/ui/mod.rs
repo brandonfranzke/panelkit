@@ -17,7 +17,6 @@ pub mod traits;
 pub mod components;
 
 // Export UI pages
-pub mod hello_page;
 pub mod simple_demo_page;
 
 // UI Pages
