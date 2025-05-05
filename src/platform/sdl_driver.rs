@@ -3,8 +3,8 @@
 //! This module provides SDL2 implementation for the PanelKit platform interface.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{GraphicsContext, PlatformDriver};
-use crate::platform::graphics::{Color, Point, Rectangle};
+use crate::platform::PlatformDriver;
+use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
 
 use anyhow::Result;
 use sdl2::event::Event as SdlEvent;
@@ -13,44 +13,71 @@ use sdl2::mouse::MouseButton;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::fmt::Display;
+use std::any::Any;
 
-/// SDL2 rendering context that implements the GraphicsContext trait
-pub struct SDLGraphicsContext {
+/// SDL2 rendering context that implements the RenderingContext trait
+pub struct SDLRenderingContext {
     canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>,
     width: u32,
     height: u32,
 }
 
-impl SDLGraphicsContext {
-    /// Create a new SDL graphics context
+impl SDLRenderingContext {
+    /// Create a new SDL rendering context
     pub fn new(canvas: Arc<Mutex<sdl2::render::Canvas<sdl2::video::Window>>>, width: u32, height: u32) -> Self {
-        log::debug!("Creating new SDLGraphicsContext with canvas");
+        log::debug!("Creating new SDLRenderingContext with canvas");
         Self { canvas, width, height }
     }
 }
 
-impl GraphicsContext for SDLGraphicsContext {
+impl RenderingContext for SDLRenderingContext {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        self.width = width;
+        self.height = height;
+        
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+        
+        // Try to resize the window (this may not work on all platforms)
+        let window = canvas.window_mut();
+        window.set_size(width, height)
+            .map_err(|e| anyhow::anyhow!("Failed to resize SDL window: {}", e))?;
+        
+        Ok(())
+    }
+    
+    fn present(&mut self) -> Result<()> {
+        let mut canvas = self.canvas.lock()
+            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+        
+        canvas.present();
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+    
+    fn cleanup(&mut self) {
+        // SDL cleanup happens in the driver, not here
+        log::debug!("SDL rendering context cleanup");
+    }
+    
     fn clear(&mut self, color: Color) -> Result<()> {
         let mut canvas = self.canvas.lock()
             .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
             
-        canvas.set_draw_color(sdl2::pixels::Color::RGB(color.r, color.g, color.b));
+        canvas.set_draw_color(sdl2::pixels::Color::RGBA(color.r, color.g, color.b, color.a));
         canvas.clear();
         Ok(())
     }
     
-    fn set_draw_color(&mut self, color: Color) -> Result<()> {
+    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
         let mut canvas = self.canvas.lock()
             .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
-        canvas.set_draw_color(sdl2::pixels::Color::RGB(color.r, color.g, color.b));
-        Ok(())
-    }
-    
-    fn fill_rect(&mut self, rect: Rectangle) -> Result<()> {
-        let mut canvas = self.canvas.lock()
-            .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
-            
+        
+        canvas.set_draw_color(sdl2::pixels::Color::RGBA(color.r, color.g, color.b, color.a));
+        
         SDLDriver::convert_sdl_error(
             canvas.fill_rect(sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)),
             "Failed to fill rectangle"
@@ -59,9 +86,11 @@ impl GraphicsContext for SDLGraphicsContext {
         Ok(())
     }
     
-    fn draw_rect(&mut self, rect: Rectangle) -> Result<()> {
+    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
         let mut canvas = self.canvas.lock()
             .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+        
+        canvas.set_draw_color(sdl2::pixels::Color::RGBA(color.r, color.g, color.b, color.a));
             
         SDLDriver::convert_sdl_error(
             canvas.draw_rect(sdl2::rect::Rect::new(rect.x, rect.y, rect.width, rect.height)),
@@ -71,9 +100,11 @@ impl GraphicsContext for SDLGraphicsContext {
         Ok(())
     }
     
-    fn draw_line(&mut self, start: Point, end: Point) -> Result<()> {
+    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
         let mut canvas = self.canvas.lock()
             .map_err(|e| anyhow::anyhow!("Failed to lock SDL canvas mutex: {}", e))?;
+        
+        canvas.set_draw_color(sdl2::pixels::Color::RGBA(color.r, color.g, color.b, color.a));
             
         SDLDriver::convert_sdl_error(
             canvas.draw_line(
@@ -86,15 +117,29 @@ impl GraphicsContext for SDLGraphicsContext {
         Ok(())
     }
     
-    fn dimensions(&self) -> (u32, u32) {
-        (self.width, self.height)
+    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+        // Not implemented in basic SDL
+        log::warn!("Text rendering not implemented in SDL driver");
+        Ok(())
     }
     
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+        // Simple implementation - draw filled rectangle with border
+        self.fill_rect(rect, bg_color)?;
+        self.draw_rect(rect, border_color)?;
+        // No text rendering in this simple implementation
+        Ok(())
+    }
+    
+    fn create_surface(&mut self, _width: u32, _height: u32) -> Result<Box<dyn Surface>> {
+        anyhow::bail!("Surface creation not implemented in SDL driver")
+    }
+    
+    fn as_any(&self) -> &dyn Any {
         self
     }
     
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -193,9 +238,11 @@ impl PlatformDriver for SDLDriver {
             self.height = height;
         }
         
-        // Initialize with gray background using a temporary context
-        let mut ctx = self.create_graphics_context()?;
-        ctx.clear(Color::rgb(100, 100, 100))?;
+        // Initialize with gray background
+        let mut canvas = self.canvas.lock().unwrap();
+        canvas.set_draw_color(sdl2::pixels::Color::RGB(100, 100, 100));
+        canvas.clear();
+        canvas.present();
         
         Ok(())
     }
@@ -282,9 +329,9 @@ impl PlatformDriver for SDLDriver {
         (self.width, self.height)
     }
     
-    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>> {
-        // Create a new graphics context that shares the canvas
-        let context = SDLGraphicsContext::new(self.canvas.clone(), self.width, self.height);
+    fn create_rendering_context(&mut self) -> Result<Box<dyn RenderingContext>> {
+        // Create a new rendering context that shares the canvas
+        let context = SDLRenderingContext::new(self.canvas.clone(), self.width, self.height);
         Ok(Box::new(context))
     }
     

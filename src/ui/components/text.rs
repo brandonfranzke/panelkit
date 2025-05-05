@@ -2,8 +2,7 @@
 //!
 //! This module provides a simple text rendering component using basic shapes.
 
-use crate::platform::{GraphicsContext, Renderable};
-use crate::platform::graphics::Color;
+use crate::primitives::{RenderingContext, Renderable, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
 use crate::ui::components::{ColoredRectangle, UIComponent};
 use anyhow::Result;
 
@@ -84,7 +83,7 @@ impl Text {
 }
 
 impl Renderable for Text {
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         let text_width = self.calc_width();
         let text_height = self.calc_height();
         
@@ -106,21 +105,34 @@ impl Renderable for Text {
             ).render(ctx)?;
         }
         
-        // For now, since we don't have real font rendering, we'll draw the text
-        // as a series of simple shapes based on the characters
-        let mut char_x = x;
-        for c in self.text.chars() {
-            // Simple approximation of character shapes
-            draw_character(ctx, char_x, self.y, c, self.color, self.font_size)?;
-            char_x += (self.font_size / 2) as i32;
-        }
+        // Use the rendering context's text drawing capability
+        let position = Point::new(x, self.y);
+        let text_alignment = match self.align {
+            TextAlign::Left => TextAlignment::Left,
+            TextAlign::Center => TextAlignment::Center,
+            TextAlign::Right => TextAlignment::Right,
+        };
+        
+        let style = TextStyle {
+            font_size: match self.font_size {
+                size if size <= 12 => FontSize::Small,
+                size if size <= 16 => FontSize::Medium,
+                _ => FontSize::Large,
+            },
+            color: self.color,
+            alignment: text_alignment,
+            bold: false,
+            italic: false,
+        };
+        
+        ctx.draw_text(&self.text, position, style)?;
         
         Ok(())
     }
 }
 
 impl UIComponent for Text {
-    fn bounds(&self) -> crate::platform::graphics::Rectangle {
+    fn bounds(&self) -> Rectangle {
         let text_width = self.calc_width();
         let text_height = self.calc_height();
         
@@ -131,71 +143,7 @@ impl UIComponent for Text {
             TextAlign::Right => self.x - text_width as i32,
         };
         
-        crate::platform::graphics::Rectangle::new(x, self.y, text_width, text_height)
+        Rectangle::new(x, self.y, text_width, text_height)
     }
 }
 
-/// Draw a character using primitive shapes
-fn draw_character(
-    ctx: &mut dyn GraphicsContext, 
-    x: i32, 
-    y: i32, 
-    c: char, 
-    color: Color,
-    size: u32
-) -> Result<()> {
-    // Simplistic character rendering using rectangles
-    // In a real implementation, this would use font rendering
-    
-    let stroke_width = std::cmp::max(1, size / 12);
-    let char_width = size / 2;
-    let char_height = size;
-    
-    // For now, we'll just render a simplified version
-    match c {
-        'A'..='Z' | 'a'..='z' => {
-            // Draw a simple rectangle for the letter
-            ColoredRectangle::filled(
-                x, 
-                y, 
-                char_width, 
-                char_height, 
-                color
-            ).render(ctx)?;
-        },
-        '0'..='9' => {
-            // Draw a different shape for numbers
-            ColoredRectangle::outlined(
-                x, 
-                y, 
-                char_width, 
-                char_height, 
-                color
-            ).render(ctx)?;
-            
-            // Fill with a lighter version of the color
-            ColoredRectangle::filled(
-                x + stroke_width as i32, 
-                y + stroke_width as i32, 
-                char_width - 2 * stroke_width, 
-                char_height - 2 * stroke_width, 
-                color
-            ).render(ctx)?;
-        },
-        ' ' => {
-            // Space character - do nothing
-        },
-        _ => {
-            // All other characters get a simple mark
-            ColoredRectangle::filled(
-                x, 
-                y + (char_height / 2) as i32, 
-                char_width, 
-                stroke_width, 
-                color
-            ).render(ctx)?;
-        }
-    }
-    
-    Ok(())
-}

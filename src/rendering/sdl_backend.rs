@@ -1,11 +1,10 @@
 //! SDL2-based rendering backend
 //!
-//! This module implements the RenderingBackend trait using SDL2 for host development.
+//! This module implements the RenderingContext trait using SDL2 for host development.
 //! This backend is only fully functional when compiled with the 'sdl2' feature.
 
 use anyhow::{Result, Context, bail};
-use crate::rendering::{RenderingBackend, Surface};
-use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
+use crate::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface};
 use std::any::Any;
 
 // Conditionally include SDL2 if the feature is available
@@ -23,7 +22,7 @@ use {
 
 // Define different versions of the backend based on SDL2 availability
 #[cfg(feature = "sdl2")]
-/// SDL2 implementation of the RenderingBackend trait
+/// SDL2 implementation of the RenderingContext trait
 pub struct SDLBackend {
     sdl_context: sdl2::Sdl,
     canvas: Arc<Mutex<Canvas<Window>>>,
@@ -198,7 +197,7 @@ impl SDLBackend {
 }
 
 #[cfg(feature = "sdl2")]
-impl RenderingBackend for SDLBackend {
+impl RenderingContext for SDLBackend {
     fn init(&mut self, width: u32, height: u32) -> Result<()> {
         self.width = width;
         self.height = height;
@@ -417,7 +416,7 @@ impl SDLSurface {
 }
 
 #[cfg(not(feature = "sdl2"))]
-impl RenderingBackend for SDLBackend {
+impl RenderingContext for SDLBackend {
     fn init(&mut self, width: u32, height: u32) -> Result<()> {
         self.width = width;
         self.height = height;

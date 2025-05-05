@@ -133,29 +133,48 @@ This allows UI components to use either the `GraphicsContext` interface or the r
 
 ### 3. Rendering Factory
 
-The `RenderingFactory` creates the appropriate rendering backend based on the environment:
+The `RenderingFactory` creates the appropriate rendering backend based on runtime platform detection:
 
 ```rust
 pub struct RenderingFactory;
 
 impl RenderingFactory {
-    pub fn create(title: &str) -> Result<Box<dyn RenderingBackend>> {
-        #[cfg(feature = "host")]
-        {
-            let backend = sdl_backend::SDLBackend::new(title)?;
-            return Ok(Box::new(backend));
-        }
+    /// Create a new rendering context appropriate for the current environment
+    pub fn create(title: &str) -> Result<Box<dyn RenderingContext>> {
+        Self::create_for_platform(title, TargetPlatform::Auto)
+    }
+    
+    /// Create a new rendering context for a specific platform
+    pub fn create_for_platform(title: &str, platform: TargetPlatform) -> Result<Box<dyn RenderingContext>> {
+        // Resolve auto platform
+        let target = if platform == TargetPlatform::Auto {
+            Self::detect_platform()
+        } else {
+            platform
+        };
         
-        #[cfg(feature = "embedded")]
-        {
-            let backend = fb_backend::FramebufferBackend::new()?;
-            return Ok(Box::new(backend));
-        }
+        log::info!("Creating rendering context for target: {:?}", target);
         
-        // This should be unreachable due to the cfg blocks above
-        #[allow(unreachable_code)]
-        {
-            anyhow::bail!("No rendering backend available for current configuration")
+        match target {
+            TargetPlatform::Host => Self::create_sdl_backend(title),
+            TargetPlatform::Embedded => Self::create_fb_backend(),
+            TargetPlatform::Auto => unreachable!("Auto platform should have been resolved"),
+        }
+    }
+    
+    /// Detect the current platform
+    fn detect_platform() -> TargetPlatform {
+        // Check if we're likely on an embedded device
+        let is_embedded = cfg!(target_arch = "arm") || 
+                         std::env::var("PANELKIT_EMBEDDED").is_ok() ||
+                         std::path::Path::new("/dev/fb0").exists();
+        
+        if is_embedded {
+            log::info!("Auto-detected embedded platform for rendering");
+            TargetPlatform::Embedded
+        } else {
+            log::info!("Auto-detected host platform for rendering");
+            TargetPlatform::Host
         }
     }
 }
@@ -163,27 +182,43 @@ impl RenderingFactory {
 
 ### 4. UI Integration
 
-The UI manager and pages can use the rendering abstraction:
+The UI manager and pages use the rendering abstraction uniformly:
 
 ```rust
 // UI Manager initialization
-#[cfg(not(feature = "use_lvgl"))]
-{
-    // Check for PANELKIT_USE_RENDERING env variable 
-    // to enable the rendering abstraction-based pages
-    if std::env::var("PANELKIT_USE_RENDERING").is_ok() {
-        self.logger.info("Using rendering abstraction-based pages");
+self.logger.info("Initializing UI with rendering abstraction");
+
+// Register Hello page using rendering abstraction
+self.register_page("hello", Box::new(HelloPage::new()))
+    .context("Failed to register hello page")?;
+
+// Register World page using rendering abstraction  
+self.register_page("world", Box::new(WorldPage::new()))
+    .context("Failed to register world page")?;
+
+// Example page implementation using the rendering context
+impl Page for HelloPage {
+    fn render(&self, rendering_context: &mut dyn RenderingContext) -> Result<()> {
+        // Clear with background color
+        rendering_context.clear(Color::ui_background())?;
         
-        // Register Hello page using rendering abstraction
-        self.register_page("hello", Box::new(HelloPage::new()))
-            .context("Failed to register hello page")?;
+        // Draw title text
+        rendering_context.draw_text(
+            "Hello Page",
+            Point::new(10, 10),
+            TextStyle::new(Color::black()).with_size(FontSize::Large)
+        )?;
         
-        // Register World page using rendering abstraction  
-        self.register_page("world", Box::new(WorldPage::new()))
-            .context("Failed to register world page")?;
-    } else {
-        // Use standard pages
-        // ...
+        // Draw button
+        rendering_context.draw_button(
+            Rectangle::new(50, 50, 100, 40),
+            "Click Me",
+            Color::ui_accent(),
+            Color::white(),
+            Color::ui_accent()
+        )?;
+        
+        Ok(())
     }
 }
 ```
@@ -226,12 +261,17 @@ The rendering system uses a simplified retained-mode approach:
    - Backend-specific features are accessible through safe downcasting when needed
    - No unsafe code required for backend-specific optimizations
 
-## Enabling the Rendering Architecture
+## Runtime Platform Selection
 
-To enable the rendering abstraction:
+The rendering architecture automatically detects the appropriate platform at runtime. You can override this with environment variables:
 
 ```bash
-PANELKIT_USE_RENDERING=1 cargo run
+# Force embedded mode even on host systems
+PANELKIT_EMBEDDED=1 cargo run
+
+# Force specific backend selection
+PANELKIT_PLATFORM=host cargo run
+PANELKIT_PLATFORM=embedded cargo run
 ```
 
 ## Key Benefits

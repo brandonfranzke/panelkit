@@ -2,8 +2,7 @@
 //!
 //! This module provides a simple button component.
 
-use crate::platform::{GraphicsContext, Renderable};
-use crate::platform::graphics::{Color, Point, Rectangle};
+use crate::primitives::{RenderingContext, Renderable, Color, Point, Rectangle};
 use crate::ui::components::{ColoredRectangle, UIComponent};
 use anyhow::Result;
 
@@ -53,57 +52,34 @@ impl Button {
 }
 
 impl Renderable for Button {
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         // Adjust colors if pressed
         let fill_color = if self.pressed {
-            Color::rgb(
+            Color::rgba(
                 (self.fill_color.r as u16 * 80 / 100) as u8,
                 (self.fill_color.g as u16 * 80 / 100) as u8,
                 (self.fill_color.b as u16 * 80 / 100) as u8,
+                self.fill_color.a
             )
         } else {
             self.fill_color
         };
         
-        // Draw button background
-        ColoredRectangle::filled(
-            self.bounds.x, 
-            self.bounds.y, 
-            self.bounds.width, 
-            self.bounds.height, 
-            fill_color
-        ).render(ctx)?;
-        
-        // Draw button border
-        ColoredRectangle::outlined(
-            self.bounds.x, 
-            self.bounds.y, 
-            self.bounds.width, 
-            self.bounds.height, 
+        // Use the new RenderingContext draw_button method
+        ctx.draw_button(
+            self.bounds, 
+            &self.text, 
+            fill_color, 
+            self.text_color, 
             self.border_color
-        ).render(ctx)?;
-        
-        // For now, we don't have proper text rendering, so we'll just draw
-        // a simplified representation of text using a small rectangle
-        let text_width = std::cmp::min(self.text.len() as u32 * 8, self.bounds.width - 10);
-        let text_height = 10;
-        let text_x = self.bounds.x + (self.bounds.width as i32 - text_width as i32) / 2;
-        let text_y = self.bounds.y + (self.bounds.height as i32 - text_height as i32) / 2;
-        
-        ColoredRectangle::filled(
-            text_x, 
-            text_y, 
-            text_width, 
-            text_height, 
-            self.text_color
-        ).render(ctx)?;
+        )?;
         
         Ok(())
     }
 }
 
 impl UIComponent for Button {
-    fn bounds(&self) -> crate::platform::graphics::Rectangle {
+    fn bounds(&self) -> Rectangle {
         self.bounds
     }
 }

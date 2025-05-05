@@ -5,8 +5,8 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::platform::{GraphicsContext, Renderable};
-use crate::platform::graphics::{Color, Point, Rectangle};
+use crate::primitives::{RenderingContext, Renderable};
+use crate::primitives::{Color, Point, Rectangle};
 use crate::ui::components::{
     layout::TitleBar,
     text::Text, 
@@ -48,7 +48,7 @@ impl SimpleDemoPage {
     }
     
     /// Draw the slider with current value
-    fn draw_slider(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn draw_slider(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         // Draw slider background
         ColoredRectangle::filled(
             self.slider_bounds.x,
@@ -77,7 +77,7 @@ impl Page for SimpleDemoPage {
         Ok(())
     }
     
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         self.logger.trace("Rendering DemoPage");
         
         // Clear with blue background
@@ -148,10 +148,10 @@ impl Page for SimpleDemoPage {
         self.draw_slider(ctx)?;
         
         // Draw navigation arrow to Hello page
-        ctx.set_draw_color(Color::rgb(200, 200, 200))?;
+        let arrow_color = Color::rgb(200, 200, 200);
         for i in 0..self.left_arrow.len() {
             let j = (i + 1) % self.left_arrow.len();
-            ctx.draw_line(self.left_arrow[i], self.left_arrow[j])?;
+            ctx.draw_line(self.left_arrow[i], self.left_arrow[j], arrow_color)?;
         }
         
         self.logger.trace("DemoPage rendered successfully");

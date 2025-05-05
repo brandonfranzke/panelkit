@@ -220,17 +220,25 @@ match risky_operation() {
 }
 ```
 
-## Feature Flags
+## Runtime Platform Selection
 
-Configure PanelKit behavior with Cargo features:
+PanelKit uses runtime detection to select the appropriate platform implementation:
 
-```toml
-# Cargo.toml
+```rust
+// In code, specify target platform:
+let config = AppConfig {
+    // ... other config ...
+    target_platform: TargetPlatform::Host, // or TargetPlatform::Embedded or TargetPlatform::Auto
+};
 
-[features]
-default = ["host"]
-host = ["sdl2"]
-embedded = []
+// Or use environment variables:
+// PANELKIT_EMBEDDED=1 forces embedded mode
+// PANELKIT_PLATFORM=host|embedded sets specific platform
 ```
 
-These flags control which platform implementation is used at runtime.
+The `Auto` option will detect the platform based on:
+1. Architecture (ARM implies embedded)
+2. Environment variables
+3. Device files (checking for /dev/fb0)
+
+This dynamic selection replaces the previous compile-time feature flags approach and allows a single binary to adapt to different environments.

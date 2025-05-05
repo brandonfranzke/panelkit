@@ -19,7 +19,7 @@ DOCKER_RUN := docker run --rm -v $(SRC_DIR):/src -v $(CARGO_CACHE_VOLUME):/root/
 ARM_TARGET := armv7-unknown-linux-gnueabihf
 
 # Primary targets
-.PHONY: all help check-deps host run build-container target deploy clean
+.PHONY: all help check-deps build run build-container cross-compile deploy clean
 
 # Default target
 all: help
@@ -30,16 +30,13 @@ help:
 	@echo ""
 	@echo "Development targets:"
 	@echo "  make check-deps      - Check if required dependencies are installed"
-	@echo "  make host            - Build for host development environment"
-	@echo "  make run             - Run the host development build"
-	@echo "  make target          - Cross-compile for embedded target (Raspberry Pi)"
-	@echo "  make unified         - Build unified version with all backends"
-	@echo "  make run-unified     - Run the unified build with auto-detection"
+	@echo "  make build           - Build for development (with runtime platform detection)"
+	@echo "  make run             - Run the application (auto-detects platform)"
 	@echo "  make clean           - Clean build artifacts"
 	@echo ""
 	@echo "Deployment targets:"
-	@echo "  make deploy          - Deploy to embedded target device (embedded-only build)"
-	@echo "  make deploy-unified  - Deploy unified build to target device (auto-detects platform)"
+	@echo "  make cross-compile   - Cross-compile for embedded target (Raspberry Pi)"
+	@echo "  make deploy          - Deploy to embedded target device"
 	@echo "  make create-service  - Create systemd service file"
 	@echo "  make install-service - Install systemd service on target"
 	@echo ""
@@ -63,66 +60,40 @@ build-container: check-deps
 	@docker build -t $(DOCKER_IMAGE) -f $(DOCKER_DOCKERFILE) .
 	@echo "✅ Docker container built successfully"
 
-# Build for host development environment
-host: check-deps
-	@echo "Building for host development environment..."
+# Build for development (with runtime platform detection)
+build: check-deps
+	@echo "Building application with runtime platform detection..."
 	@mkdir -p $(BUILD_DIR)
 	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
 		LIBRARY_PATH="/opt/homebrew/lib" \
 		cargo build
-	@cp target/debug/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-macos
-	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-macos
-	@echo "✅ Host build complete: $(BUILD_DIR)/$(PROJECT_NAME)-macos"
+	@cp target/debug/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)
+	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)
+	@echo "✅ Build complete: $(BUILD_DIR)/$(PROJECT_NAME)"
 
-# Run the host development build
-run: host
-	@echo "Running host development build..."
-	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-macos --platform host
+# Run the application
+run: build
+	@echo "Running application (auto-detecting platform)..."
+	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME) --platform auto
 
 # Cross-compile for embedded target
-target: build-container
+cross-compile: build-container
 	@echo "Cross-compiling for embedded target..."
 	@mkdir -p $(BUILD_DIR)
 	@$(DOCKER_RUN) $(DOCKER_IMAGE) \
 		bash -c "cargo build --target=$(ARM_TARGET) --release"
 	@$(DOCKER_RUN) $(DOCKER_IMAGE) cp -r /src/target/$(ARM_TARGET)/release/$(PROJECT_NAME) /src/build/$(PROJECT_NAME)-arm
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-arm
-	@echo "✅ Target build complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
-
-# Build unified version with all backends
-unified: check-deps
-	@echo "Building unified version with all backends..."
-	@mkdir -p $(BUILD_DIR)
-	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
-		LIBRARY_PATH="/opt/homebrew/lib" \
-		cargo build --release
-	@cp target/release/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-unified
-	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-unified
-	@echo "✅ Unified build complete: $(BUILD_DIR)/$(PROJECT_NAME)-unified"
-
-# Run the unified build with auto-detection
-run-unified: unified
-	@echo "Running unified build with auto-detection..."
-	@DYLD_LIBRARY_PATH=/opt/homebrew/lib RUST_LOG=debug $(BUILD_DIR)/$(PROJECT_NAME)-unified --platform auto
+	@echo "✅ Cross-compilation complete: $(BUILD_DIR)/$(PROJECT_NAME)-arm"
 
 # Deploy to target device
-deploy: target
+deploy: cross-compile
 	@echo "Deploying to target device..."
 	@ssh $(TARGET_USER)@$(TARGET_HOST) "mkdir -p $(TARGET_DIR)" || \
 		(echo "❌ Failed to connect to $(TARGET_HOST). Check your connection and try again." && exit 1)
 	@scp $(BUILD_DIR)/$(PROJECT_NAME)-arm $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
 	@ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
 	@echo "✅ Deployed to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
-	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME) --platform embedded\""
-
-# Deploy unified build to target device
-deploy-unified: unified
-	@echo "Deploying unified build to target device..."
-	@ssh $(TARGET_USER)@$(TARGET_HOST) "mkdir -p $(TARGET_DIR)" || \
-		(echo "❌ Failed to connect to $(TARGET_HOST). Check your connection and try again." && exit 1)
-	@scp $(BUILD_DIR)/$(PROJECT_NAME)-unified $(TARGET_USER)@$(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)
-	@ssh $(TARGET_USER)@$(TARGET_HOST) "chmod +x $(TARGET_DIR)/$(PROJECT_NAME)"
-	@echo "✅ Deployed unified build to $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT_NAME)"
 	@echo "   Run on target with: ssh $(TARGET_USER)@$(TARGET_HOST) \"cd $(TARGET_DIR) && RUST_LOG=debug ./$(PROJECT_NAME) --platform auto\""
 
 # Create systemd service file for target

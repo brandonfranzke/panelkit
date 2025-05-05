@@ -9,7 +9,8 @@ PanelKit is designed as a self-contained appliance-like UI system for embedded d
 ### Features
 
 - **Cross-Platform Development**: Develop on macOS/Linux, deploy to embedded targets
-- **Unified Interface**: Single, coherent API across development and production
+- **Runtime Platform Detection**: Automatically detects and adapts to the current platform
+- **Unified Rendering Interface**: Single, coherent API across development and production
 - **Event-Driven Architecture**: Robust pub/sub system for component communication
 - **Page-Based Navigation**: Structured UI organization with navigation
 - **Platform Abstraction**: Clean separation between UI logic and hardware specifics
@@ -23,8 +24,10 @@ PanelKit is designed as a self-contained appliance-like UI system for embedded d
 PanelKit is in active development with:
 
 - Core application architecture and runtime implemented
+- Runtime polymorphism for platform and backend selection
 - Unified platform driver interface with multiple implementations
-- Rendering abstraction layer with pluggable backends (SDL2, framebuffer)
+- Consolidated rendering primitives and abstraction layer
+- Pluggable rendering backends (SDL2, framebuffer) with automatic detection
 - UI manager with page navigation and safe component access
 - Event system with typed events and pub/sub messaging
 - State management framework with serialization support
@@ -50,27 +53,24 @@ make check-deps
 Build and run the application on your development machine:
 
 ```bash
-# Build for local development
-make host
+# Build for development
+make build
 
-# Run the application
+# Run the application (auto-detects platform)
 make run
-
-# Run the application with rendering abstraction layer enabled
-./scripts/run_with_rendering.sh
 ```
 
 Deploy to a Raspberry Pi:
 
 ```bash
 # Cross-compile for ARM
-make target
+make cross-compile
 
 # Deploy to the target device
 make deploy TARGET_HOST=raspberrypi.local TARGET_USER=pi
 
-# Run on the target with rendering abstraction enabled
-ssh pi@raspberrypi.local "cd /home/pi/panelkit && PANELKIT_USE_RENDERING=1 RUST_LOG=debug ./panelkit"
+# Run on the target (auto-detects platform)
+ssh pi@raspberrypi.local "cd /home/pi/panelkit && RUST_LOG=debug ./panelkit"
 ```
 
 ### Architecture
@@ -100,7 +100,7 @@ PanelKit follows a layered architecture with clean separation of concerns:
                      └───────────────────┘
 ```
 
-The architecture includes a rendering abstraction layer that provides a clean interface for different rendering backends, allowing the same UI code to run on both host (SDL2) and embedded (framebuffer) targets.
+The architecture uses runtime polymorphism with a unified rendering abstraction layer that provides a clean interface for different backends. The system automatically detects the appropriate platform and rendering backend at runtime, allowing the same binary to adapt to both host (SDL2) and embedded (framebuffer) environments.
 
 For more details, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
@@ -108,17 +108,17 @@ For more details, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
 ### Building
 
-The project provides targets for both development and deployment:
+The project provides simplified targets for development and deployment:
 
 ```bash
-# Local development build
-make host
+# Development build (with runtime platform detection)
+make build
 
-# Run the development build
+# Run the application (auto-detects platform)
 make run
 
 # Cross-compile for Raspberry Pi
-make target
+make cross-compile
 
 # Deploy to target device
 make deploy
@@ -138,19 +138,43 @@ Extend the `Page` trait to create custom UI screens:
 
 ```rust
 use panelkit::ui::Page;
+use panelkit::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle};
+use anyhow::Result;
 
 struct MyCustomPage {
     // Page state
+    width: u32,
+    height: u32,
 }
 
 impl Page for MyCustomPage {
-    fn init(&mut self) -> anyhow::Result<()> {
+    fn init(&mut self) -> Result<()> {
         // Initialize page
         Ok(())
     }
     
-    fn render(&self) -> anyhow::Result<()> {
-        // Render page content
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        // Clear background
+        ctx.clear(Color::rgb(240, 240, 240))?;
+        
+        // Draw content with unified rendering abstraction
+        ctx.fill_rect(
+            Rectangle::new(10, 10, 100, 50),
+            Color::rgb(0, 120, 215)
+        )?;
+        
+        ctx.draw_text(
+            "Hello World",
+            Point::new(60, 35),
+            TextStyle {
+                font_size: panelkit::primitives::FontSize::Medium,
+                color: Color::rgb(255, 255, 255),
+                alignment: panelkit::primitives::TextAlignment::Center,
+                bold: false,
+                italic: false,
+            }
+        )?;
+        
         Ok(())
     }
     

@@ -1,14 +1,13 @@
 //! Framebuffer rendering backend
 //!
-//! This module implements the RenderingBackend trait using direct framebuffer 
+//! This module implements the RenderingContext trait using direct framebuffer 
 //! access for embedded targets. Currently this is a stub implementation.
 
 use anyhow::Result;
-use crate::rendering::{RenderingBackend, Surface};
-use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle};
+use crate::primitives::{Color, Point, Rectangle, TextStyle, RenderingContext, Surface, FontSize, TextAlignment};
 use std::any::Any;
 
-/// Framebuffer implementation of the RenderingBackend trait
+/// Framebuffer implementation of the RenderingContext trait
 pub struct FramebufferBackend {
     width: u32,
     height: u32,
@@ -27,7 +26,7 @@ impl FramebufferBackend {
     }
 }
 
-impl RenderingBackend for FramebufferBackend {
+impl RenderingContext for FramebufferBackend {
     fn init(&mut self, width: u32, height: u32) -> Result<()> {
         self.width = width;
         self.height = height;

@@ -46,13 +46,14 @@ Manages the user interface:
 
 Provides unified hardware abstraction:
 - **PlatformDriver**: Core unified interface for all platforms
-- **GraphicsContext**: Abstract graphics handling for different platforms
+- **RenderingContext**: Abstract rendering interface for all graphics operations
 - **Implementation variants**:
-  - SDLDriver: For host development (current primary implementation)
+  - RenderingPlatformDriver: Primary implementation using rendering backends
+  - SDLBackend: For host development using SDL2
+  - FramebufferBackend: For embedded targets using framebuffer
   - MockDriver: For testing and headless operation
-  - (Future) FramebufferDriver: For embedded targets (planned)
 
-Note: The current implementation uses some platform-specific code in the application layer when accessing SDL contexts. Future improvements will fully abstract these details.
+The platform abstraction layer uses runtime polymorphism to select the appropriate implementation based on the detected platform or explicit configuration.
 
 ### 4. Event System (event/mod.rs)
 
@@ -81,10 +82,11 @@ Manages application state:
 
 PanelKit achieves cross-platform compatibility through multiple mechanisms:
 
-1. **Runtime polymorphism**: Platform implementations are selected at runtime
-2. **Feature-aware behavior**: UI components adapt to available platform capabilities
-3. **GraphicsContext abstraction**: Rendering adapts to underlying graphics system
-4. **Common event model**: Input from different sources maps to a unified event type
+1. **Runtime polymorphism**: Platform implementations are dynamically selected at runtime based on environment detection
+2. **Unified rendering abstraction**: All rendering operations go through the `RenderingContext` interface
+3. **Graceful fallbacks**: System degrades gracefully when preferred backends are unavailable
+4. **Type-safe downcasting**: Backend-specific features are accessible through safe downcasting when needed
+5. **Common event model**: Input from different sources maps to a unified event type
 
 ## Error Handling
 

@@ -142,12 +142,14 @@ Remove all build artifacts:
 make clean
 ```
 
-## Feature Flags
+## Runtime Platform Selection
 
-PanelKit uses feature flags to control compilation:
+PanelKit uses runtime detection instead of compile-time feature flags:
 
-- `host`: Enables SDL2-based simulation for desktop development
-- `embedded`: Enables optimizations for target hardware
+- **Single Binary**: The application can adapt to different environments at runtime
+- **Auto-Detection**: Automatically selects appropriate backend based on environment
+- **Environment Override**: Use `PANELKIT_EMBEDDED=1` or `PANELKIT_PLATFORM=host|embedded`
+- **API Selection**: Programmatically select platform with `AppConfig::target_platform`
 
 ## Troubleshooting
 

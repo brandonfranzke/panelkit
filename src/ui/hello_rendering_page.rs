@@ -4,10 +4,8 @@
 
 use crate::event::Event;
 use crate::ui::Page;
-use crate::platform::GraphicsContext;
-use crate::platform::graphics::{Point, Rectangle, Color};
 use crate::logging;
-use crate::rendering::RenderingBackend;
+use crate::primitives::{RenderingContext, Point, Rectangle, Color, TextStyle, FontSize, TextAlignment};
 use anyhow::Result; 
 use std::any::Any;
 
@@ -52,103 +50,70 @@ impl HelloRenderingPage {
     }
     
     /// Draw title bar
-    fn draw_title_bar(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn draw_title_bar(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         // Draw title background
         ctx.clear(Color::rgb(240, 240, 240))?;
         
-        // Try to use rendering backend if available
-        if let Some(driver_ctx) = ctx.as_any_mut().downcast_mut::<crate::platform::rendering_driver::RenderingGraphicsContext>() {
-            // Get the backend from the context
-            if let Some(backend) = driver_ctx.backend.as_any_mut().downcast_mut::<crate::rendering::sdl_backend::SDLBackend>() {
-                // Create rendering primitives
-                use crate::rendering::primitives;
-                
-                // Draw title area
-                let rendering_rect = primitives::Rectangle::from_graphics(self.title_area);
-                let rendering_color = primitives::Color::rgb(30, 120, 60);
-                backend.fill_rect(rendering_rect, rendering_color)?;
-                
-                // Draw title text
-                let title_position = primitives::Point::new(
-                    self.title_area.x + (self.title_area.width as i32 / 2),
-                    self.title_area.y + (self.title_area.height as i32 / 2) - 10
-                );
-                
-                let title_style = primitives::TextStyle::new(primitives::Color::rgb(255, 255, 255))
-                    .with_size(primitives::FontSize::Large)
-                    .with_alignment(primitives::TextAlignment::Center);
-                    
-                backend.draw_text("Hello Page", title_position, title_style)?;
-                
-                return Ok(());
-            }
-        }
+        // Draw title area
+        ctx.fill_rect(self.title_area, Color::rgb(30, 120, 60))?;
         
-        // Fall back to standard GraphicsContext if rendering backend isn't available
-        self.draw_title_bar_fallback(ctx)
-    }
-    
-    /// Draw title bar using standard rendering (fallback)
-    fn draw_title_bar_fallback(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
-        // This is a simplified version for compatibility with standard GraphicsContext
-        ctx.fill_rect(self.title_area)?;
+        // Draw title text
+        let title_position = Point::new(
+            self.title_area.x + (self.title_area.width as i32 / 2),
+            self.title_area.y + (self.title_area.height as i32 / 2) - 10
+        );
+        
+        let title_style = TextStyle {
+            font_size: FontSize::Large,
+            color: Color::rgb(255, 255, 255),
+            alignment: TextAlignment::Center,
+            bold: false,
+            italic: false,
+        };
+                
+        ctx.draw_text("Hello Page", title_position, title_style)?;
+        
         Ok(())
     }
     
     /// Draw content area
-    fn draw_content(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
-        // Try to use rendering backend if available
-        if let Some(driver_ctx) = ctx.as_any_mut().downcast_mut::<crate::platform::rendering_driver::RenderingGraphicsContext>() {
-            // Get the backend from the context
-            if let Some(backend) = driver_ctx.backend.as_any_mut().downcast_mut::<crate::rendering::sdl_backend::SDLBackend>() {
-                // Create rendering primitives
-                use crate::rendering::primitives;
+    fn draw_content(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
+        // Draw hello text
+        let content_position = Point::new(
+            self.content_area.x + (self.content_area.width as i32 / 2),
+            self.content_area.y + (self.content_area.height as i32 / 2) - 20
+        );
+        
+        let content_style = TextStyle {
+            font_size: FontSize::Large,
+            color: Color::rgb(30, 30, 30),
+            alignment: TextAlignment::Center,
+            bold: false,
+            italic: false,
+        };
                 
-                // Draw hello text
-                let content_position = primitives::Point::new(
-                    self.content_area.x + (self.content_area.width as i32 / 2),
-                    self.content_area.y + (self.content_area.height as i32 / 2) - 20
-                );
-                
-                let content_style = primitives::TextStyle::new(primitives::Color::rgb(30, 30, 30))
-                    .with_size(primitives::FontSize::ExtraLarge)
-                    .with_alignment(primitives::TextAlignment::Center)
-                    .with_bold(true);
-                    
-                backend.draw_text("Hello", content_position, content_style)?;
-                
-                // Draw navigation arrow
-                let arrow_color = primitives::Color::rgb(50, 100, 200);
-                
-                // Draw filled triangle for arrow
-                for i in 0..3 {
-                    let j = (i + 1) % 3;
-                    let start = primitives::Point::from_graphics(self.right_arrow_points[i]);
-                    let end = primitives::Point::from_graphics(self.right_arrow_points[j]);
-                    backend.draw_line(start, end, arrow_color)?;
-                }
-                
-                // Draw "next" button
-                let button_rect = primitives::Rectangle::from_graphics(self.button_area);
-                backend.draw_button(
-                    button_rect,
-                    "Next →",
-                    primitives::Color::rgb(30, 120, 60),
-                    primitives::Color::rgb(255, 255, 255),
-                    primitives::Color::rgb(20, 80, 40)
-                )?;
-                
-                return Ok(());
-            }
+        ctx.draw_text("Hello", content_position, content_style)?;
+        
+        // Draw navigation arrow
+        let arrow_color = Color::rgb(50, 100, 200);
+        
+        // Draw filled triangle for arrow
+        for i in 0..3 {
+            let j = (i + 1) % 3;
+            let start = self.right_arrow_points[i];
+            let end = self.right_arrow_points[j];
+            ctx.draw_line(start, end, arrow_color)?;
         }
         
-        // Fall back to standard GraphicsContext if rendering backend isn't available
-        self.draw_content_fallback(ctx)
-    }
-    
-    /// Draw content using standard rendering (fallback)
-    fn draw_content_fallback(&self, _ctx: &mut dyn GraphicsContext) -> Result<()> {
-        // This is a simplified version for compatibility with standard GraphicsContext
+        // Draw "next" button
+        ctx.draw_button(
+            self.button_area,
+            "Next →",
+            Color::rgb(30, 120, 60),
+            Color::rgb(255, 255, 255),
+            Color::rgb(20, 80, 40)
+        )?;
+        
         Ok(())
     }
 }
@@ -163,7 +128,7 @@ impl Page for HelloRenderingPage {
         Ok(())
     }
     
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         self.logger.trace("Rendering HelloRenderingPage");
         
         // Draw title bar

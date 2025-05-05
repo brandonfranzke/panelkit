@@ -3,57 +3,38 @@
 //! This module provides mock implementations of platform-specific components for testing.
 
 use crate::event::{Event, TouchAction};
-use crate::platform::{GraphicsContext, PlatformDriver};
-use crate::platform::graphics::{Color, Point, Rectangle};
+use crate::platform::PlatformDriver;
+use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
 use anyhow::Result;
 use std::time::{Duration, Instant};
+use std::any::Any;
 
-/// Mock graphics context that simulates rendering operations
-pub struct MockGraphicsContext {
+/// Mock rendering context that simulates rendering operations
+pub struct MockRenderingContext {
     width: u32,
     height: u32,
-    current_color: Color,
 }
 
-impl MockGraphicsContext {
-    /// Create a new mock graphics context
+impl MockRenderingContext {
+    /// Create a new mock rendering context
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             width,
             height,
-            current_color: Color::rgb(0, 0, 0),
         }
     }
 }
 
-impl GraphicsContext for MockGraphicsContext {
-    fn clear(&mut self, color: Color) -> Result<()> {
-        log::trace!("Mock clear with color: RGB({}, {}, {})", color.r, color.g, color.b);
+impl RenderingContext for MockRenderingContext {
+    fn init(&mut self, width: u32, height: u32) -> Result<()> {
+        self.width = width;
+        self.height = height;
+        log::trace!("Mock init with dimensions: {}x{}", width, height);
         Ok(())
     }
     
-    fn set_draw_color(&mut self, color: Color) -> Result<()> {
-        self.current_color = color;
-        log::trace!("Mock set color: RGB({}, {}, {})", color.r, color.g, color.b);
-        Ok(())
-    }
-    
-    fn fill_rect(&mut self, rect: Rectangle) -> Result<()> {
-        log::trace!("Mock fill rectangle: ({}, {}, {}, {}) with color RGB({}, {}, {})",
-            rect.x, rect.y, rect.width, rect.height,
-            self.current_color.r, self.current_color.g, self.current_color.b);
-        Ok(())
-    }
-    
-    fn draw_rect(&mut self, rect: Rectangle) -> Result<()> {
-        log::trace!("Mock draw rectangle outline: ({}, {}, {}, {})",
-            rect.x, rect.y, rect.width, rect.height);
-        Ok(())
-    }
-    
-    fn draw_line(&mut self, start: Point, end: Point) -> Result<()> {
-        log::trace!("Mock draw line from ({}, {}) to ({}, {})",
-            start.x, start.y, end.x, end.y);
+    fn present(&mut self) -> Result<()> {
+        log::trace!("Mock present called");
         Ok(())
     }
     
@@ -61,11 +42,108 @@ impl GraphicsContext for MockGraphicsContext {
         (self.width, self.height)
     }
     
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn cleanup(&mut self) {
+        log::trace!("Mock cleanup called");
+    }
+    
+    fn clear(&mut self, color: Color) -> Result<()> {
+        log::trace!("Mock clear with color: RGB({}, {}, {}, {})", color.r, color.g, color.b, color.a);
+        Ok(())
+    }
+    
+    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Mock fill rectangle: ({}, {}, {}, {}) with color RGB({}, {}, {}, {})",
+            rect.x, rect.y, rect.width, rect.height,
+            color.r, color.g, color.b, color.a);
+        Ok(())
+    }
+    
+    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Mock draw rectangle outline: ({}, {}, {}, {}) with color RGB({}, {}, {}, {})",
+            rect.x, rect.y, rect.width, rect.height,
+            color.r, color.g, color.b, color.a);
+        Ok(())
+    }
+    
+    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
+        log::trace!("Mock draw line from ({}, {}) to ({}, {}) with color RGB({}, {}, {}, {})",
+            start.x, start.y, end.x, end.y,
+            color.r, color.g, color.b, color.a);
+        Ok(())
+    }
+    
+    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+        log::trace!("Mock draw text: '{}' at ({}, {})", text, position.x, position.y);
+        Ok(())
+    }
+    
+    fn draw_button(&mut self, rect: Rectangle, text: &str, bg_color: Color, text_color: Color, border_color: Color) -> Result<()> {
+        log::trace!("Mock draw button: '{}' at ({}, {}, {}, {})", 
+            text, rect.x, rect.y, rect.width, rect.height);
+        Ok(())
+    }
+    
+    fn create_surface(&mut self, width: u32, height: u32) -> Result<Box<dyn Surface>> {
+        log::trace!("Mock create surface: {}x{}", width, height);
+        Ok(Box::new(MockSurface::new(width, height)))
+    }
+    
+    fn as_any(&self) -> &dyn Any {
         self
     }
     
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+/// Mock surface implementation
+pub struct MockSurface {
+    width: u32,
+    height: u32,
+}
+
+impl MockSurface {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+}
+
+impl Surface for MockSurface {
+    fn clear(&mut self, color: Color) -> Result<()> {
+        log::trace!("Mock surface clear with color: RGB({}, {}, {}, {})", color.r, color.g, color.b, color.a);
+        Ok(())
+    }
+    
+    fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+    
+    fn fill_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Mock surface fill rect at ({}, {}, {}, {})", rect.x, rect.y, rect.width, rect.height);
+        Ok(())
+    }
+    
+    fn draw_rect(&mut self, rect: Rectangle, color: Color) -> Result<()> {
+        log::trace!("Mock surface draw rect at ({}, {}, {}, {})", rect.x, rect.y, rect.width, rect.height);
+        Ok(())
+    }
+    
+    fn draw_line(&mut self, start: Point, end: Point, color: Color) -> Result<()> {
+        log::trace!("Mock surface draw line from ({}, {}) to ({}, {})", start.x, start.y, end.x, end.y);
+        Ok(())
+    }
+    
+    fn draw_text(&mut self, text: &str, position: Point, style: TextStyle) -> Result<()> {
+        log::trace!("Mock surface draw text: '{}' at ({}, {})", text, position.x, position.y);
+        Ok(())
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -156,9 +234,9 @@ impl PlatformDriver for MockDriver {
         (self.width, self.height)
     }
     
-    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>> {
-        // Create a new mock graphics context
-        let context = MockGraphicsContext::new(self.width, self.height);
+    fn create_rendering_context(&mut self) -> Result<Box<dyn RenderingContext>> {
+        // Create a new mock rendering context
+        let context = MockRenderingContext::new(self.width, self.height);
         Ok(Box::new(context))
     }
     

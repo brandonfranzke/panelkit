@@ -5,8 +5,7 @@
 use crate::event::Event;
 use crate::ui::Page;
 use crate::logging;
-use crate::platform::{GraphicsContext, Renderable};
-use crate::platform::graphics::{Color, Point, Rectangle};
+use crate::primitives::{RenderingContext, Renderable, Color, Point, Rectangle};
 use crate::ui::components::{layout::TitleBar, text::Text, text::TextAlign, ColoredRectangle};
 use anyhow::Result;
 use std::any::Any;
@@ -45,7 +44,7 @@ impl Page for HelloPage {
         Ok(())
     }
     
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         self.logger.trace("Rendering HelloPage");
         
         // Clear the screen with a green background
@@ -87,10 +86,10 @@ impl Page for HelloPage {
         }
         
         // Draw navigation arrow to Demo page
-        ctx.set_draw_color(Color::rgb(200, 200, 200))?;
+        let arrow_color = Color::rgb(200, 200, 200);
         for i in 0..self.right_arrow.len() {
             let j = (i + 1) % self.right_arrow.len();
-            ctx.draw_line(self.right_arrow[i], self.right_arrow[j])?;
+            ctx.draw_line(self.right_arrow[i], self.right_arrow[j], arrow_color)?;
         }
         
         self.logger.trace("HelloPage rendered successfully");

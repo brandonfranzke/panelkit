@@ -2,8 +2,7 @@
 //!
 //! This module provides layout elements for arranging components.
 
-use crate::platform::{GraphicsContext, Renderable};
-use crate::platform::graphics::Rectangle;
+use crate::primitives::{RenderingContext, Renderable, Rectangle, Color};
 use crate::ui::components::{ColoredRectangle, UIComponent};
 use anyhow::Result;
 
@@ -37,7 +36,7 @@ impl Container {
 }
 
 impl Renderable for Container {
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         // Draw background if set
         if let Some(ref bg) = self.background {
             bg.render(ctx)?;
@@ -53,7 +52,7 @@ impl Renderable for Container {
 }
 
 impl UIComponent for Container {
-    fn bounds(&self) -> crate::platform::graphics::Rectangle {
+    fn bounds(&self) -> Rectangle {
         self.bounds
     }
 }
@@ -65,7 +64,7 @@ pub struct TitleBar {
 
 impl TitleBar {
     /// Create a new title bar
-    pub fn new(x: i32, y: i32, width: u32, height: u32, title: &str, text_color: crate::platform::graphics::Color, bg_color: crate::platform::graphics::Color) -> Self {
+    pub fn new(x: i32, y: i32, width: u32, height: u32, title: &str, text_color: Color, bg_color: Color) -> Self {
         let mut container = Container::new(x, y, width, height)
             .with_background(ColoredRectangle::filled(x, y, width, height, bg_color));
             
@@ -82,13 +81,13 @@ impl TitleBar {
 }
 
 impl Renderable for TitleBar {
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()> {
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()> {
         self.container.render(ctx)
     }
 }
 
 impl UIComponent for TitleBar {
-    fn bounds(&self) -> crate::platform::graphics::Rectangle {
+    fn bounds(&self) -> Rectangle {
         self.container.bounds()
     }
 }
