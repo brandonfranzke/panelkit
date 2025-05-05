@@ -4,6 +4,7 @@
 
 use crate::primitives::{RenderingContext, Rectangle, Point, Color};
 use crate::ui::traits::{Positioned, Contains, Renderable, Component};
+use crate::event::{Event, TouchEvent, KeyboardEvent};
 use anyhow::Result;
 
 pub mod button;
@@ -112,6 +113,8 @@ impl Component for ColoredRectangle {
     fn is_visible(&self) -> bool {
         self.base.visible
     }
+    
+    // Rectangle doesn't process any events, so use default implementation from Component
 }
 
 /// A line component 
@@ -176,4 +179,6 @@ impl Component for Line {
     fn is_visible(&self) -> bool {
         self.visible
     }
+    
+    // Line doesn't process any events, so use default implementation from Component
 }

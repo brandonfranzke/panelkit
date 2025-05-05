@@ -5,6 +5,7 @@
 use crate::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
 use crate::ui::components::{ColoredRectangle, ComponentBase};
 use crate::ui::traits::{Component, Positioned, Contains, Renderable};
+use crate::event::{Event, TouchEvent, KeyboardEvent};
 use anyhow::Result;
 
 /// Text alignment options
@@ -170,5 +171,7 @@ impl Component for Text {
     fn is_visible(&self) -> bool {
         self.base.visible
     }
+    
+    // Text component has no special event handling, so we use the default implementation
 }
 

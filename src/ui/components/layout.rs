@@ -103,6 +103,27 @@ impl Component for Container {
         }
     }
     
+    // Override event handler methods to propagate to children
+    fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.propagate_to_children(event)
+    }
+    
+    fn on_touch_move(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.propagate_to_children(event)
+    }
+    
+    fn on_touch_up(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.propagate_to_children(event)
+    }
+    
+    fn on_touch_long_press(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.propagate_to_children(event)
+    }
+    
+    fn on_gesture(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.propagate_to_children(event)
+    }
+    
     fn on_key_event(&mut self, event: &mut KeyboardEvent) -> Result<bool> {
         // If we have a focused child, delegate to it
         if let Some(index) = self.focused_index {
@@ -111,7 +132,19 @@ impl Component for Container {
             }
         }
         
-        Ok(false)
+        // Otherwise, try all children in order
+        self.propagate_to_children(event)
+    }
+    
+    fn process_event(&mut self, event: &mut dyn Event) -> Result<bool> {
+        // First check if the component itself can handle the event
+        let handled = Component::process_event(self, event)?;
+        if handled || event.is_handled() {
+            return Ok(true);
+        }
+        
+        // Then try to propagate to children
+        self.propagate_to_children(event)
     }
 }
 
@@ -179,6 +212,31 @@ impl Component for TitleBar {
     
     fn set_focused(&mut self, focused: bool) {
         self.container.set_focused(focused);
+    }
+    
+    // Forward touch events to container
+    fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.container.on_touch_down(event)
+    }
+    
+    fn on_touch_move(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.container.on_touch_move(event)
+    }
+    
+    fn on_touch_up(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.container.on_touch_up(event)
+    }
+    
+    fn on_touch_long_press(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.container.on_touch_long_press(event)
+    }
+    
+    fn on_gesture(&mut self, event: &mut TouchEvent) -> Result<bool> {
+        self.container.on_gesture(event)
+    }
+    
+    fn on_key_event(&mut self, event: &mut KeyboardEvent) -> Result<bool> {
+        self.container.on_key_event(event)
     }
 }
 

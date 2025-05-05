@@ -63,6 +63,12 @@ pub struct AppConfig {
 /// Core application state
 pub struct Application {
     config: AppConfig,
+    event_bus: event::dispatch::EventBus,
+    // Keep old event_broker for backward compatibility
+    #[deprecated(
+        since = "0.2.0", 
+        note = "Use event_bus instead, which provides type-safe event handling"
+    )]
     event_broker: event::EventBroker,
     state_manager: state::StateManager,
     ui_manager: ui::UIManager,
@@ -76,6 +82,10 @@ impl Application {
         let logger = logging::app_logger();
         logger.info("Creating new application instance");
         
+        // Create new event bus
+        let event_bus = event::dispatch::EventBus::new();
+        
+        // Keep old event broker for backward compatibility
         let event_broker = event::EventBroker::new();
         
         let state_manager = state::StateManager::new(
@@ -90,6 +100,7 @@ impl Application {
         
         Ok(Self {
             config,
+            event_bus,
             event_broker,
             state_manager,
             ui_manager,
@@ -144,14 +155,14 @@ impl Application {
                 .context("Failed to poll for input events")?;
             
             // Process events
-            for event in events {
+            for legacy_event in events {
                 // Check for system events
-                match &event {
-                    event::Event::Custom { event_type, .. } if event_type == "quit" => {
+                match &legacy_event {
+                    event::LegacyEvent::Custom { event_type, .. } if event_type == "quit" => {
                         logger.info("Received quit event, exiting application");
                         self.running = false;
                     },
-                    event::Event::Navigate { page_id } => {
+                    event::LegacyEvent::Navigate { page_id } => {
                         logger.info(&format!("Received navigation event to page: {}", page_id));
                         if let Err(e) = self.ui_manager.navigate_to(page_id) {
                             logger.error(&format!("Failed to navigate to page '{}': {}", page_id, e));
@@ -160,10 +171,18 @@ impl Application {
                     _ => {}
                 }
                 
-                logger.trace(&format!("Processing event: {:?}", event));
-                self.event_broker.publish("input", event.clone());
+                logger.trace(&format!("Processing legacy event: {:?}", legacy_event));
                 
-                match self.ui_manager.process_event(&event) {
+                // Publish to legacy event broker for backward compatibility
+                self.event_broker.publish("input", legacy_event.clone());
+                
+                // Convert legacy event to new event type and publish to new event bus
+                // Note: We're just going to skip this for now until we fully migrate to new events
+                // This is because we can't easily clone or move out of a Box<dyn Event>
+                // let new_event = event::convert_legacy_event(&legacy_event);
+                
+                // Process event in UI manager using legacy event system (for now)
+                match self.ui_manager.process_event(&legacy_event) {
                     Ok(_) => {},
                     Err(e) => {
                         logger.error(&format!("Error processing event in UI: {:#}", e));

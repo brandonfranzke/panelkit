@@ -114,6 +114,9 @@ impl Renderable for Button {
     }
 }
 
+// Button basic component methods now in the impl Component block
+
+// Implementation of event handling methods for Button
 impl Component for Button {
     fn set_enabled(&mut self, enabled: bool) {
         self.base.enabled = enabled;
@@ -130,18 +133,13 @@ impl Component for Button {
     fn is_visible(&self) -> bool {
         self.base.visible
     }
-}
-
-// Override Component's touch event methods
-impl Button {
-    /// Handle a touch down event
+    
     fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
         // No need to check enabled/visible - Component trait already does this
         self.pressed = true;
         Ok(true)
     }
     
-    /// Handle a touch move event
     fn on_touch_move(&mut self, event: &mut TouchEvent) -> Result<bool> {
         if !self.pressed {
             return Ok(false);
@@ -153,7 +151,6 @@ impl Button {
         Ok(inside)
     }
     
-    /// Handle a touch up event
     fn on_touch_up(&mut self, event: &mut TouchEvent) -> Result<bool> {
         if !self.pressed {
             return Ok(false);
