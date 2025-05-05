@@ -93,8 +93,10 @@ fn main() -> anyhow::Result<()> {
 
     // Parse dimensions
     let dimensions = if args.dimensions == "auto" {
-        // Auto-detect dimensions
-        // TODO: Implement auto-detection
+        // Auto-detect dimensions based on platform
+        // This is a default fallback value for now.
+        // In the future, this will dynamically detect the actual display dimensions
+        // through platform-specific capabilities.
         (800, 480)
     } else {
         // Parse dimensions in format WIDTHxHEIGHT
