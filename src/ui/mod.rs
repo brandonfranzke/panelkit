@@ -8,7 +8,7 @@ use anyhow::{Result, Context};
 use crate::error::UIError;
 use crate::RenderingContext;
 use crate::logging;
-use crate::event::{Event, LegacyEvent, EventHandler, convert_legacy_event};
+use crate::event::{Event, EnumEvent, EventHandler, convert_enum_to_trait_event};
 
 // Core trait definitions
 pub mod traits;
@@ -32,59 +32,57 @@ pub trait Page {
     /// Render the page using the provided rendering context
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()>;
     
-    /// Handle legacy input events for this page
-    /// Returns a navigation event if the page wants to navigate
+    /// Handle events using enum-based event representation
+    /// Returns a navigation target string if the page wants to navigate
     /// 
-    /// This method is being kept for backward compatibility during the transition.
     #[deprecated(
         since = "0.2.0",
-        note = "MIGRATION REQUIRED: Use handle_new_event instead. Will be removed in version 0.3.0."
+        note = "Use handle_new_event instead which provides type-safe event processing."
     )]
-    fn handle_event(&mut self, event: &LegacyEvent) -> Result<Option<String>>;
+    fn handle_event(&mut self, event: &EnumEvent) -> Result<Option<String>>;
     
-    /// Handle new event system events
-    /// Returns a navigation event if the page wants to navigate
+    /// Handle events using trait-based event representation
+    /// Returns a navigation target string if the page wants to navigate
     fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
-        // Default implementation for backward compatibility
-        // Pages should override this method to handle new events directly
+        // Default implementation for pages that haven't been updated yet
+        // Pages should override this method for direct trait-based event handling
         
-        // Now that we have proper event cloning, we can implement a better default:
-        // Convert to legacy event and call handle_event
+        // Convert trait-based event to enum-based event and call handle_event
         #[allow(deprecated)]
         match event.event_type() {
             crate::event::EventType::Touch => {
                 if let Some(touch_event) = event.as_any().downcast_ref::<crate::event::TouchEvent>() {
-                    let legacy_action = match touch_event.action {
-                        crate::event::TouchAction::Down => crate::event::LegacyTouchAction::Press,
-                        crate::event::TouchAction::Up => crate::event::LegacyTouchAction::Up,
-                        crate::event::TouchAction::Move => crate::event::LegacyTouchAction::Move,
-                        crate::event::TouchAction::LongPress => crate::event::LegacyTouchAction::LongPress,
+                    let enum_action = match touch_event.action {
+                        crate::event::TouchAction::Down => crate::event::EnumTouchAction::Press,
+                        crate::event::TouchAction::Up => crate::event::EnumTouchAction::Up,
+                        crate::event::TouchAction::Move => crate::event::EnumTouchAction::Move,
+                        crate::event::TouchAction::LongPress => crate::event::EnumTouchAction::LongPress,
                         crate::event::TouchAction::Gesture(ref gesture) => {
                             if let crate::event::GestureType::Swipe(dir) = gesture {
-                                crate::event::LegacyTouchAction::Swipe(*dir)
+                                crate::event::EnumTouchAction::Swipe(*dir)
                             } else {
-                                crate::event::LegacyTouchAction::Move
+                                crate::event::EnumTouchAction::Move
                             }
                         }
                     };
                     
-                    let legacy_event = LegacyEvent::Touch {
+                    let enum_event = EnumEvent::Touch {
                         x: touch_event.position.x,
                         y: touch_event.position.y,
-                        action: legacy_action,
+                        action: enum_action,
                     };
                     
-                    return self.handle_event(&legacy_event);
+                    return self.handle_event(&enum_event);
                 }
             },
             crate::event::EventType::Custom => {
                 if let Some(custom_event) = event.as_any().downcast_ref::<crate::event::CustomEvent>() {
-                    let legacy_event = LegacyEvent::Custom {
+                    let enum_event = EnumEvent::Custom {
                         event_type: custom_event.name.clone(),
                         payload: custom_event.payload.clone(),
                     };
                     
-                    return self.handle_event(&legacy_event);
+                    return self.handle_event(&enum_event);
                 }
             },
             _ => {}
@@ -204,18 +202,18 @@ impl UIManager {
         Ok(())
     }
     
-    /// Process an event in the UI system (legacy version)
+    /// Process an enum-based event in the UI system
     #[deprecated(
         since = "0.2.0",
-        note = "MIGRATION REQUIRED: Use process_new_event instead. Will be removed in version 0.3.0."
+        note = "Use process_new_event instead which provides type-safe event processing."
     )]
-    pub fn process_event(&mut self, event: &LegacyEvent) -> Result<()> {
+    pub fn process_event(&mut self, event: &EnumEvent) -> Result<()> {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {
                 // Handle the event and check for navigation requests
                 #[allow(deprecated)]
                 let navigation = page.handle_event(event)
-                    .with_context(|| format!("Failed to process legacy event in page '{}'", page_id))?;
+                    .with_context(|| format!("Failed to process enum-based event in page '{}'", page_id))?;
                 
                 // If the page wants to navigate, do it
                 if let Some(target_page) = navigation {
@@ -227,7 +225,7 @@ impl UIManager {
         Ok(())
     }
     
-    /// Process a new event system event
+    /// Process a trait-based event in the UI system
     pub fn process_new_event(&mut self, event: &mut dyn Event) -> Result<()> {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {

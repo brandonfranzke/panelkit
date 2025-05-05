@@ -2,7 +2,7 @@
 //!
 //! This module provides a "World" page for the application.
 
-use crate::event::{Event, TouchEvent, EventType, CustomEvent, TouchAction, LegacyEvent};
+use crate::event::{Event, TouchEvent, EventType, CustomEvent, TouchAction, EnumEvent};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Point, Rectangle, Color, TextStyle, FontSize, TextAlignment};
@@ -143,13 +143,13 @@ impl Page for WorldRenderingPage {
     
     #[deprecated(
         since = "0.2.0",
-        note = "MIGRATION REQUIRED: Use handle_new_event instead. Will be removed in version 0.3.0."
+        note = "Use handle_new_event instead which provides type-safe event processing. Will be removed in version 0.3.0."
     )]
-    fn handle_event(&mut self, event: &crate::event::LegacyEvent) -> Result<Option<String>> {
-        // Forward to new_event handler by converting to the new event type
+    fn handle_event(&mut self, event: &crate::event::EnumEvent) -> Result<Option<String>> {
+        // Forward to trait-based event handler by converting to the trait-based event type
         // This avoids duplicating logic and ensures both handlers work the same
-        let mut new_event = crate::event::convert_legacy_event(event);
-        self.handle_new_event(&mut *new_event)
+        let mut trait_event = crate::event::convert_enum_to_trait_event(event);
+        self.handle_new_event(&mut *trait_event)
     }
     
     fn on_activate(&mut self) -> Result<()> {
@@ -191,12 +191,12 @@ impl Page for WorldRenderingPage {
         self
     }
     
-    fn handle_new_event(&mut self, event: &mut dyn NewEvent) -> Result<Option<String>> {
+    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
         match event.event_type() {
             EventType::Touch => {
                 // Downcast to TouchEvent
                 if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
-                    // Only handle TouchAction::Down events (equivalent to legacy Press)
+                    // Only handle TouchAction::Down events (equivalent to enum-based Press)
                     if touch_event.action == TouchAction::Down {
                         let position = touch_event.position;
                         

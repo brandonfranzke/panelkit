@@ -63,16 +63,16 @@ pub struct AppConfig {
 /// Core application state
 pub struct Application {
     config: AppConfig,
-    /// New type-safe event bus system - use this for all new code
+    /// Type-safe trait-based event bus system
     event_bus: event::dispatch::EventBus,
     
-    /// Legacy event broker for backward compatibility
+    /// Enum-based event broker
     /// 
     /// IMPORTANT: This will be removed in version 0.3.0
-    /// See docs/EVENT_SYSTEM_MIGRATION.md for migration instructions
+    /// This uses an enum-based approach instead of the trait-based event system
     #[deprecated(
         since = "0.2.0", 
-        note = "MIGRATION REQUIRED: Use event_bus instead, which provides type-safe event handling. See docs/EVENT_SYSTEM_MIGRATION.md"
+        note = "Use event_bus instead, which provides type-safe event handling."
     )]
     event_broker: event::EventBroker,
     state_manager: state::StateManager,
@@ -90,7 +90,7 @@ impl Application {
         // Create new event bus
         let event_bus = event::dispatch::EventBus::new();
         
-        // Keep old event broker for backward compatibility
+        // Create enum-based event broker as well
         let event_broker = event::EventBroker::new();
         
         let state_manager = state::StateManager::new(
@@ -175,44 +175,44 @@ impl Application {
                     logger.error(&format!("Error publishing event to event bus: {:#}", e));
                 }
                 
-                // For backward compatibility, also publish to legacy event broker
+                // For backward compatibility, also publish to enum-based event broker
                 #[allow(deprecated)]
                 {
-                    // Convert new event to legacy event for old code
+                    // Convert trait-based event to enum-based event
                     match event.event_type() {
                         event::EventType::Touch => {
                             if let Some(touch_event) = event.as_any().downcast_ref::<event::TouchEvent>() {
-                                let legacy_action = match touch_event.action {
-                                    event::TouchAction::Down => event::LegacyTouchAction::Press,
-                                    event::TouchAction::Up => event::LegacyTouchAction::Up,
-                                    event::TouchAction::Move => event::LegacyTouchAction::Move,
-                                    event::TouchAction::LongPress => event::LegacyTouchAction::LongPress,
+                                let enum_action = match touch_event.action {
+                                    event::TouchAction::Down => event::EnumTouchAction::Press,
+                                    event::TouchAction::Up => event::EnumTouchAction::Up,
+                                    event::TouchAction::Move => event::EnumTouchAction::Move,
+                                    event::TouchAction::LongPress => event::EnumTouchAction::LongPress,
                                     event::TouchAction::Gesture(ref gesture) => {
                                         if let event::GestureType::Swipe(dir) = gesture {
-                                            event::LegacyTouchAction::Swipe(*dir)
+                                            event::EnumTouchAction::Swipe(*dir)
                                         } else {
-                                            event::LegacyTouchAction::Move
+                                            event::EnumTouchAction::Move
                                         }
                                     }
                                 };
                                 
-                                let legacy_event = event::LegacyEvent::Touch {
+                                let enum_event = event::EnumEvent::Touch {
                                     x: touch_event.position.x,
                                     y: touch_event.position.y,
-                                    action: legacy_action,
+                                    action: enum_action,
                                 };
                                 
-                                self.event_broker.publish("input", legacy_event);
+                                self.event_broker.publish("input", enum_event);
                                 
-                                // Also process the legacy event in the UI manager (will be removed in 0.3.0)
-                                if let Err(e) = self.ui_manager.process_event(&legacy_event) {
-                                    logger.error(&format!("Error processing legacy event in UI: {:#}", e));
+                                // Also process the enum-based event in the UI manager (will be removed in 0.3.0)
+                                if let Err(e) = self.ui_manager.process_event(&enum_event) {
+                                    logger.error(&format!("Error processing enum-based event in UI: {:#}", e));
                                 }
                             }
                         },
                         event::EventType::Custom => {
                             if let Some(custom_event) = event.as_any().downcast_ref::<event::CustomEvent>() {
-                                let legacy_event = event::LegacyEvent::Custom {
+                                let enum_event = event::EnumEvent::Custom {
                                     event_type: custom_event.name.clone(),
                                     payload: custom_event.payload.clone(),
                                 };
@@ -227,11 +227,11 @@ impl Application {
                                     }
                                 }
                                 
-                                self.event_broker.publish("input", legacy_event.clone());
+                                self.event_broker.publish("input", enum_event.clone());
                                 
-                                // Also process the legacy event in the UI manager (will be removed in 0.3.0)
-                                if let Err(e) = self.ui_manager.process_event(&legacy_event) {
-                                    logger.error(&format!("Error processing legacy event in UI: {:#}", e));
+                                // Also process the enum-based event in the UI manager (will be removed in 0.3.0)
+                                if let Err(e) = self.ui_manager.process_event(&enum_event) {
+                                    logger.error(&format!("Error processing enum-based event in UI: {:#}", e));
                                 }
                             }
                         },

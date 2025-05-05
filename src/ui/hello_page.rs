@@ -2,7 +2,7 @@
 //!
 //! This is a minimal example page that displays "Hello, World!" text.
 
-use crate::event::{LegacyEvent as Event, LegacyTouchAction};
+use crate::event::{EnumEvent as Event, EnumTouchAction};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Color, Point, Rectangle};
@@ -97,7 +97,7 @@ impl Page for HelloPage {
         Ok(())
     }
     
-    fn handle_event(&mut self, event: &crate::event::LegacyEvent) -> Result<Option<String>> {
+    fn handle_event(&mut self, event: &crate::event::EnumEvent) -> Result<Option<String>> {
         match event {
             Event::Touch { x, y, action } => {
                 self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", action, x, y));
@@ -117,7 +117,7 @@ impl Page for HelloPage {
                    *x <= arrow_bounds.x + arrow_bounds.width as i32 &&
                    *y >= arrow_bounds.y && 
                    *y <= arrow_bounds.y + arrow_bounds.height as i32 &&
-                   matches!(action, crate::event::LegacyTouchAction::Press) {
+                   matches!(action, crate::event::EnumTouchAction::Press) {
                     self.logger.info("Right arrow clicked, navigating to Demo page");
                     return Ok(Some("demo".to_string()));
                 }
