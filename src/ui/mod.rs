@@ -8,7 +8,7 @@ use anyhow::{Result, Context};
 use crate::error::UIError;
 use crate::RenderingContext;
 use crate::logging;
-use crate::event::{Event, EnumEvent, EventHandler, convert_enum_to_trait_event};
+use crate::event::{Event, EventHandler};
 
 // Core trait definitions
 pub mod traits;
@@ -32,65 +32,9 @@ pub trait Page {
     /// Render the page using the provided rendering context
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()>;
     
-    /// Handle events using enum-based event representation
-    /// Returns a navigation target string if the page wants to navigate
-    /// 
-    #[deprecated(
-        since = "0.2.0",
-        note = "Use handle_new_event instead which provides type-safe event processing."
-    )]
-    fn handle_event(&mut self, event: &EnumEvent) -> Result<Option<String>>;
-    
     /// Handle events using trait-based event representation
     /// Returns a navigation target string if the page wants to navigate
-    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
-        // Default implementation for pages that haven't been updated yet
-        // Pages should override this method for direct trait-based event handling
-        
-        // Convert trait-based event to enum-based event and call handle_event
-        #[allow(deprecated)]
-        match event.event_type() {
-            crate::event::EventType::Touch => {
-                if let Some(touch_event) = event.as_any().downcast_ref::<crate::event::TouchEvent>() {
-                    let enum_action = match touch_event.action {
-                        crate::event::TouchAction::Down => crate::event::EnumTouchAction::Press,
-                        crate::event::TouchAction::Up => crate::event::EnumTouchAction::Up,
-                        crate::event::TouchAction::Move => crate::event::EnumTouchAction::Move,
-                        crate::event::TouchAction::LongPress => crate::event::EnumTouchAction::LongPress,
-                        crate::event::TouchAction::Gesture(ref gesture) => {
-                            if let crate::event::GestureType::Swipe(dir) = gesture {
-                                crate::event::EnumTouchAction::Swipe(*dir)
-                            } else {
-                                crate::event::EnumTouchAction::Move
-                            }
-                        }
-                    };
-                    
-                    let enum_event = EnumEvent::Touch {
-                        x: touch_event.position.x,
-                        y: touch_event.position.y,
-                        action: enum_action,
-                    };
-                    
-                    return self.handle_event(&enum_event);
-                }
-            },
-            crate::event::EventType::Custom => {
-                if let Some(custom_event) = event.as_any().downcast_ref::<crate::event::CustomEvent>() {
-                    let enum_event = EnumEvent::Custom {
-                        event_type: custom_event.name.clone(),
-                        payload: custom_event.payload.clone(),
-                    };
-                    
-                    return self.handle_event(&enum_event);
-                }
-            },
-            _ => {}
-        }
-        
-        // If we couldn't convert or handle the event, return None
-        Ok(None)
-    }
+    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>>;
     
     /// Called when this page becomes active
     fn on_activate(&mut self) -> Result<()>;
@@ -202,36 +146,14 @@ impl UIManager {
         Ok(())
     }
     
-    /// Process an enum-based event in the UI system
-    #[deprecated(
-        since = "0.2.0",
-        note = "Use process_new_event instead which provides type-safe event processing."
-    )]
-    pub fn process_event(&mut self, event: &EnumEvent) -> Result<()> {
-        if let Some(page_id) = &self.current_page {
-            if let Some(page) = self.pages.get_mut(page_id) {
-                // Handle the event and check for navigation requests
-                #[allow(deprecated)]
-                let navigation = page.handle_event(event)
-                    .with_context(|| format!("Failed to process enum-based event in page '{}'", page_id))?;
-                
-                // If the page wants to navigate, do it
-                if let Some(target_page) = navigation {
-                    self.navigate_to(&target_page)
-                        .with_context(|| format!("Failed to navigate to page '{}'", target_page))?;
-                }
-            }
-        }
-        Ok(())
-    }
     
-    /// Process a trait-based event in the UI system
-    pub fn process_new_event(&mut self, event: &mut dyn Event) -> Result<()> {
+    /// Process an event in the UI system
+    pub fn process_event(&mut self, event: &mut dyn Event) -> Result<()> {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {
                 // Handle the event and check for navigation requests
                 let navigation = page.handle_new_event(event)
-                    .with_context(|| format!("Failed to process new event in page '{}'", page_id))?;
+                    .with_context(|| format!("Failed to process event in page '{}'", page_id))?;
                 
                 // If the page wants to navigate, do it
                 if let Some(target_page) = navigation {

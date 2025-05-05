@@ -65,16 +65,6 @@ pub struct Application {
     config: AppConfig,
     /// Type-safe trait-based event bus system
     event_bus: event::dispatch::EventBus,
-    
-    /// Enum-based event broker
-    /// 
-    /// IMPORTANT: This will be removed in version 0.3.0
-    /// This uses an enum-based approach instead of the trait-based event system
-    #[deprecated(
-        since = "0.2.0", 
-        note = "Use event_bus instead, which provides type-safe event handling."
-    )]
-    event_broker: event::EventBroker,
     state_manager: state::StateManager,
     ui_manager: ui::UIManager,
     platform_driver: Box<dyn platform::PlatformDriver>,
@@ -90,9 +80,6 @@ impl Application {
         // Create new event bus
         let event_bus = event::dispatch::EventBus::new();
         
-        // Create enum-based event broker as well
-        let event_broker = event::EventBroker::new();
-        
         let state_manager = state::StateManager::new(
             config.state_path.as_deref()
         ).context("Failed to initialize state manager")?;
@@ -106,7 +93,6 @@ impl Application {
         Ok(Self {
             config,
             event_bus,
-            event_broker,
             state_manager,
             ui_manager,
             platform_driver,
@@ -155,92 +141,38 @@ impl Application {
         logger.info("Starting main application loop");
         
         while self.running {
-            // Poll for input events - now returns Vec<Box<dyn Event>> directly
+            // Poll for input events
             let events = self.platform_driver.poll_events()
                 .context("Failed to poll for input events")?;
             
-            // Process events using the new event system
+            // Process events
             for mut event in events {
-                // Check for system events
+                // Check for quit events
                 if let Some(custom_event) = event.as_any().downcast_ref::<event::CustomEvent>() {
                     if custom_event.name == "quit" {
                         logger.info("Received quit event, exiting application");
                         self.running = false;
                     }
+                    
+                    // Handle navigation events
+                    if custom_event.name.starts_with("navigate:") {
+                        if let Some(page_id) = custom_event.name.strip_prefix("navigate:") {
+                            logger.info(&format!("Received navigation event to page: {}", page_id));
+                            if let Err(e) = self.ui_manager.navigate_to(page_id) {
+                                logger.error(&format!("Failed to navigate to page '{}': {}", page_id, e));
+                            }
+                        }
+                    }
                 }
                 
-                // Publish to the new event bus
+                // Publish to the event bus
                 let event_clone = event.clone_event();
                 if let Err(e) = self.event_bus.publish_boxed("input", event_clone) {
                     logger.error(&format!("Error publishing event to event bus: {:#}", e));
                 }
                 
-                // For backward compatibility, also publish to enum-based event broker
-                #[allow(deprecated)]
-                {
-                    // Convert trait-based event to enum-based event
-                    match event.event_type() {
-                        event::EventType::Touch => {
-                            if let Some(touch_event) = event.as_any().downcast_ref::<event::TouchEvent>() {
-                                let enum_action = match touch_event.action {
-                                    event::TouchAction::Down => event::EnumTouchAction::Press,
-                                    event::TouchAction::Up => event::EnumTouchAction::Up,
-                                    event::TouchAction::Move => event::EnumTouchAction::Move,
-                                    event::TouchAction::LongPress => event::EnumTouchAction::LongPress,
-                                    event::TouchAction::Gesture(ref gesture) => {
-                                        if let event::GestureType::Swipe(dir) = gesture {
-                                            event::EnumTouchAction::Swipe(*dir)
-                                        } else {
-                                            event::EnumTouchAction::Move
-                                        }
-                                    }
-                                };
-                                
-                                let enum_event = event::EnumEvent::Touch {
-                                    x: touch_event.position.x,
-                                    y: touch_event.position.y,
-                                    action: enum_action,
-                                };
-                                
-                                self.event_broker.publish("input", enum_event);
-                                
-                                // Also process the enum-based event in the UI manager (will be removed in 0.3.0)
-                                if let Err(e) = self.ui_manager.process_event(&enum_event) {
-                                    logger.error(&format!("Error processing enum-based event in UI: {:#}", e));
-                                }
-                            }
-                        },
-                        event::EventType::Custom => {
-                            if let Some(custom_event) = event.as_any().downcast_ref::<event::CustomEvent>() {
-                                let enum_event = event::EnumEvent::Custom {
-                                    event_type: custom_event.name.clone(),
-                                    payload: custom_event.payload.clone(),
-                                };
-                                
-                                // Handle navigation events specially
-                                if custom_event.name.starts_with("navigate:") {
-                                    if let Some(page_id) = custom_event.name.strip_prefix("navigate:") {
-                                        logger.info(&format!("Received navigation event to page: {}", page_id));
-                                        if let Err(e) = self.ui_manager.navigate_to(page_id) {
-                                            logger.error(&format!("Failed to navigate to page '{}': {}", page_id, e));
-                                        }
-                                    }
-                                }
-                                
-                                self.event_broker.publish("input", enum_event.clone());
-                                
-                                // Also process the enum-based event in the UI manager (will be removed in 0.3.0)
-                                if let Err(e) = self.ui_manager.process_event(&enum_event) {
-                                    logger.error(&format!("Error processing enum-based event in UI: {:#}", e));
-                                }
-                            }
-                        },
-                        _ => {}
-                    }
-                }
-                
-                // Process with the new event system directly (preferred path)
-                if let Err(e) = self.ui_manager.process_new_event(event.as_mut()) {
+                // Process with the event system
+                if let Err(e) = self.ui_manager.process_event(event.as_mut()) {
                     logger.error(&format!("Error processing event in UI: {:#}", e));
                 }
             }
