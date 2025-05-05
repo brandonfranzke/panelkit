@@ -158,7 +158,7 @@ impl Page for SimpleDemoPage {
         Ok(())
     }
     
-    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
+    fn handle_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
         match event.event_type() {
             EventType::Touch => {
                 if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {

@@ -180,12 +180,12 @@ impl Page for WorldRenderingPage {
         self
     }
     
-    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
+    fn handle_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
         match event.event_type() {
             EventType::Touch => {
                 // Downcast to TouchEvent
                 if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
-                    // Only handle TouchAction::Down events (equivalent to enum-based Press)
+                    // Only handle TouchAction::Down events
                     if touch_event.action == TouchAction::Down {
                         let position = touch_event.position;
                         

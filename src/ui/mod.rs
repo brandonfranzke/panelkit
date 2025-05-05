@@ -32,9 +32,9 @@ pub trait Page {
     /// Render the page using the provided rendering context
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()>;
     
-    /// Handle events using trait-based event representation
+    /// Handle events
     /// Returns a navigation target string if the page wants to navigate
-    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>>;
+    fn handle_event(&mut self, event: &mut dyn Event) -> Result<Option<String>>;
     
     /// Called when this page becomes active
     fn on_activate(&mut self) -> Result<()>;
@@ -152,7 +152,7 @@ impl UIManager {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {
                 // Handle the event and check for navigation requests
-                let navigation = page.handle_new_event(event)
+                let navigation = page.handle_event(event)
                     .with_context(|| format!("Failed to process event in page '{}'", page_id))?;
                 
                 // If the page wants to navigate, do it
