@@ -84,7 +84,7 @@ impl PlatformDriver for RenderingPlatformDriver {
         if let Some(_sdl_backend) = self.rendering_context.as_any().downcast_ref::<crate::rendering::sdl_backend::SDLBackend>() {
             // Use a mock context for now that just delegates to the main context
             // In a real implementation, we would create a proper shared context
-            let mock_context = crate::platform::mock::MockDriver::new();
+            let mock_context = crate::platform::mock::MockRenderingContext::new(self.width, self.height);
             return Ok(Box::new(mock_context));
         }
         
