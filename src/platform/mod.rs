@@ -4,16 +4,12 @@
 
 use anyhow::{Result, Context};
 use crate::TargetPlatform;
+use crate::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, Surface};
 
 // Include platform implementations
-pub mod graphics;
 pub mod mock;
 pub mod sdl_driver;
 pub mod rendering_driver;
-
-// Re-export graphics types for convenience and transitional compatibility
-pub use graphics::{GraphicsContext, Renderable};
-pub use crate::rendering::primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
 
 /// Unified platform driver interface that handles both display and input
 pub trait PlatformDriver {
@@ -29,8 +25,8 @@ pub trait PlatformDriver {
     /// Get the display dimensions
     fn dimensions(&self) -> (u32, u32);
     
-    /// Create a graphics context for rendering
-    fn create_graphics_context(&mut self) -> Result<Box<dyn GraphicsContext>>;
+    /// Create a rendering context for drawing operations
+    fn create_rendering_context(&mut self) -> Result<Box<dyn RenderingContext>>;
     
     /// Release all resources
     fn cleanup(&mut self);

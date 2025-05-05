@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::any::Any;
 use anyhow::{Result, Context};
 use crate::error::UIError;
-use crate::platform::GraphicsContext;
+use crate::RenderingContext;
 use crate::logging;
 
 // Export UI components
@@ -17,53 +17,16 @@ pub mod hello_page;
 pub mod simple_demo_page;
 
 // UI Pages
-
-// Core application pages
 pub mod hello_rendering_page;
 pub mod world_rendering_page;
-// Compatibility helper for working with both graphics and rendering types
-pub mod compat {
-    use crate::platform::graphics;
-    use crate::rendering::primitives;
-    
-    /// Convert a graphics Point to a primitives Point
-    pub fn point_to_rendering(p: &graphics::Point) -> primitives::Point {
-        primitives::Point::new(p.x, p.y)
-    }
-    
-    /// Convert a primitives Point to a graphics Point
-    pub fn point_from_rendering(p: &primitives::Point) -> graphics::Point {
-        graphics::Point::new(p.x, p.y)
-    }
-    
-    /// Convert a graphics Rectangle to a primitives Rectangle
-    pub fn rect_to_rendering(r: &graphics::Rectangle) -> primitives::Rectangle {
-        primitives::Rectangle::new(r.x, r.y, r.width, r.height)
-    }
-    
-    /// Convert a primitives Rectangle to a graphics Rectangle
-    pub fn rect_from_rendering(r: &primitives::Rectangle) -> graphics::Rectangle {
-        graphics::Rectangle::new(r.x, r.y, r.width, r.height)
-    }
-    
-    /// Convert a graphics Color to a primitives Color
-    pub fn color_to_rendering(c: &graphics::Color) -> primitives::Color {
-        primitives::Color::rgb(c.r, c.g, c.b)
-    }
-    
-    /// Convert a primitives Color to a graphics Color
-    pub fn color_from_rendering(c: &primitives::Color) -> graphics::Color {
-        graphics::Color::rgb(c.r, c.g, c.b)
-    }
-}
 
 /// Represents a UI page in the application
 pub trait Page {
     /// Initialize the page
     fn init(&mut self) -> Result<()>;
     
-    /// Render the page using the provided graphics context
-    fn render(&self, ctx: &mut dyn GraphicsContext) -> Result<()>;
+    /// Render the page using the provided rendering context
+    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()>;
     
     /// Handle input events for this page
     /// Returns a navigation event if the page wants to navigate
@@ -89,7 +52,7 @@ pub trait Page {
 pub struct UIManager {
     pages: HashMap<String, Box<dyn Page>>,
     current_page: Option<String>,
-    graphics_context: Option<Box<dyn GraphicsContext>>,
+    rendering_context: Option<Box<dyn RenderingContext>>,
     width: u32,
     height: u32,
     logger: &'static logging::ComponentLogger,
@@ -101,7 +64,7 @@ impl UIManager {
         Self {
             pages: HashMap::new(),
             current_page: None,
-            graphics_context: None,
+            rendering_context: None,
             width: 800,
             height: 480,
             logger: logging::ui_logger(),
@@ -198,18 +161,18 @@ impl UIManager {
     pub fn render(&mut self) -> Result<()> {
         self.logger.trace("Starting render");
         
-        if self.graphics_context.is_none() {
-            self.logger.warn("No graphics context available, can't render");
+        if self.rendering_context.is_none() {
+            self.logger.warn("No rendering context available, can't render");
             return Ok(());
         }
         
-        // Get a mutable reference to the graphics context
-        let graphics_context = self.graphics_context.as_mut().unwrap();
+        // Get a mutable reference to the rendering context
+        let rendering_context = self.rendering_context.as_mut().unwrap();
         
         // Call the current page's render method
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get(page_id) {
-                page.render(graphics_context.as_mut())
+                page.render(rendering_context.as_mut())
                     .with_context(|| format!("Failed to render page '{}'", page_id))?;
             } else {
                 self.logger.error(&format!("Current page '{}' not found in pages map!", page_id));
@@ -223,17 +186,17 @@ impl UIManager {
         Ok(())
     }
     
-    /// Set the graphics context for rendering
-    pub fn set_graphics_context(&mut self, ctx: Box<dyn GraphicsContext>) -> Result<()> {
-        self.logger.debug("Setting graphics context for UI manager");
+    /// Set the rendering context for UI drawing
+    pub fn set_rendering_context(&mut self, ctx: Box<dyn RenderingContext>) -> Result<()> {
+        self.logger.debug("Setting rendering context for UI manager");
         
         // Get dimensions from context
         let (width, height) = ctx.dimensions();
         self.width = width;
         self.height = height;
         
-        // Store graphics context
-        self.graphics_context = Some(ctx);
+        // Store rendering context
+        self.rendering_context = Some(ctx);
         
         // Update layout of all pages
         for (id, page) in &mut self.pages {
@@ -242,7 +205,7 @@ impl UIManager {
                 .with_context(|| format!("Failed to update layout for page '{}'", id))?;
         }
         
-        self.logger.debug("Graphics context set successfully");
+        self.logger.debug("Rendering context set successfully");
         Ok(())
     }
 }

@@ -39,12 +39,9 @@ futures = "0.3"
 # version = "1.0"
 # optional = true
 
-# Features are preserved for backward compatibility with existing build scripts,
-# but not used internally anymore
+# Simple feature to toggle SDL2 availability
 [features]
-default = ["with-sdl2"]
-host = ["with-sdl2"]
-embedded = []
+default = ["sdl2"]
 with-sdl2 = ["sdl2"]
 
 [profile.release]

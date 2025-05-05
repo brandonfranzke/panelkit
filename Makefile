@@ -69,7 +69,7 @@ host: check-deps
 	@mkdir -p $(BUILD_DIR)
 	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
 		LIBRARY_PATH="/opt/homebrew/lib" \
-		cargo build --features with-sdl2
+		cargo build
 	@cp target/debug/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-macos
 	@echo "✅ Host build complete: $(BUILD_DIR)/$(PROJECT_NAME)-macos"
@@ -95,7 +95,7 @@ unified: check-deps
 	@mkdir -p $(BUILD_DIR)
 	@RUSTFLAGS="-C link-args=-Wl,-rpath,/opt/homebrew/lib -L/opt/homebrew/lib" \
 		LIBRARY_PATH="/opt/homebrew/lib" \
-		cargo build --features with-sdl2 --release
+		cargo build --release
 	@cp target/release/$(PROJECT_NAME) $(BUILD_DIR)/$(PROJECT_NAME)-unified
 	@chmod +x $(BUILD_DIR)/$(PROJECT_NAME)-unified
 	@echo "✅ Unified build complete: $(BUILD_DIR)/$(PROJECT_NAME)-unified"

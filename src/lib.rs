@@ -5,6 +5,7 @@
 pub mod error;
 pub mod event;
 pub mod logging;
+pub mod primitives;
 pub mod platform;
 pub mod rendering;
 pub mod state;
@@ -12,6 +13,9 @@ pub mod ui;
 
 // Re-export error types and Result for convenience
 pub use error::{Error, Result, AnyhowResult}; 
+
+// Re-export primitives for convenience
+pub use primitives::{Color, Point, Rectangle, TextStyle, FontSize, TextAlignment, RenderingContext, Surface, Renderable};
 
 // Continue to use anyhow for context in implementation
 use error::Context;
@@ -104,14 +108,14 @@ impl Application {
         self.platform_driver.init(self.config.width, self.config.height)
             .context("Failed to initialize platform driver")?;
         
-        // Step 2: Create graphics context and set it for UI rendering
-        logger.debug("Creating graphics context for UI");
-        let graphics_context = self.platform_driver.create_graphics_context()
-            .context("Failed to create graphics context")?;
+        // Step 2: Create rendering context and set it for UI rendering
+        logger.debug("Creating rendering context for UI");
+        let rendering_context = self.platform_driver.create_rendering_context()
+            .context("Failed to create rendering context")?;
         
-        // Pass graphics context to UI manager
-        self.ui_manager.set_graphics_context(graphics_context)
-            .context("Failed to set graphics context for UI manager")?;
+        // Pass rendering context to UI manager
+        self.ui_manager.set_rendering_context(rendering_context)
+            .context("Failed to set rendering context for UI manager")?;
         
         // Step 3: Load state
         logger.debug("Loading application state");
