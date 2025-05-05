@@ -47,28 +47,24 @@ impl PlatformFactory {
         let default_height = 480;
         let app_title = "PanelKit";
         
-        // Use rendering driver
-        match rendering_driver::RenderingPlatformDriver::new(app_title, default_width, default_height) {
-            Ok(driver) => {
-                log::info!("Initialized platform driver");
-                return Ok(Box::new(driver));
-            },
-            Err(e) => {
-                log::warn!("Failed to initialize platform driver: {:?}. Falling back to alternative drivers.", e);
-                // Fall through to standard drivers
-            }
-        }
+        // IMPORTANT: Only use one driver implementation - don't try to create multiples
+        // as SDL2 can only be initialized once per application
         
-        // Alternative driver paths
+        // Use rendering driver as the primary choice
         #[cfg(feature = "host")]
         {
-            // Default to SDL driver
-            let sdl_driver = sdl_driver::SDLDriver::new(
-                default_width, 
-                default_height, 
-                app_title
-            )?;
-            return Ok(Box::new(sdl_driver));
+            // On host, use the rendering driver with SDL2 backend
+            match rendering_driver::RenderingPlatformDriver::new(app_title, default_width, default_height) {
+                Ok(driver) => {
+                    log::info!("Initialized rendering platform driver");
+                    return Ok(Box::new(driver));
+                },
+                Err(e) => {
+                    // Log the error but don't try a second SDL2 initialization
+                    log::error!("Failed to initialize rendering platform driver: {:?}", e);
+                    anyhow::bail!("Could not initialize platform driver");
+                }
+            }
         }
         
         #[cfg(feature = "embedded")]
@@ -76,6 +72,7 @@ impl PlatformFactory {
             // For now, use mock driver for embedded feature
             // This will be replaced with a proper framebuffer driver
             let mock_driver = mock::MockDriver::new();
+            log::info!("Initialized mock platform driver for embedded target");
             return Ok(Box::new(mock_driver));
         }
         
