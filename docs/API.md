@@ -125,59 +125,136 @@ Note: The platform abstraction is designed for a single-threaded application mod
 
 ## Event System
 
-### Event Types
+PanelKit uses a trait-based event system that provides type safety and proper event propagation.
+
+### Event Trait
+
+The core of the event system is the `Event` trait:
 
 ```rust
-pub enum Event {
-    Touch {
-        x: i32,
-        y: i32,
-        action: TouchAction,
-    },
-    NetworkStatus(bool),
-    StateChange {
-        key: String,
-        value: String,
-    },
-    Custom {
-        event_type: String,
-        payload: String,
-    },
-}
-
-pub enum TouchAction {
-    Press,
-    Release,
-    Move,
-    LongPress,
-    Swipe(SwipeDirection),
-}
-
-pub enum SwipeDirection {
-    Left,
-    Right,
-    Up,
-    Down,
+pub trait Event: Debug + Sync {
+    /// Get the event type
+    fn event_type(&self) -> EventType;
+    
+    /// Check if the event is handled
+    fn is_handled(&self) -> bool;
+    
+    /// Mark the event as handled
+    fn mark_handled(&mut self);
+    
+    /// Convert to Any for downcasting
+    fn as_any(&self) -> &dyn Any;
+    
+    /// Convert to Any for downcasting
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    
+    /// Create a deep clone of the event
+    fn clone_event(&self) -> Box<dyn Event + Send>;
 }
 ```
 
-### Event Broker
+### Specific Event Types
 
 ```rust
-// Create and use the event broker
-let broker = event::EventBroker::new();
+// Touch event
+pub struct TouchEvent {
+    pub data: EventData,        // Common event data
+    pub action: TouchAction,    // Down, Up, Move, etc.
+    pub position: Point,        // Touch position
+}
 
-// Subscribe to events
-let receiver = broker.subscribe("input");
+// Keyboard event
+pub struct KeyboardEvent {
+    pub data: EventData,
+    pub key_code: u32,
+    pub pressed: bool,
+}
 
-// Publish events
-broker.publish("input", Event::Touch { /* ... */ });
+// System event
+pub struct SystemEvent {
+    pub data: EventData,
+    pub system_type: SystemEventType, // Resize, AppClosing, etc.
+}
 
-// Process events
-while let Ok(event) = receiver.try_recv() {
-    // Handle event
+// Custom event
+pub struct CustomEvent {
+    pub data: EventData,
+    pub name: String,
+    pub payload: String,
 }
 ```
+
+### EventBus
+
+```rust
+// Create a new event bus
+let mut event_bus = EventBus::new();
+
+// Subscribe to a topic
+let receiver = event_bus.subscribe("input");
+
+// Publish an event
+event_bus.publish("input", TouchEvent::new(
+    TouchAction::Down,
+    Point::new(100, 100)
+));
+
+// Process received events
+while let Ok(mut event) = receiver.try_recv() {
+    match event.event_type() {
+        EventType::Touch => {
+            if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
+                // Process touch event
+            }
+        },
+        // Handle other event types
+        _ => {}
+    }
+}
+```
+
+### Event Handler
+
+```rust
+// Implement the EventHandler trait
+impl EventHandler for MyComponent {
+    fn handle_event(&mut self, event: &mut dyn Event) -> Result<bool> {
+        match event.event_type() {
+            EventType::Touch => {
+                if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
+                    if touch_event.action == TouchAction::Down {
+                        // Handle touch down
+                        touch_event.mark_handled(); // Stop propagation
+                        return Ok(true);  // Return true if handled
+                    }
+                }
+            },
+            // Handle other event types
+            _ => {}
+        }
+        
+        Ok(false) // Not handled
+    }
+}
+```
+
+### Enum-based Events (Deprecated)
+
+For backward compatibility, an enum-based event system is also provided:
+
+```rust
+// Deprecated: Use trait-based events instead
+pub enum EnumEvent {
+    Touch { x: i32, y: i32, action: EnumTouchAction },
+    Key { key: String, pressed: bool },
+    // Other event types...
+}
+
+// Convert between event systems
+let trait_event = convert_enum_to_trait_event(&enum_event);
+```
+
+See `docs/EVENT_SYSTEM.md` for detailed documentation on the event system.
 
 ## State Management
 

@@ -12,8 +12,10 @@ The initial architecture was established with these key components:
    - Simple events and rendering
 
 2. **Event System**
-   - Pub/sub pattern
-   - Typed events
+   - Trait-based events with type safety
+   - Event propagation phases (capturing, at-target, bubbling)
+   - Box<dyn Event> support
+   - Enum-based backward compatibility
 
 3. **State Management**
    - In-memory state with optional persistence

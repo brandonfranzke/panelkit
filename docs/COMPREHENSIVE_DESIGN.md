@@ -142,10 +142,12 @@ PanelKit is a compact, always-on graphical user interface application designed f
    - Composition-based component design
 
 2. **Event System**
-   - **Event Broker**: Pub/sub message dispatcher
-   - **Event Types**: Touch, State changes, Network, etc.
-   - **Multi-level propagation**: Components at different levels can subscribe to events
-   - Type-safe event channels using Rust's trait system
+   - **Trait-based events**: Strong type safety through Rust's trait system
+   - **Event propagation phases**: Capturing, at-target, and bubbling phases
+   - **EventBus**: Type-safe pub/sub message dispatcher
+   - **EventHandler trait**: Components implement this for event processing
+   - **Event cloning mechanism**: For multi-subscriber scenarios
+   - **Box<dyn Event> support**: For use with trait objects
 
 3. **State Management**
    - **State Manager**: Thread-safe state container
