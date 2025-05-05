@@ -58,7 +58,7 @@ The platform abstraction layer uses runtime polymorphism to select the appropria
 ### 4. Event System (event/mod.rs, event/types.rs, event/dispatch.rs)
 
 Implements a robust event system:
-- **Trait-based events**: Primary system using Rust's trait system with downcasting for type safety
+- **Trait-based events**: Using Rust's trait system with downcasting for type safety
 - **Event propagation phases**: Capturing (parent to child), at-target, and bubbling (child to parent)
 - **EventBus**: Type-safe pub/sub message dispatcher with multi-subscriber support
 - **EventHandler trait**: Components implement this for event processing
@@ -66,7 +66,6 @@ Implements a robust event system:
 - **Event cloning mechanism**: Box<dyn Event>::clone_event() for multi-subscriber scenarios
 - **Box<dyn Event> support**: Full Event trait implementation for boxed trait objects
 - **Thread-safe events**: Sync+Send bounds for concurrent processing
-- **Enum-based events**: Backward compatibility layer (deprecated)
 
 ### 5. State Management (state/mod.rs)
 

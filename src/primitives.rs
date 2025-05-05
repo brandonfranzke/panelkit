@@ -281,16 +281,3 @@ pub trait Surface {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-/// A rendering primitive that can be drawn to a rendering context
-/// 
-/// # Deprecated
-/// 
-/// This trait is deprecated in favor of the `Renderable` trait in `ui::traits`
-#[deprecated(
-    since = "0.2.0", 
-    note = "Please use the Renderable trait from ui::traits instead"
-)]
-pub trait Renderable {
-    /// Render this primitive to the given rendering context
-    fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()>;
-}

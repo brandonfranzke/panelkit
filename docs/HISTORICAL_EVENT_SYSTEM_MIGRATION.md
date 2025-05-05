@@ -1,6 +1,8 @@
-# Event System Migration Guide
+# Historical Event System Migration Guide
 
-This document provides guidance for migrating from the legacy event system (v0.2.x) to the new event system (v0.3.x).
+> **Note**: This document is historical and kept for reference purposes only. The migration described here has been completed, and the old event system has been entirely removed from the codebase. The current PanelKit codebase uses only the trait-based event system.
+
+This document originally provided guidance for migrating from the enum-based event system (v0.2.x) to the trait-based event system (v0.3.x).
 
 ## Overview of Changes
 
@@ -13,14 +15,14 @@ The PanelKit event system has been completely redesigned to provide:
 
 ## Migration Timeline
 
-- **v0.2.x**: Both systems available, legacy system marked as deprecated
-- **v0.3.0**: Legacy system removed entirely
+- **v0.2.x**: Both systems were available, enum-based system marked as deprecated
+- **v0.3.0**: Enum-based system removed entirely (completed)
 
 ## Key Migration Steps
 
 ### 1. Update Event Types
 
-**Legacy approach**:
+**Old enum-based approach**:
 ```rust
 use crate::event::Event;
 
@@ -37,11 +39,11 @@ fn handle_event(&mut self, event: &Event) {
 }
 ```
 
-**New approach**:
+**Current trait-based approach**:
 ```rust
 use crate::event::{Event, TouchEvent, KeyboardEvent};
 
-fn handle_new_event(&mut self, event: &mut dyn Event) {
+fn handle_event(&mut self, event: &mut dyn Event) {
     match event.event_type() {
         EventType::Touch => {
             if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
@@ -66,7 +68,7 @@ fn handle_new_event(&mut self, event: &mut dyn Event) {
 
 ### 2. Update TouchAction Types
 
-| Legacy TouchAction | New TouchAction   |
+| Old Enum TouchAction | Current Trait TouchAction |
 |--------------------|-------------------|
 | `Press`            | `Down`            |
 | `Release`          | `Up`              |
@@ -109,7 +111,7 @@ impl Component for MyComponent {
 
 ### 4. Replace EventBroker with EventBus
 
-**Legacy approach**:
+**Old enum-based approach**:
 ```rust
 let event_broker = EventBroker::new();
 let receiver = event_broker.subscribe("input");
@@ -119,7 +121,7 @@ event_broker.publish("input", Event::Custom {
 });
 ```
 
-**New approach**:
+**Current trait-based approach**:
 ```rust
 let mut event_bus = EventBus::new();
 let receiver = event_bus.subscribe("input");
@@ -128,10 +130,10 @@ event_bus.publish("input", CustomEvent::new("some_event", "data"));
 
 ### 5. Update Page Event Handling
 
-For UI Pages, implement the `handle_new_event` method:
+For UI Pages, implement the `handle_event` method:
 
 ```rust
-fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
+fn handle_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
     match event.event_type() {
         EventType::Touch => {
             if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
@@ -163,6 +165,6 @@ fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> 
 ## Additional Resources
 
 - See `src/ui/components/button.rs` for an example of Component event handling
-- See `src/ui/hello_rendering_page.rs` for an example of Page event handling
+- See `src/ui/hello_rendering_page.rs` for an example of Page event handling with the trait-based system
 - The `event::types` module contains all the new event types
 - The `event::dispatch` module contains event dispatching mechanisms

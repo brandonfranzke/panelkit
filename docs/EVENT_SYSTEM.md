@@ -4,10 +4,9 @@ This document describes the architecture and usage of the PanelKit event system,
 
 ## Overview
 
-The event system is based on Rust traits for type safety and flexibility, with a dual approach:
+The event system is based on Rust traits for type safety and flexibility:
 
-1. **Trait-based event system**: The primary approach, using Rust's trait system for type safety and downcasting
-2. **Enum-based event system**: A simpler approach that uses enums for event representation (deprecated)
+**Trait-based event system**: Using Rust's trait system for type safety and downcasting
 
 The architecture supports:
 

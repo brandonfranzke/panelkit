@@ -53,7 +53,7 @@ pub trait Page {
 }
 
 /// DO NOT implement EventHandler for Page because it would conflict with the Component impl
-/// Instead, we'll directly use the handle_new_event method in the UIManager
+/// Instead, we'll directly use the handle_event method in the UIManager
 
 /// The UI manager that handles page navigation and rendering
 pub struct UIManager {
