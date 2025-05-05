@@ -2,7 +2,7 @@
 //!
 //! This module provides SDL2 implementation for the PanelKit platform interface.
 
-use crate::event::{Event, TouchAction};
+use crate::event::{LegacyEvent, LegacyTouchAction};
 use crate::platform::PlatformDriver;
 use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
 
@@ -247,7 +247,7 @@ impl PlatformDriver for SDLDriver {
         Ok(())
     }
     
-    fn poll_events(&mut self) -> Result<Vec<Event>> {
+    fn poll_events(&mut self) -> Result<Vec<LegacyEvent>> {
         let mut events = Vec::new();
         let mut event_pump = self.sdl_context.event_pump()
             .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
@@ -256,46 +256,46 @@ impl PlatformDriver for SDLDriver {
             match sdl_event {
                 SdlEvent::Quit {..} | 
                 SdlEvent::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    events.push(Event::Custom { 
+                    events.push(LegacyEvent::Custom { 
                         event_type: "quit".to_string(), 
                         payload: "".to_string() 
                     });
                 },
                 SdlEvent::KeyDown { keycode: Some(Keycode::Right), .. } => {
-                    events.push(Event::Custom { 
+                    events.push(LegacyEvent::Custom { 
                         event_type: "next_page".to_string(), 
                         payload: "".to_string() 
                     });
                 },
                 SdlEvent::KeyDown { keycode: Some(Keycode::Left), .. } => {
-                    events.push(Event::Custom { 
+                    events.push(LegacyEvent::Custom { 
                         event_type: "prev_page".to_string(), 
                         payload: "".to_string() 
                     });
                 },
                 SdlEvent::MouseButtonDown { mouse_btn: MouseButton::Left, x, y, .. } => {
                     self.update_touch(x, y, true);
-                    events.push(Event::Touch { 
+                    events.push(LegacyEvent::Touch { 
                         x, 
                         y, 
-                        action: TouchAction::Press 
+                        action: LegacyTouchAction::Press 
                     });
                 },
                 SdlEvent::MouseButtonUp { mouse_btn: MouseButton::Left, x, y, .. } => {
                     self.update_touch(x, y, false);
-                    events.push(Event::Touch { 
+                    events.push(LegacyEvent::Touch { 
                         x, 
                         y, 
-                        action: TouchAction::Release 
+                        action: LegacyTouchAction::Up 
                     });
                 },
                 SdlEvent::MouseMotion { x, y, mousestate, .. } => {
                     if mousestate.left() {
                         self.update_touch(x, y, true);
-                        events.push(Event::Touch { 
+                        events.push(LegacyEvent::Touch { 
                             x, 
                             y, 
-                            action: TouchAction::Move 
+                            action: LegacyTouchAction::Move 
                         });
                     }
                 },

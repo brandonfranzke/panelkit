@@ -2,12 +2,12 @@
 //!
 //! This module defines the event types used throughout the application.
 
-use crate::primitives::{Point, Rectangle};
+use crate::primitives::Point;
 use std::any::Any;
 use std::fmt::Debug;
 
 /// Base trait for all events
-pub trait Event: Debug + Clone {
+pub trait Event: Debug + Sync {
     /// Get the event type
     fn event_type(&self) -> EventType;
     
@@ -101,7 +101,7 @@ pub enum EventType {
 }
 
 /// Touch action types
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TouchAction {
     /// Touch started (finger down)
     Down,
@@ -120,7 +120,7 @@ pub enum TouchAction {
 }
 
 /// Gesture types
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GestureType {
     /// Swipe gesture
     Swipe(SwipeDirection),

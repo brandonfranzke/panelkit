@@ -2,7 +2,7 @@
 //!
 //! This module provides a "World" page for the application.
 
-use crate::event::Event;
+use crate::event::{LegacyEvent as Event, Event as NewEvent, TouchEvent, EventType, CustomEvent, TouchAction};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Point, Rectangle, Color, TextStyle, FontSize, TextAlignment};
@@ -141,7 +141,7 @@ impl Page for WorldRenderingPage {
         Ok(())
     }
     
-    fn handle_event(&mut self, event: &Event) -> Result<Option<String>> {
+    fn handle_event(&mut self, event: &crate::event::LegacyEvent) -> Result<Option<String>> {
         match event {
             Event::Touch { x, y, action: _ } => {
                 // Check if the user clicked the back button
@@ -212,5 +212,53 @@ impl Page for WorldRenderingPage {
     
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+    
+    fn handle_new_event(&mut self, event: &mut dyn NewEvent) -> Result<Option<String>> {
+        match event.event_type() {
+            EventType::Touch => {
+                // Downcast to TouchEvent
+                if let Some(touch_event) = event.as_any_mut().downcast_mut::<TouchEvent>() {
+                    // Only handle TouchAction::Down events (equivalent to legacy Press)
+                    if touch_event.action == TouchAction::Down {
+                        let position = touch_event.position;
+                        
+                        // Check if the user clicked the back button
+                        if self.button_area.contains(&position) {
+                            self.logger.info("Back button clicked, navigating to Hello page");
+                            touch_event.mark_handled();
+                            return Ok(Some("hello".to_string()));
+                        }
+                        
+                        // Check if the user clicked the arrow
+                        let arrow_bounds = Rectangle::new(
+                            80 - 25,
+                            self.height as i32 / 2 - 40,
+                            50,
+                            80
+                        );
+                        
+                        if arrow_bounds.contains(&position) {
+                            self.logger.info("Navigation arrow clicked, navigating to Hello page");
+                            touch_event.mark_handled();
+                            return Ok(Some("hello".to_string()));
+                        }
+                    }
+                }
+            },
+            EventType::Custom => {
+                // Downcast to CustomEvent
+                if let Some(custom_event) = event.as_any_mut().downcast_mut::<CustomEvent>() {
+                    if custom_event.name == "prev_page" {
+                        self.logger.info("Received prev_page event, navigating to Hello page");
+                        custom_event.mark_handled();
+                        return Ok(Some("hello".to_string()));
+                    }
+                }
+            },
+            _ => {}
+        }
+        
+        Ok(None)
     }
 }

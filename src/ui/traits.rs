@@ -7,7 +7,6 @@ use crate::event::{
     Event, TouchEvent, KeyboardEvent, EventType, TouchAction, EventHandler
 };
 use anyhow::Result;
-use std::any::Any;
 
 /// Trait for objects that can be positioned on screen
 pub trait Positioned {
@@ -133,32 +132,32 @@ pub trait Component: Positioned + Contains + Renderable + EventHandler {
     }
 
     /// Handle a touch down event
-    fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
+    fn on_touch_down(&mut self, _event: &mut TouchEvent) -> Result<bool> {
         Ok(false)
     }
     
     /// Handle a touch move event
-    fn on_touch_move(&mut self, event: &mut TouchEvent) -> Result<bool> {
+    fn on_touch_move(&mut self, _event: &mut TouchEvent) -> Result<bool> {
         Ok(false)
     }
     
     /// Handle a touch up event
-    fn on_touch_up(&mut self, event: &mut TouchEvent) -> Result<bool> {
+    fn on_touch_up(&mut self, _event: &mut TouchEvent) -> Result<bool> {
         Ok(false)
     }
     
     /// Handle a long press event
-    fn on_touch_long_press(&mut self, event: &mut TouchEvent) -> Result<bool> {
+    fn on_touch_long_press(&mut self, _event: &mut TouchEvent) -> Result<bool> {
         Ok(false)
     }
     
     /// Handle a gesture event
-    fn on_gesture(&mut self, event: &mut TouchEvent) -> Result<bool> {
+    fn on_gesture(&mut self, _event: &mut TouchEvent) -> Result<bool> {
         Ok(false)
     }
     
     /// Handle a key event
-    fn on_key_event(&mut self, event: &mut KeyboardEvent) -> Result<bool> {
+    fn on_key_event(&mut self, _event: &mut KeyboardEvent) -> Result<bool> {
         Ok(false)
     }
     
@@ -168,7 +167,7 @@ pub trait Component: Positioned + Contains + Renderable + EventHandler {
     }
     
     /// Set focus state
-    fn set_focused(&mut self, focused: bool) { }
+    fn set_focused(&mut self, _focused: bool) { }
 }
 
 /// Implementation of EventHandler for all Components
@@ -193,7 +192,7 @@ pub trait Container: Component {
     fn propagate_to_children(&mut self, event: &mut dyn Event) -> Result<bool> {
         // For touch events, propagate to children in reverse order (top to bottom visually)
         // This ensures that components "on top" get events first
-        let mut children = self.children_mut();
+        let children = self.children_mut();
         let children_len = children.len();
         
         for i in (0..children_len).rev() {

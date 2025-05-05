@@ -17,7 +17,7 @@ pub trait PlatformDriver {
     fn init(&mut self, width: u32, height: u32) -> Result<()>;
     
     /// Poll for input events
-    fn poll_events(&mut self) -> Result<Vec<crate::event::Event>>;
+    fn poll_events(&mut self) -> Result<Vec<crate::event::LegacyEvent>>;
     
     /// Present rendered content to the display
     fn present(&mut self) -> Result<()>;

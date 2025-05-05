@@ -2,7 +2,7 @@
 //!
 //! This module provides mock implementations of platform-specific components for testing.
 
-use crate::event::{Event, TouchAction};
+use crate::event::{LegacyEvent, LegacyTouchAction};
 use crate::platform::PlatformDriver;
 use crate::primitives::{Color, Point, Rectangle, RenderingContext, TextStyle, Surface, FontSize, TextAlignment};
 use anyhow::Result;
@@ -191,7 +191,7 @@ impl PlatformDriver for MockDriver {
         Ok(())
     }
     
-    fn poll_events(&mut self) -> Result<Vec<Event>> {
+    fn poll_events(&mut self) -> Result<Vec<LegacyEvent>> {
         let now = Instant::now();
         let mut events = Vec::new();
         
@@ -212,10 +212,10 @@ impl PlatformDriver for MockDriver {
             }
             
             // Create touch event
-            events.push(Event::Touch {
+            events.push(LegacyEvent::Touch {
                 x: self.x,
                 y: self.y,
-                action: TouchAction::Press,
+                action: LegacyTouchAction::Press,
             });
             
             self.last_event = now;

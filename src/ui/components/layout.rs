@@ -2,7 +2,7 @@
 //!
 //! This module provides layout elements for arranging components.
 
-use crate::primitives::{RenderingContext, Rectangle, Color, Point};
+use crate::primitives::{RenderingContext, Rectangle, Color};
 use crate::ui::components::{ColoredRectangle, ComponentBase};
 use crate::ui::traits::{Component, Positioned, Contains, Renderable, Container as ContainerTrait};
 use crate::event::{Event, TouchEvent, KeyboardEvent};
@@ -61,6 +61,20 @@ impl Renderable for Container {
         }
         
         Ok(())
+    }
+}
+
+impl ContainerTrait for Container {
+    fn add_child<T: Component + 'static>(&mut self, child: T) {
+        self.components.push(Box::new(child));
+    }
+    
+    fn children(&self) -> &[Box<dyn Component>] {
+        &self.components
+    }
+    
+    fn children_mut(&mut self) -> &mut [Box<dyn Component>] {
+        &mut self.components
     }
 }
 
@@ -137,9 +151,54 @@ impl Component for Container {
     }
     
     fn process_event(&mut self, event: &mut dyn Event) -> Result<bool> {
-        // First check if the component itself can handle the event
-        let handled = Component::process_event(self, event)?;
-        if handled || event.is_handled() {
+        // First check component's own event processing logic
+        let base_handled = match event.event_type() {
+            crate::event::EventType::Touch => {
+                if let Some(touch_event) = event.as_any_mut().downcast_mut::<crate::event::TouchEvent>() {
+                    match touch_event.action {
+                        crate::event::TouchAction::Down => {
+                            if self.contains(&touch_event.position) {
+                                self.on_touch_down(touch_event)?
+                            } else {
+                                false
+                            }
+                        },
+                        crate::event::TouchAction::Move => self.on_touch_move(touch_event)?,
+                        crate::event::TouchAction::Up => self.on_touch_up(touch_event)?,
+                        crate::event::TouchAction::LongPress => {
+                            if self.contains(&touch_event.position) {
+                                self.on_touch_long_press(touch_event)?
+                            } else {
+                                false
+                            }
+                        },
+                        crate::event::TouchAction::Gesture(_) => {
+                            if self.contains(&touch_event.position) {
+                                self.on_gesture(touch_event)?
+                            } else {
+                                false
+                            }
+                        }
+                    }
+                } else {
+                    false
+                }
+            },
+            crate::event::EventType::Keyboard => {
+                if let Some(key_event) = event.as_any_mut().downcast_mut::<crate::event::KeyboardEvent>() {
+                    if self.is_focused() {
+                        self.on_key_event(key_event)?
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => false
+        };
+        
+        if base_handled || event.is_handled() {
             return Ok(true);
         }
         
@@ -160,7 +219,7 @@ impl TitleBar {
             .with_background(ColoredRectangle::filled(x, y, width, height, bg_color));
             
         // Add a title text component centered in the bar
-        container.add(crate::ui::components::text::Text::new(
+        container.add_child(crate::ui::components::text::Text::new(
             x + (width as i32 / 2), 
             y + ((height as i32 - 16) / 2), 
             title,
@@ -240,17 +299,4 @@ impl Component for TitleBar {
     }
 }
 
-// Implement the Container trait for our Container struct
-impl ContainerTrait for Container {
-    fn add_child<T: Component + 'static>(&mut self, child: T) {
-        self.components.push(Box::new(child));
-    }
-    
-    fn children(&self) -> &[Box<dyn Component>] {
-        &self.components
-    }
-    
-    fn children_mut(&mut self) -> &mut [Box<dyn Component>] {
-        &mut self.components
-    }
-}
+// Container trait already implemented above

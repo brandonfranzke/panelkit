@@ -85,7 +85,7 @@ impl SDLBackend {
     }
     
     /// Poll for events and convert them to PanelKit events
-    pub fn poll_events(&self) -> Result<Vec<crate::event::Event>> {
+    pub fn poll_events(&self) -> Result<Vec<crate::event::LegacyEvent>> {
         let mut event_pump = self.sdl_context.event_pump()
             .map_err(|e| anyhow::anyhow!("Failed to get SDL event pump: {}", e))?;
             
@@ -95,7 +95,7 @@ impl SDLBackend {
             match event {
                 SdlEvent::Quit {..} => {
                     // Map quit event to a custom event
-                    events.push(crate::event::Event::Custom {
+                    events.push(crate::event::LegacyEvent::Custom {
                         event_type: "quit".to_string(),
                         payload: String::new(),
                     });
@@ -103,7 +103,7 @@ impl SDLBackend {
                 SdlEvent::KeyDown { keycode: Some(key), .. } => {
                     // Map key events
                     let key_str = format!("{:?}", key).to_lowercase();
-                    events.push(crate::event::Event::Key {
+                    events.push(crate::event::LegacyEvent::Key {
                         key: key_str,
                         pressed: true,
                     });
@@ -111,7 +111,7 @@ impl SDLBackend {
                 SdlEvent::KeyUp { keycode: Some(key), .. } => {
                     // Map key events
                     let key_str = format!("{:?}", key).to_lowercase();
-                    events.push(crate::event::Event::Key {
+                    events.push(crate::event::LegacyEvent::Key {
                         key: key_str,
                         pressed: false,
                     });
@@ -120,10 +120,10 @@ impl SDLBackend {
                     // Map mouse events to touch events for simplicity
                     match mouse_btn {
                         sdl2::mouse::MouseButton::Left => {
-                            events.push(crate::event::Event::Touch {
+                            events.push(crate::event::LegacyEvent::Touch {
                                 x,
                                 y,
-                                action: crate::event::TouchAction::Press,
+                                action: crate::event::LegacyTouchAction::Press,
                             });
                         },
                         _ => {}
@@ -133,10 +133,10 @@ impl SDLBackend {
                     // Map mouse events to touch events for simplicity
                     match mouse_btn {
                         sdl2::mouse::MouseButton::Left => {
-                            events.push(crate::event::Event::Touch {
+                            events.push(crate::event::LegacyEvent::Touch {
                                 x,
                                 y,
-                                action: crate::event::TouchAction::Release,
+                                action: crate::event::LegacyTouchAction::Up,
                             });
                         },
                         _ => {}
@@ -145,10 +145,10 @@ impl SDLBackend {
                 SdlEvent::MouseMotion { x, y, mousestate, .. } => {
                     // If mouse button is pressed, send a Move event
                     if mousestate.left() {
-                        events.push(crate::event::Event::Touch {
+                        events.push(crate::event::LegacyEvent::Touch {
                             x,
                             y,
-                            action: crate::event::TouchAction::Move,
+                            action: crate::event::LegacyTouchAction::Move,
                         });
                     }
                 },
@@ -191,7 +191,7 @@ impl SDLBackend {
     }
     
     /// Poll for events (stub implementation)
-    pub fn poll_events(&self) -> Result<Vec<crate::event::Event>> {
+    pub fn poll_events(&self) -> Result<Vec<crate::event::LegacyEvent>> {
         Ok(Vec::new())
     }
 }

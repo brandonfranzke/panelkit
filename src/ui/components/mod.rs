@@ -2,9 +2,8 @@
 //!
 //! This module provides reusable UI components for building pages.
 
-use crate::primitives::{RenderingContext, Rectangle, Point, Color};
+use crate::primitives::{RenderingContext, Rectangle, Color, Point};
 use crate::ui::traits::{Positioned, Contains, Renderable, Component};
-use crate::event::{Event, TouchEvent, KeyboardEvent};
 use anyhow::Result;
 
 pub mod button;

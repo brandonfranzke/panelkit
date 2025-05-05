@@ -2,10 +2,10 @@
 //!
 //! This module provides a simple button component.
 
-use crate::primitives::{RenderingContext, Color, Point, Rectangle};
+use crate::primitives::{RenderingContext, Color, Rectangle};
 use crate::ui::components::{ComponentBase};
 use crate::ui::traits::{Component, Positioned, Contains, Renderable};
-use crate::event::{Event, TouchEvent, EventType};
+use crate::event::TouchEvent;
 use anyhow::Result;
 
 /// A simple button component
@@ -134,7 +134,7 @@ impl Component for Button {
         self.base.visible
     }
     
-    fn on_touch_down(&mut self, event: &mut TouchEvent) -> Result<bool> {
+    fn on_touch_down(&mut self, _event: &mut TouchEvent) -> Result<bool> {
         // No need to check enabled/visible - Component trait already does this
         self.pressed = true;
         Ok(true)

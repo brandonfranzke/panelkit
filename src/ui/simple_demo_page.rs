@@ -2,7 +2,7 @@
 //!
 //! This is a simplified demo page using our component system.
 
-use crate::event::Event;
+use crate::event::{LegacyEvent as Event, LegacyTouchAction};
 use crate::ui::Page;
 use crate::logging;
 use crate::primitives::{RenderingContext, Color, Point, Rectangle};
@@ -158,7 +158,7 @@ impl Page for SimpleDemoPage {
         Ok(())
     }
     
-    fn handle_event(&mut self, event: &Event) -> Result<Option<String>> {
+    fn handle_event(&mut self, event: &crate::event::LegacyEvent) -> Result<Option<String>> {
         match event {
             Event::Touch { x, y, action } => {
                 self.logger.debug(&format!("Received touch event: {:?} at ({}, {})", action, x, y));
@@ -168,7 +168,7 @@ impl Page for SimpleDemoPage {
                    *x <= self.button_bounds.x + self.button_bounds.width as i32 &&
                    *y >= self.button_bounds.y && 
                    *y <= self.button_bounds.y + self.button_bounds.height as i32 &&
-                   matches!(action, crate::event::TouchAction::Press) {
+                   matches!(action, crate::event::LegacyTouchAction::Press) {
                     self.counter += 1;
                     self.logger.info(&format!("Button clicked! Counter: {}", self.counter));
                 }
@@ -193,7 +193,7 @@ impl Page for SimpleDemoPage {
                    *x <= arrow_bounds.x + arrow_bounds.width as i32 &&
                    *y >= arrow_bounds.y && 
                    *y <= arrow_bounds.y + arrow_bounds.height as i32 &&
-                   matches!(action, crate::event::TouchAction::Press) {
+                   matches!(action, crate::event::LegacyTouchAction::Press) {
                     self.logger.info("Left arrow clicked, navigating to Hello page");
                     return Ok(Some("hello".to_string()));
                 }

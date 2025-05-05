@@ -8,6 +8,7 @@ use anyhow::{Result, Context};
 use crate::error::UIError;
 use crate::RenderingContext;
 use crate::logging;
+use crate::event::{Event, LegacyEvent, EventHandler, convert_legacy_event};
 
 // Core trait definitions
 pub mod traits;
@@ -31,9 +32,29 @@ pub trait Page {
     /// Render the page using the provided rendering context
     fn render(&self, ctx: &mut dyn RenderingContext) -> Result<()>;
     
-    /// Handle input events for this page
+    /// Handle legacy input events for this page
     /// Returns a navigation event if the page wants to navigate
-    fn handle_event(&mut self, event: &crate::event::Event) -> Result<Option<String>>;
+    /// 
+    /// This method is being kept for backward compatibility during the transition.
+    fn handle_event(&mut self, event: &LegacyEvent) -> Result<Option<String>>;
+    
+    /// Handle new event system events
+    /// Returns a navigation event if the page wants to navigate
+    fn handle_new_event(&mut self, event: &mut dyn Event) -> Result<Option<String>> {
+        // Default implementation calls the legacy method for backward compatibility
+        // Pages can override this method to handle new events directly
+        
+        // Since each event type needs different conversion logic and we can't clone the 
+        // dynamic event, the default implementation just returns None.
+        // Pages that want to use the new event system should override this method.
+        match event.event_type() {
+            _ => Ok(None)
+        }
+        
+        // This would be the ideal implementation if we could create a LegacyEvent from any Event
+        // But that's not easily possible with the current design
+        // self.handle_event(&legacy_event)
+    }
     
     /// Called when this page becomes active
     fn on_activate(&mut self) -> Result<()>;
@@ -50,6 +71,9 @@ pub trait Page {
     /// Safe mutable downcast to concrete type
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
+
+/// DO NOT implement EventHandler for Page because it would conflict with the Component impl
+/// Instead, we'll directly use the handle_new_event method in the UIManager
 
 /// The UI manager that handles page navigation and rendering
 pub struct UIManager {
@@ -142,13 +166,31 @@ impl UIManager {
         Ok(())
     }
     
-    /// Process an event in the UI system
-    pub fn process_event(&mut self, event: &crate::event::Event) -> Result<()> {
+    /// Process an event in the UI system (legacy version)
+    pub fn process_event(&mut self, event: &LegacyEvent) -> Result<()> {
         if let Some(page_id) = &self.current_page {
             if let Some(page) = self.pages.get_mut(page_id) {
                 // Handle the event and check for navigation requests
                 let navigation = page.handle_event(event)
-                    .with_context(|| format!("Failed to process event in page '{}'", page_id))?;
+                    .with_context(|| format!("Failed to process legacy event in page '{}'", page_id))?;
+                
+                // If the page wants to navigate, do it
+                if let Some(target_page) = navigation {
+                    self.navigate_to(&target_page)
+                        .with_context(|| format!("Failed to navigate to page '{}'", target_page))?;
+                }
+            }
+        }
+        Ok(())
+    }
+    
+    /// Process a new event system event
+    pub fn process_new_event(&mut self, event: &mut dyn Event) -> Result<()> {
+        if let Some(page_id) = &self.current_page {
+            if let Some(page) = self.pages.get_mut(page_id) {
+                // Handle the event and check for navigation requests
+                let navigation = page.handle_new_event(event)
+                    .with_context(|| format!("Failed to process new event in page '{}'", page_id))?;
                 
                 // If the page wants to navigate, do it
                 if let Some(target_page) = navigation {

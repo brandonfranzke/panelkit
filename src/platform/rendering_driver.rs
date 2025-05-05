@@ -5,7 +5,7 @@
 use anyhow::Result;
 use crate::platform::PlatformDriver;
 use crate::primitives::{RenderingContext, Color, Point, Rectangle};
-use crate::event::Event;
+use crate::event::LegacyEvent;
 use crate::TargetPlatform;
 use std::time::Duration;
 
@@ -54,7 +54,7 @@ impl PlatformDriver for RenderingPlatformDriver {
         Ok(())
     }
     
-    fn poll_events(&mut self) -> Result<Vec<Event>> {
+    fn poll_events(&mut self) -> Result<Vec<LegacyEvent>> {
         // If our backend is SDL, we can get events from it directly via downcasting
         if let Some(sdl_backend) = self.rendering_context.as_any_mut().downcast_mut::<crate::rendering::sdl_backend::SDLBackend>() {
             let events = sdl_backend.poll_events()?;

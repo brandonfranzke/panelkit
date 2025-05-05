@@ -177,15 +177,25 @@ impl Application {
                 self.event_broker.publish("input", legacy_event.clone());
                 
                 // Convert legacy event to new event type and publish to new event bus
-                // Note: We're just going to skip this for now until we fully migrate to new events
-                // This is because we can't easily clone or move out of a Box<dyn Event>
-                // let new_event = event::convert_legacy_event(&legacy_event);
+                // Also create a new event for the UI manager to process
+                let mut new_event = event::convert_legacy_event(&legacy_event);
                 
-                // Process event in UI manager using legacy event system (for now)
+                // Process event in UI manager using both event systems
+                // First with the legacy system
                 match self.ui_manager.process_event(&legacy_event) {
                     Ok(_) => {},
                     Err(e) => {
-                        logger.error(&format!("Error processing event in UI: {:#}", e));
+                        logger.error(&format!("Error processing legacy event in UI: {:#}", e));
+                        // Continue running despite errors in event handling
+                    }
+                }
+                
+                // Then with the new event system
+                // We use process_new_event which takes a &mut dyn Event
+                match self.ui_manager.process_new_event(new_event.as_mut()) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        logger.error(&format!("Error processing new event in UI: {:#}", e));
                         // Continue running despite errors in event handling
                     }
                 }

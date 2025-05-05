@@ -5,7 +5,6 @@
 use crate::primitives::{RenderingContext, Color, Point, Rectangle, TextStyle, FontSize, TextAlignment};
 use crate::ui::components::{ColoredRectangle, ComponentBase};
 use crate::ui::traits::{Component, Positioned, Contains, Renderable};
-use crate::event::{Event, TouchEvent, KeyboardEvent};
 use anyhow::Result;
 
 /// Text alignment options
