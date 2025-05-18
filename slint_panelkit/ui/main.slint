@@ -1,438 +1,525 @@
-// Main UI definition for minimal prototype with adaptive layout
+// PanelKit UI - Using Slint's layout engine
+import { Button, ScrollView, StandardButton } from "std-widgets.slint";
 
-// Global configuration for adaptive layout
-global Config {
-    in-out property <bool> is-portrait;
-    in-out property <length> screen-width;
-    in-out property <length> screen-height;
-    in-out property <length> smaller-dimension;
-    in-out property <length> larger-dimension;
+// Main window
+export component MainWindow inherits Window {
+    callback set-background-color(color);
+    callback change-page(int);
+    callback cycle-color();
+    callback quit-app();
     
-    // Grid configuration - 2 buttons on smaller dimension, 4 on larger
-    in-out property <int> cols;
-    in-out property <int> rows;
+    preferred-width: 480px;
+    preferred-height: 640px;
     
-    // Button sizing - always square
-    in-out property <length> button-size;  // Size of each square button
-    in-out property <length> button-width;  // Keep separate for future flexibility
-    in-out property <length> button-height; // Keep separate for future flexibility
+    in-out property <int> current-page: 0;
+    in-out property <bool> is-portrait: self.height > self.width;
+    in-out property <color> my-background: #222222;
     
-    // Calculate button dimensions and layout
-    in-out property <length> base-padding: smaller-dimension * 0.05;
-    in-out property <length> button-spacing: smaller-dimension * 0.03;
+    // All our color definitions
+    property <color> color-red: #ff0000;
+    property <color> color-green: #00ff00;
+    property <color> color-blue: #0000ff;
+    property <color> color-purple: #800080;
+    property <color> color-time: #006699;
+    property <color> color-random: #555555;
+    property <color> color-back: #444444;
+    property <color> color-quit: #aa3333;
     
-    // Font scaling based on button size
-    in-out property <length> base-font-size: button-size * 0.15;
-    in-out property <length> large-font-size: button-size * 0.2;
-    in-out property <length> small-font-size: button-size * 0.12;
-    
-    // Grid dimensions
-    in-out property <length> grid-width: 0px;
-    in-out property <length> grid-height: 0px;
-    
-    // Calculate if scrolling is needed
-    in-out property <bool> needs-vertical-scroll: false;
-    in-out property <bool> needs-horizontal-scroll: false;
-}
-
-// Common components and global state management
-global AppState {
-    in-out property <int> current-page: 0;  // 0 = main page, 1 = grid page
-    in-out property <color> background-color: #222222;
-    in-out property <bool> quit-requested: false;
-
-    callback change-background(color);
-    callback random-color();
-    callback quit();
-
-    public function exit() {
-        debug("Setting quit-requested flag to true");
-        self.quit-requested = true;
-        self.quit();
-    }
-}
-
-// Adaptive button component
-component ColorButton {
-    in property <string> text;
-    in property <color> button-color;
-    in property <length> pos-x;
-    in property <length> pos-y;
-    
-    callback clicked();
-
-    Rectangle {
-        x: root.pos-x;
-        y: root.pos-y;
-        width: Config.button-width;
-        height: Config.button-height;
-        border-radius: Config.button-size * 0.1;
-        background: root.button-color;
-
-        Text {
-            text: root.text;
-            color: white;
-            font-size: Config.base-font-size;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            font-weight: 600;
-        }
-
-        TouchArea {
-            clicked => { root.clicked(); }
-        }
-    }
-}
-
-// Special time button component
-component TimeButton {
-    in property <length> pos-x;
-    in property <length> pos-y;
-    
-    callback clicked();
-
-    Rectangle {
-        x: root.pos-x;
-        y: root.pos-y;
-        width: Config.button-width;
-        height: Config.button-height;
-        border-radius: Config.button-size * 0.1;
-        border-width: Config.button-size * 0.02;
-        border-color: white;
-        background: #006699;
-        
-        VerticalLayout {
-            padding: Config.button-size * 0.1;
-            spacing: Config.button-size * 0.05;
-            alignment: center;
-            
-            Text {
-                text: "14:30:25";
-                color: white;
-                font-size: Config.large-font-size;
-                font-weight: 700;
-                horizontal-alignment: center;
-            }
-            
-            Text {
-                text: "15-May-2023";
-                color: white;
-                font-size: Config.small-font-size;
-                horizontal-alignment: center;
-            }
-        }
-        
-        TouchArea {
-            clicked => { 
-                parent.background = #0088cc;
-                root.clicked();
-            }
-        }
-    }
-}
-
-// Touch tracking for swipe detection
-global Tracker {
-    in-out property <length> start-x;
-    in-out property <length> swipe-threshold: Config.smaller-dimension * 0.2;
-
-    public function process-swipe(end-x: length) {
-        if (end-x - self.start-x > self.swipe-threshold) {
-            AppState.current-page = 0;
-        } else if (self.start-x - end-x > self.swipe-threshold) {
-            AppState.current-page = 1;
-        }
-    }
-}
-
-// Scrollable container with touch scrolling
-component ScrollableGrid {
-    // Scroll offsets
-    property <length> scroll-x: 0px;
-    property <length> scroll-y: 0px;
-    property <length> max-scroll-x: 0px;
-    property <length> max-scroll-y: 0px;
-    
-    // Touch state for scrolling
-    property <bool> is-scrolling: false;
-    property <length> touch-start-x: 0px;
-    property <length> touch-start-y: 0px;
-    property <length> scroll-start-x: 0px;
-    property <length> scroll-start-y: 0px;
-    
-    // Initialize max scroll values based on actual dimensions
-    init => {
-        root.max-scroll-x = max(0px, Config.grid-width - root.width);
-        root.max-scroll-y = max(0px, Config.grid-height - root.height);
-    }
+    // Layout calculations
+    property <length> smaller-dim: min(self.width, self.height);
+    property <length> my-padding: smaller-dim * 0.05;
+    property <length> my-spacing: smaller-dim * 0.03;
+    property <length> button-size: (smaller-dim - (2 * my-padding) - my-spacing) / 2;
     
     Rectangle {
         width: parent.width;
         height: parent.height;
-        clip: true;
+        background: root.my-background;
         
-        // Touch area for scrolling
+        // Page 1: Introduction
+        if root.current-page == 0: Rectangle {
+            VerticalLayout {
+                padding: 20px;
+                spacing: 20px;
+                alignment: center;
+                
+                Text {
+                    text: "Minimal Slint Demo";
+                    font-size: 24px;
+                    color: white;
+                    horizontal-alignment: center;
+                }
+                
+                Rectangle {
+                    width: 200px;
+                    height: 60px;
+                    border-radius: 10px;
+                    background: #6fa8dc;
+                    
+                    Text {
+                        text: "Touch Here";
+                        color: white;
+                        font-size: 16px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    
+                    TouchArea {
+                        clicked => {
+                            info-text.visible = !info-text.visible;
+                            debug("Touch button clicked - toggling info text");
+                        }
+                    }
+                }
+                
+                info-text := Text {
+                    text: "Swipe left to see more";
+                    color: #93c47d;
+                    font-size: 18px;
+                    horizontal-alignment: center;
+                    visible: true;
+                }
+            }
+        }
+        
+        // Page 2: Button grid
+        if root.current-page == 1: ScrollView {
+            if root.is-portrait: VerticalLayout {
+                // Portrait: 2x4 grid
+                padding: root.my-padding;
+                spacing: root.my-spacing;
+                
+                HorizontalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-red;
+                        
+                        Text {
+                            text: "Red";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-red;
+                                root.set-background-color(root.color-red);
+                                debug("Red button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-green;
+                        
+                        Text {
+                            text: "Green";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-green;
+                                root.set-background-color(root.color-green);
+                                debug("Green button clicked");
+                            }
+                        }
+                    }
+                }
+                
+                HorizontalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-blue;
+                        
+                        Text {
+                            text: "Blue";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-blue;
+                                root.set-background-color(root.color-blue);
+                                debug("Blue button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-purple;
+                        
+                        Text {
+                            text: "Purple";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-purple;
+                                root.set-background-color(root.color-purple);
+                                debug("Purple button clicked");
+                            }
+                        }
+                    }
+                }
+                
+                HorizontalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-time;
+                        
+                        Text {
+                            text: "Time";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                debug("Time button clicked - TODO: show actual time");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-random;
+                        
+                        Text {
+                            text: "Random";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.cycle-color();
+                                debug("Random button clicked - cycling color");
+                            }
+                        }
+                    }
+                }
+                
+                HorizontalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-back;
+                        
+                        Text {
+                            text: "Back";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.current-page = 0;
+                                root.change-page(0);
+                                debug("Back button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-quit;
+                        
+                        Text {
+                            text: "Quit";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-red;
+                                root.quit-app();
+                                debug("Quit button clicked");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if !root.is-portrait: HorizontalLayout {
+                // Landscape: 4x2 grid
+                padding: root.my-padding;
+                spacing: root.my-spacing;
+                
+                VerticalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-red;
+                        
+                        Text {
+                            text: "Red";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-red;
+                                root.set-background-color(root.color-red);
+                                debug("Red button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-time;
+                        
+                        Text {
+                            text: "Time";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                debug("Time button clicked - TODO: show actual time");
+                            }
+                        }
+                    }
+                }
+                
+                VerticalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-green;
+                        
+                        Text {
+                            text: "Green";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-green;
+                                root.set-background-color(root.color-green);
+                                debug("Green button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-random;
+                        
+                        Text {
+                            text: "Random";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.cycle-color();
+                                debug("Random button clicked - cycling color");
+                            }
+                        }
+                    }
+                }
+                
+                VerticalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-blue;
+                        
+                        Text {
+                            text: "Blue";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-blue;
+                                root.set-background-color(root.color-blue);
+                                debug("Blue button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-back;
+                        
+                        Text {
+                            text: "Back";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.current-page = 0;
+                                root.change-page(0);
+                                debug("Back button clicked");
+                            }
+                        }
+                    }
+                }
+                
+                VerticalLayout {
+                    spacing: root.my-spacing;
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-purple;
+                        
+                        Text {
+                            text: "Purple";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-purple;
+                                root.set-background-color(root.color-purple);
+                                debug("Purple button clicked");
+                            }
+                        }
+                    }
+                    
+                    Rectangle {
+                        width: root.button-size;
+                        height: root.button-size;
+                        border-radius: 10px;
+                        background: root.color-quit;
+                        
+                        Text {
+                            text: "Quit";
+                            color: white;
+                            font-size: root.button-size * 0.15;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        
+                        TouchArea {
+                            clicked => {
+                                root.my-background = root.color-red;
+                                root.quit-app();
+                                debug("Quit button clicked");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Touch area for swipe detection
         TouchArea {
+            property <length> start-x;
+            
             width: parent.width;
             height: parent.height;
             
             pointer-event(event) => {
                 if (event.kind == PointerEventKind.down) {
-                    root.is-scrolling = true;
-                    root.touch-start-x = self.mouse-x;
-                    root.touch-start-y = self.mouse-y;
-                    root.scroll-start-x = root.scroll-x;
-                    root.scroll-start-y = root.scroll-y;
-                    return true;
+                    self.start-x = self.mouse-x;
+                    debug("Touch down at", self.start-x, "- Current page:", root.current-page);
                 } else if (event.kind == PointerEventKind.up) {
-                    root.is-scrolling = false;
-                    return true;
-                } else if (event.kind == PointerEventKind.move && root.is-scrolling) {
-                    // Calculate new scroll position
-                    root.scroll-x = clamp(
-                        root.scroll-start-x - (self.mouse-x - root.touch-start-x),
-                        0px,
-                        root.max-scroll-x
-                    );
-                    root.scroll-y = clamp(
-                        root.scroll-start-y - (self.mouse-y - root.touch-start-y),
-                        0px,
-                        root.max-scroll-y
-                    );
-                    return true;
-                }
-                return false;
-            }
-        }
-        
-        // Grid container that moves based on scroll
-        grid-container := Rectangle {
-            x: -root.scroll-x;
-            y: -root.scroll-y;
-            width: Config.grid-width;
-            height: Config.grid-height;
-            
-            // Create all buttons with positioning
-            // First row - top left corner starts exactly at padding
-            ColorButton {
-                text: "Red";
-                button-color: #ff0000;
-                pos-x: Config.base-padding;
-                pos-y: Config.base-padding;
-                clicked => { AppState.background-color = #ff0000; }
-            }
-            
-            ColorButton {
-                text: "Green";
-                button-color: #00ff00;
-                pos-x: Config.base-padding + Config.button-width + Config.button-spacing;
-                pos-y: Config.base-padding;
-                clicked => { AppState.background-color = #00ff00; }
-            }
-            
-            // Second row (portrait) or continue first row (landscape)
-            ColorButton {
-                text: "Blue";
-                button-color: #0000ff;
-                pos-x: Config.is-portrait ? Config.base-padding : Config.base-padding + 2 * (Config.button-width + Config.button-spacing);
-                pos-y: Config.is-portrait ? Config.base-padding + Config.button-height + Config.button-spacing : Config.base-padding;
-                clicked => { AppState.background-color = #0000ff; }
-            }
-            
-            ColorButton {
-                text: "Purple";
-                button-color: #800080;
-                pos-x: Config.is-portrait ? Config.base-padding + Config.button-width + Config.button-spacing : Config.base-padding + 3 * (Config.button-width + Config.button-spacing);
-                pos-y: Config.is-portrait ? Config.base-padding + Config.button-height + Config.button-spacing : Config.base-padding;
-                clicked => { AppState.background-color = #800080; }
-            }
-            
-            // Third row (portrait) or second row (landscape)
-            TimeButton {
-                pos-x: Config.base-padding;
-                pos-y: Config.is-portrait ? Config.base-padding + 2 * (Config.button-height + Config.button-spacing) : Config.base-padding + Config.button-height + Config.button-spacing;
-                clicked => { debug("Time button clicked"); }
-            }
-            
-            ColorButton {
-                text: "Random";
-                button-color: #555555;
-                pos-x: Config.base-padding + Config.button-width + Config.button-spacing;
-                pos-y: Config.is-portrait ? Config.base-padding + 2 * (Config.button-height + Config.button-spacing) : Config.base-padding + Config.button-height + Config.button-spacing;
-                clicked => {
-                    if (AppState.background-color == #ff0000) {
-                        AppState.background-color = #00ff00;
-                    } else if (AppState.background-color == #00ff00) {
-                        AppState.background-color = #0000ff;
-                    } else {
-                        AppState.background-color = #ff0000;
+                    debug("Touch up at", self.mouse-x, "- Start was", self.start-x);
+                    debug("Current page:", root.current-page);
+                    
+                    // Swipe left (to go to next page)
+                    if (self.mouse-x - self.start-x) < -100px && root.current-page == 0 {
+                        root.current-page = 1;
+                        root.change-page(1);
+                        debug("Swipe left detected - changing to page 1");
+                    }
+                    // Swipe right (to go to previous page)
+                    else if (self.mouse-x - self.start-x) > 100px && root.current-page == 1 {
+                        root.current-page = 0;
+                        root.change-page(0);
+                        debug("Swipe right detected - changing to page 0");
                     }
                 }
             }
-            
-            // Fourth row (portrait) or continue second row (landscape)
-            ColorButton {
-                text: "Back";
-                button-color: #444444;
-                pos-x: Config.is-portrait ? Config.base-padding : Config.base-padding + 2 * (Config.button-width + Config.button-spacing);
-                pos-y: Config.is-portrait ? Config.base-padding + 3 * (Config.button-height + Config.button-spacing) : Config.base-padding + Config.button-height + Config.button-spacing;
-                clicked => { AppState.current-page = 0; }
-            }
-            
-            ColorButton {
-                text: "Quit";
-                button-color: #aa3333;
-                pos-x: Config.is-portrait ? Config.base-padding + Config.button-width + Config.button-spacing : Config.base-padding + 3 * (Config.button-width + Config.button-spacing);
-                pos-y: Config.is-portrait ? Config.base-padding + 3 * (Config.button-height + Config.button-spacing) : Config.base-padding + Config.button-height + Config.button-spacing;
-                clicked => {
-                    AppState.background-color = #ff0000;
-                    debug("Please press ESC key to exit");
-                }
-            }
-        }
-    }
-}
-
-export component MainWindow inherits Window {
-    // Remove fixed dimensions - let system determine
-    background: AppState.background-color;
-    
-    // Use a timer to ensure window dimensions are available
-    Timer {
-        interval: 10ms;
-        running: true;
-        triggered => {
-            if (root.width > 0 && root.height > 0) {
-                // Only initialize once we have valid dimensions
-                if (Config.screen-width == 0px || Config.screen-height == 0px) {
-                    Config.screen-width = root.width;
-                    Config.screen-height = root.height;
-                    
-                    // Auto-detect: Portrait is when height > width (taller than wide)
-                    Config.is-portrait = root.height > root.width;
-                    
-                    Config.smaller-dimension = min(root.width, root.height);
-                    Config.larger-dimension = max(root.width, root.height);
-                    
-                    // Set grid layout: 2 buttons on smaller dimension, 4 on larger
-                    if (Config.is-portrait) {
-                        Config.cols = 2;  // 2 columns (width is smaller)
-                        Config.rows = 4;  // 4 rows (height is larger)
-                    } else {
-                        Config.cols = 4;  // 4 columns (width is larger)
-                        Config.rows = 2;  // 2 rows (height is smaller)
-                    }
-                    
-                    // Calculate button size based on smaller dimension and number of buttons
-                    // Account for padding and spacing
-                    if (Config.is-portrait) {
-                        // Portrait: 2 buttons horizontally
-                        Config.button-size = (Config.smaller-dimension - (2 * Config.base-padding) - Config.button-spacing) / 2;
-                    } else {
-                        // Landscape: 2 buttons vertically
-                        Config.button-size = (Config.smaller-dimension - (2 * Config.base-padding) - Config.button-spacing) / 2;
-                    }
-                    
-                    // For now, buttons are square
-                    Config.button-width = Config.button-size;
-                    Config.button-height = Config.button-size;
-                    
-                    // Calculate grid dimensions
-                    Config.grid-width = Config.cols * Config.button-width + (Config.cols - 1) * Config.button-spacing + 2 * Config.base-padding;
-                    Config.grid-height = Config.rows * Config.button-height + (Config.rows - 1) * Config.button-spacing + 2 * Config.base-padding;
-                    
-                    // Check if scrolling is needed
-                    Config.needs-horizontal-scroll = Config.grid-width > Config.screen-width;
-                    Config.needs-vertical-scroll = Config.grid-height > Config.screen-height;
-                    
-                    debug("Screen:", Config.screen-width, "x", Config.screen-height);
-                    debug("Portrait:", Config.is-portrait);
-                    debug("Grid:", Config.cols, "x", Config.rows);
-                    debug("Button size:", Config.button-size);
-                    debug("Base padding:", Config.base-padding);
-                    debug("Button spacing:", Config.button-spacing);
-                    debug("Grid size:", Config.grid-width, "x", Config.grid-height);
-                    debug("Needs v-scroll:", Config.needs-vertical-scroll);
-                    debug("Needs h-scroll:", Config.needs-horizontal-scroll);
-                }
-                // Stop the timer once initialized
-                self.running = false;
-            }
-        }
-    }
-    
-    Rectangle {
-        width: parent.width;
-        height: parent.height;
-        
-        // Handle swipe gesture for page navigation
-        TouchArea {
-            width: parent.width;
-            height: parent.height;
-            pointer-event(event) => {
-                // Only handle swipes on the first page
-                if (AppState.current-page == 0) {
-                    if (event.kind == PointerEventKind.down) {
-                        Tracker.start-x = self.mouse-x;
-                    } else if (event.kind == PointerEventKind.up) {
-                        Tracker.process-swipe(self.mouse-x);
-                    }
-                    return false;
-                }
-                return false;
-            }
-        }
-        
-        // Main Page
-        if (AppState.current-page == 0) : Rectangle {
-            // Title text
-            Text {
-                text: "Minimal Slint Demo";
-                font-size: Config.large-font-size;
-                color: white;
-                x: (parent.width - self.width) / 2;
-                y: parent.height * 0.2;
-            }
-            
-            // Button - scales with screen
-            Rectangle {
-                width: Config.smaller-dimension * 0.4;
-                height: Config.smaller-dimension * 0.15;
-                border-radius: Config.smaller-dimension * 0.01;
-                background: #6fa8dc;
-                x: (parent.width - self.width) / 2;
-                y: (parent.height - self.height) / 2;
-                
-                Text {
-                    text: "Touch Here";
-                    color: white;
-                    font-size: Config.base-font-size;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-                
-                TouchArea {
-                    clicked => {
-                        info-text.visible = !info-text.visible;
-                    }
-                }
-            }
-            
-            // Information text
-            info-text := Text {
-                text: "Swipe right to see more";
-                color: #93c47d;
-                x: (parent.width - self.width) / 2;
-                y: parent.height * 0.7;
-                visible: true;
-                font-size: Config.base-font-size;
-            }
-        }
-        
-        // Grid Page - With scrolling
-        if (AppState.current-page == 1) : ScrollableGrid {
-            width: parent.width;
-            height: parent.height;
         }
     }
 }
