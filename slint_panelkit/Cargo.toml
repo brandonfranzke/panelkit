@@ -19,6 +19,7 @@ simple_logger = { version = "4.2.0", default-features = false, features = ["colo
 thiserror = "1.0"
 rand = "0.8"
 chrono = "0.4.38"
+libc = "0.2"
 
 # Optimize for embedded
 [profile.release]

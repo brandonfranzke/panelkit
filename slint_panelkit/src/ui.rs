@@ -23,6 +23,10 @@ pub fn create_main_window(config: &AppConfig) -> Result<MainWindow> {
             info!("Window size set to {}x{}", dimensions.width, dimensions.height);
             debug!("Orientation: {}", if dimensions.is_portrait() { "portrait" } else { "landscape" });
         }
+        #[cfg(feature = "embedded")]
+        {
+            let _ = dimensions; // Suppress unused variable warning on embedded
+        }
     }
     
     // Create shared state

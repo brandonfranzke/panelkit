@@ -39,14 +39,6 @@ impl AppState {
             rng.gen(),
         );
     }
-
-    pub fn cycle_color(&mut self) {
-        self.background_color = match self.background_color {
-            c if c == Color::from_rgb_u8(0xff, 0x00, 0x00) => Color::from_rgb_u8(0x00, 0xff, 0x00),
-            c if c == Color::from_rgb_u8(0x00, 0xff, 0x00) => Color::from_rgb_u8(0x00, 0x00, 0xff),
-            _ => Color::from_rgb_u8(0xff, 0x00, 0x00),
-        };
-    }
 }
 
 impl Default for AppState {

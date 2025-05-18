@@ -2,26 +2,21 @@ use clap::Parser;
 
 /// Display dimensions
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)] // These fields are only used on desktop builds
 pub struct Dimensions {
     pub width: u32,
     pub height: u32,
 }
 
+#[allow(dead_code)] // Only used on desktop builds
 impl Dimensions {
     pub fn new(width: u32, height: u32) -> Self {
         Self { width, height }
     }
-
+    
+    #[cfg(not(feature = "embedded"))]
     pub fn is_portrait(&self) -> bool {
         self.height > self.width
-    }
-
-    pub fn smaller_dimension(&self) -> u32 {
-        self.width.min(self.height)
-    }
-
-    pub fn larger_dimension(&self) -> u32 {
-        self.width.max(self.height)
     }
 }
 
@@ -75,28 +70,3 @@ impl AppConfig {
     }
 }
 
-/// UI Layout constants
-pub mod layout {
-    /// Number of buttons in smaller dimension
-    pub const BUTTONS_SMALL_DIM: i32 = 2;
-    
-    /// Number of buttons in larger dimension
-    pub const BUTTONS_LARGE_DIM: i32 = 4;
-    
-    /// Padding as percentage of smaller dimension
-    pub const PADDING_PERCENT: f32 = 0.05;
-    
-    /// Button spacing as percentage of smaller dimension
-    pub const SPACING_PERCENT: f32 = 0.03;
-    
-    /// Font sizes as percentage of button size
-    pub const FONT_SIZE_BASE: f32 = 0.15;
-    pub const FONT_SIZE_LARGE: f32 = 0.20;
-    pub const FONT_SIZE_SMALL: f32 = 0.12;
-    
-    /// Swipe threshold as percentage of screen width
-    pub const SWIPE_THRESHOLD_PERCENT: f32 = 0.15;
-    
-    /// Minimum swipe distance in pixels
-    pub const SWIPE_MIN_DISTANCE: f32 = 50.0;
-}
