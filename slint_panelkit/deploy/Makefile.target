@@ -1,0 +1,23 @@
+# Minimal Makefile for slint_panelkit
+APP := slint_panelkit
+DIR := $(HOME)/panelkit
+LOG_DIR := $(DIR)/logs
+
+# Setup permissions and service
+setup:
+	sudo usermod -a -G input,video $(USER)
+	sudo chmod a+rw /dev/dri/card0 2>/dev/null || true
+	sudo chmod a+rw /dev/fb0 2>/dev/null || true
+	mkdir -p ~/.config/systemd/user/ $(LOG_DIR)
+	cp $(DIR)/$(APP).service ~/.config/systemd/user/
+	chmod +x $(DIR)/$(APP)
+	systemctl --user daemon-reload
+
+# Service controls
+start:
+	systemctl --user start $(APP)
+
+stop:
+	systemctl --user stop $(APP)
+
+.PHONY: setup start stop

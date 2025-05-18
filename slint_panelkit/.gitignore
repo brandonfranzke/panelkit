@@ -1,0 +1,15 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+*.o
+*.so
+*.a
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Cargo
+.cargo-ok

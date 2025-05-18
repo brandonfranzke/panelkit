@@ -1,0 +1,33 @@
+[package]
+name = "slint_panelkit"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["slint/renderer-software", "slint/backend-winit", "slint/compat-1-2"]
+embedded = ["slint/renderer-software", "slint/backend-linuxkms-noseat", "slint/compat-1-2"]
+
+[build-dependencies]
+slint-build = "1.11.0"
+
+[dependencies]
+# Minimal Slint setup with only what's needed
+slint = { version = "1.11.0", default-features = false, features = [] }
+# Simple logger with minimal dependencies
+log = { version = "0.4", features = ["std"] }
+simple_logger = { version = "4.2.0", default-features = false, features = ["colors"] }
+# For geteuid() syscall (smaller than spawning a process)
+libc = "0.2"
+# Random color generation
+rand = "0.8"
+
+# Super slim builds for embedded
+[profile.release]
+opt-level = 'z'           # Optimize for size
+lto = "fat"               # Link-time optimization (more aggressive)
+codegen-units = 1         # Reduce parallel code generation units to increase optimization
+strip = true              # Strip symbols
+panic = "abort"           # Remove panic unwinding code
+overflow-checks = false   # Remove overflow checks
+debug = false             # No debug info
+incremental = false       # No incremental compilation

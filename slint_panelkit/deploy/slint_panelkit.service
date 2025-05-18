@@ -1,0 +1,17 @@
+[Unit]
+Description=Minimal Slint Demo
+
+[Service]
+Type=simple
+WorkingDirectory=%h/panelkit
+ExecStart=sudo %h/panelkit/slint_panelkit
+Environment="SLINT_FULLSCREEN=1"
+Environment="SLINT_BACKEND=linuxkms"
+Environment="SLINT_RENDERER=software"
+Environment="SLINT_FORCE_NOSEAT=1"
+StandardOutput=append:%h/panelkit/logs/app.log
+StandardError=append:%h/panelkit/logs/error.log
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
