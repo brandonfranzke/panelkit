@@ -5,39 +5,46 @@ project(panelkit LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Options
-option(BUILD_SDL "Build with SDL2 renderer" ON)
-option(BUILD_FBDEV "Build with Linux framebuffer" OFF)
+# Set default build type
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 # Source files
 set(SOURCES
     src/main.c
-    src/ui_elements.c
-    src/platform.c
 )
+
+# Include directories
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Include directories
-include_directories(${PROJECT_SOURCE_DIR}/include)
+# Find packages
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2 REQUIRED sdl2)
 
-# Find LVGL
-include(cmake/lvgl.cmake)
+# Add SDL2
+include_directories(${SDL2_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
 
-# Platform specific settings
-if(BUILD_SDL)
-    # SDL2 for development/simulation
-    include(cmake/sdl2.cmake)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE LV_USE_SDL=1)
-    target_link_libraries(${PROJECT_NAME} PRIVATE SDL2)
-elseif(BUILD_FBDEV)
-    # Linux framebuffer for embedded targets
-    target_compile_definitions(${PROJECT_NAME} PRIVATE LV_USE_FBDEV=1)
+# Add LVGL (clone it during configuration)
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/lvgl")
+    execute_process(
+        COMMAND git clone -b v9.2.2 --depth 1 https://github.com/lvgl/lvgl.git
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 endif()
 
+# Add LVGL as a subdirectory
+add_subdirectory(${CMAKE_SOURCE_DIR}/lvgl EXCLUDE_FROM_ALL)
+
 # Link LVGL
-target_link_libraries(${PROJECT_NAME} PRIVATE lvgl)
+target_link_libraries(${PROJECT_NAME} lvgl)
+
+# Enable SDL2 driver in LVGL
+target_compile_definitions(${PROJECT_NAME} PRIVATE LV_USE_SDL=1)
 
 # Install
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
