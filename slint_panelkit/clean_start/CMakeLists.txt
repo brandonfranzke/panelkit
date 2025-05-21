@@ -10,7 +10,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0 -Wall -Wextra")
 
 # Source files
 set(SOURCES
-    pages_app.c
+    app.c
     api_functions.c
 )
 

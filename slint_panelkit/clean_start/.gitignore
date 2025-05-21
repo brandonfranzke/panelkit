@@ -5,6 +5,9 @@ build_*/
 */CMakeCache.txt
 */cmake_install.cmake
 */Makefile
+CMakeCache.txt
+Makefile
+cmake_install.cmake
 
 # Executables
 panelkit_*

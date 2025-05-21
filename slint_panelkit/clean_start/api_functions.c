@@ -19,7 +19,7 @@ extern void draw_text_left(const char* text, int x, int y, SDL_Color color);
 extern void draw_small_text_left(const char* text, int x, int y, SDL_Color color, int max_width);
 
 #define API_REFRESH_INTERVAL 5000  // 5 seconds in ms (for testing)
-extern Uint32 last_api_call_time; // Defined in pages_app.c
+extern Uint32 last_api_call_time; // Defined in app.c
 
 // API data
 typedef struct {

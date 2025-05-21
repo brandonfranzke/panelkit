@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Check for clean argument
+if [ "$1" == "clean" ]; then
+  echo "Cleaning build directory..."
+  rm -rf build
+  echo "Clean complete."
+  exit 0
+fi
+
 # Create build directory if it doesn't exist
 mkdir -p build
 
@@ -11,6 +19,12 @@ cmake ..
 
 # Build
 make
+
+# Check if we just want to build without running
+if [ "$1" == "build" ]; then
+  echo "Build complete."
+  exit 0
+fi
 
 # Run if build was successful
 if [ -f ./panelkit ]; then
