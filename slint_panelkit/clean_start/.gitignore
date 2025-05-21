@@ -1,0 +1,62 @@
+# Build directories
+build/
+build_*/
+*/CMakeFiles/
+*/CMakeCache.txt
+*/cmake_install.cmake
+*/Makefile
+
+# Executables
+panelkit_*
+*.out
+*.exe
+*.app
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+*.d
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# CMake generated files
+CMakeLists.txt.user
+CMakeScripts/
+CMakeUserPresets.json
+cmake-build-*/
+
+# Temporary files
+*.log
+*.tmp
