@@ -10,6 +10,10 @@ embedded = ["slint/renderer-software", "slint/backend-linuxkms-noseat", "slint/c
 [build-dependencies]
 slint-build = "1.11.0"
 
+[[bin]]
+name = "slint_panelkit"
+path = "src/main.rs"
+
 [dependencies]
 slint = { version = "1.11.0", default-features = false }
 clap = { version = "4.5", features = ["derive"] }
@@ -20,6 +24,7 @@ thiserror = "1.0"
 rand = "0.8"
 chrono = "0.4.38"
 libc = "0.2"
+once_cell = "1.19.0"
 
 # Optimize for embedded
 [profile.release]

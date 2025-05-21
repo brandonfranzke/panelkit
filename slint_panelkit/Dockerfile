@@ -1,33 +1,36 @@
-FROM rust:slim
+FROM rust:latest
 
-ENV RUST_TARGET=aarch64-unknown-linux-gnu
-
-# Essential cross-compilation dependencies only
+# Install dependencies for cross-compilation
 RUN apt-get update && apt-get install -y \
-    gcc-aarch64-linux-gnu \
-    g++-aarch64-linux-gnu \
-    libc6-dev-arm64-cross \
     pkg-config \
-    libdrm-dev \
+    libssl-dev \
+    libfontconfig1-dev \
     libudev-dev \
     libxkbcommon-dev \
     libinput-dev \
-    libgbm-dev \
-    && rm -rf /var/lib/apt/lists/*
+    gcc-aarch64-linux-gnu \
+    libc6-dev-arm64-cross
 
-# Set environment for cross-compilation
-ENV PKG_CONFIG_ALLOW_CROSS=1 \
-    CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-    CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-    CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
-    SLINT_FORCE_NOSEAT=1
+# Install cross-architecture libraries
+RUN dpkg --add-architecture arm64 && \
+    apt-get update && \
+    apt-get install -y \
+    libxkbcommon-dev:arm64 \
+    libinput-dev:arm64 \
+    libudev-dev:arm64
 
-# Add target and set working directory
-RUN rustup target add ${RUST_TARGET}
+# Install Rust for aarch64
+RUN rustup target add aarch64-unknown-linux-gnu
+
+# Set cross-compilation environment variables
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/aarch64-linux-gnu-gcc \
+    PKG_CONFIG_ALLOW_CROSS=1
+
+# Create working directory
 WORKDIR /project
 
-# Build command with explicit output path
-CMD cargo build --release --target=${RUST_TARGET} --features=embedded && \
-    # Ensure the binary exists and has proper permissions
-    ls -la /project/target/${RUST_TARGET}/release/slint_panelkit && \
-    chmod +x /project/target/${RUST_TARGET}/release/slint_panelkit
+# The actual build command will be run when the container starts
+COPY scripts/fix_docker_build.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/fix_docker_build.sh
+
+CMD ["/usr/local/bin/fix_docker_build.sh"]

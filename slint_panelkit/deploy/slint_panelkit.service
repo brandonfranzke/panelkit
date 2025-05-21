@@ -4,7 +4,7 @@ Description=PanelKit UI Application
 [Service]
 Type=simple
 WorkingDirectory=%h/panelkit
-ExecStart=%h/panelkit/slint_panelkit
+ExecStart=%h/panelkit/slint_panelkit --width 640 --height 480 --orientation portrait
 Environment="SLINT_FULLSCREEN=1"
 Environment="SLINT_BACKEND=linuxkms"
 Environment="SLINT_RENDERER=software"
