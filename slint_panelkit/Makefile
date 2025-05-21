@@ -1,86 +1,71 @@
-# PanelKit Makefile
+# Simple Makefile for PanelKit LVGL
 
-# Project configuration
-PROJECT = slint_panelkit
-TARGET = aarch64-unknown-linux-gnu
-TARGET_HOST = panelkit
-TARGET_DIR = ~/panelkit
+# Default build directory
+BUILD_DIR = build
 
-# Local configuration variables
-WIDTH = 640
-HEIGHT = 480
-ORIENTATION = portrait
-LOG_LEVEL = debug
-EXECUTABLE = ./target/debug/$(PROJECT)
+# Default to SDL build
+SDL_BUILD ?= 1
 
-# Set DEBUG to 1 for debug overlay, 0 to disable
-DEBUG = 1
+# Detect OS
+ifeq ($(shell uname), Darwin)
+	# macOS specific settings
+	CMAKE_EXTRA = -DCMAKE_PREFIX_PATH=$(shell brew --prefix sdl2)
+else
+	# Linux specific settings
+	CMAKE_EXTRA =
+endif
 
-# Set TOUCH_LOGGING to 1 to enable, 0 to disable
-TOUCH_LOGGING = 1
+# Targets
+.PHONY: all clean build run prepare rebuild
 
-# Define all phony targets in one place
-.PHONY: help build run clean target deploy
+all: build
 
-# Default target shows help
-help:
-	@echo "PanelKit Makefile"
-	@echo "================="
-	@echo "make [target] [VAR=value]"
-	@echo ""
-	@echo "Targets:"
-	@echo "  help    Show this help message (default)"
-	@echo "  build   Build in debug mode"
-	@echo "  run     Build and run in debug mode"
-	@echo "  target  Cross-compile for ARM64 (Raspberry Pi)"
-	@echo "  deploy  Deploy to target device (requires SSH config)"
-	@echo "  clean   Remove build artifacts"
-	@echo ""
-	@echo "Variables:"
-	@echo "  WIDTH=$(WIDTH) HEIGHT=$(HEIGHT) ORIENTATION=$(ORIENTATION)"
-	@echo "  LOG_LEVEL=$(LOG_LEVEL) DEBUG=$(DEBUG) TOUCH_LOGGING=$(TOUCH_LOGGING)"
-	@echo "  TARGET_HOST=$(TARGET_HOST)"
+prepare:
+	@mkdir -p $(BUILD_DIR)
 
-# Build the application in debug mode
-build:
-	@echo "Building PanelKit..."
-	@cargo build
+build: prepare
+	@echo "Building PanelKit with LVGL..."
+	@cd $(BUILD_DIR) && cmake $(CMAKE_EXTRA) .. && make -j
 
-# Run the application in debug mode
 run: build
-	@echo "Running PanelKit ($(WIDTH)x$(HEIGHT), $(ORIENTATION))"
-	@$(EXECUTABLE) \
-		--width $(WIDTH) \
-		--height $(HEIGHT) \
-		--orientation $(ORIENTATION) \
-		--log-level $(LOG_LEVEL) \
-		$(shell if [ $(DEBUG) -eq 1 ]; then echo "--debug-overlay"; fi) \
-		$(shell if [ $(TOUCH_LOGGING) -eq 1 ]; then echo "--touch-logging"; fi)
+	@echo "Running PanelKit..."
+	@cd $(BUILD_DIR) && ./panelkit
 
-# Cross-compile for target architecture using Docker
-target:
-	@echo "Cross-compiling for $(TARGET)..."
-	@docker volume inspect cargo-registry >/dev/null 2>&1 || docker volume create cargo-registry
-	@docker volume inspect cargo-target >/dev/null 2>&1 || docker volume create cargo-target
-	@docker build -t slint-cross .
-	@mkdir -p target/$(TARGET)/release
-	@docker run --rm \
-		-v $(shell pwd):/project \
-		-v cargo-registry:/usr/local/cargo/registry \
-		-v cargo-target:/project/target \
-		slint-cross bash -c "cd /project && RUSTFLAGS='-C link-arg=-lgcc' cargo build --release --target $(TARGET) --features embedded"
-
-# Deploy to target device
-deploy:
-	@echo "Deploying to $(TARGET_HOST)..."
-	@ssh $(TARGET_HOST) "mkdir -p $(TARGET_DIR)/logs"
-	@scp target/$(TARGET)/release/$(PROJECT) $(TARGET_HOST):$(TARGET_DIR)/
-	@scp deploy/Makefile.target $(TARGET_HOST):$(TARGET_DIR)/Makefile
-	@scp deploy/slint_panelkit.service $(TARGET_HOST):$(TARGET_DIR)/$(PROJECT).service
-	@echo "Deployed successfully to $(TARGET_HOST):$(TARGET_DIR)"
-	@echo "To complete setup, run: ssh $(TARGET_HOST) \"cd $(TARGET_DIR) && make setup\""
-
-# Clean build artifacts
 clean:
-	@echo "Cleaning build artifacts..."
-	@cargo clean
+	@echo "Cleaning build directory..."
+	@rm -rf $(BUILD_DIR)
+
+rebuild: clean build
+
+# Docker targets for cross-compilation
+.PHONY: docker-build docker-image docker-run
+
+# Docker image name
+DOCKER_IMAGE = panelkit-build:latest
+
+docker-image:
+	@echo "Building Docker image for cross-compilation..."
+	@docker build -t $(DOCKER_IMAGE) -f Dockerfile.build .
+
+docker-build: docker-image
+	@echo "Cross-compiling with Docker..."
+	@docker run --rm -v $(PWD):/project $(DOCKER_IMAGE) make BUILD_DIR=build-arm64 SDL_BUILD=0
+
+# Add a Dockerfile for cross-compilation
+Dockerfile.build:
+	@echo "Creating Dockerfile for cross-compilation..."
+	@echo "FROM ubuntu:22.04" > Dockerfile.build
+	@echo "" >> Dockerfile.build
+	@echo "RUN apt-get update && apt-get install -y \\" >> Dockerfile.build
+	@echo "    build-essential \\" >> Dockerfile.build
+	@echo "    cmake \\" >> Dockerfile.build
+	@echo "    git \\" >> Dockerfile.build
+	@echo "    crossbuild-essential-arm64 \\" >> Dockerfile.build
+	@echo "    pkg-config" >> Dockerfile.build
+	@echo "" >> Dockerfile.build
+	@echo "WORKDIR /project" >> Dockerfile.build
+	@echo "" >> Dockerfile.build
+	@echo "# Use ARM64 toolchain" >> Dockerfile.build
+	@echo "ENV TOOLCHAIN_FILE=/project/cmake/arm64-toolchain.cmake" >> Dockerfile.build
+	@echo "" >> Dockerfile.build
+	@echo "CMD ["make", "BUILD_DIR=build-arm64", "SDL_BUILD=0"]" >> Dockerfile.build

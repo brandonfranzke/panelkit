@@ -71,31 +71,19 @@ The core challenge identified is properly handling and distinguishing different 
 5. **Timeout-Based Disambiguation**: Use time thresholds to distinguish between taps and gesture starts
 6. **Velocity Tracking**: Calculate speed and direction of touch movements for inertial scrolling
 
-### 2. Page Navigation System
+### 2. UI Component Design
 
-```
-┌─────────────────────────────────────────────┐
-│             PageManager                     │
-│                                             │
-│  ┌─────────────┐  ┌─────────────────────┐   │
-│  │ Page Stack  │  │ Transition Manager  │   │
-│  └─────────────┘  └─────────────────────┘   │
-│                                             │
-└─────────────────────────────────────────────┘
-            │             │
-            ▼             ▼
-┌───────────────┐  ┌─────────────────┐
-│  Page Content │  │ Swipe Detector  │
-└───────────────┘  └─────────────────┘
-```
+#### Button Design
+- Buttons should be 50% of the window width
+- Button height should be 2/3 of the viewport height
+- Use center alignment for consistent placement
+- Provide clear visual feedback for touches
 
-#### Page Navigation Features:
-
-1. **Stack-Based Navigation**: Push/pop pages for hierarchical navigation
-2. **Swipe Transitions**: Horizontal swipes to move between pages at the same level
-3. **Visual Transitions**: Smooth animations when changing pages
-4. **State Preservation**: Maintain page state during navigation
-5. **Page Factory**: Create pages on demand based on navigation actions
+#### ScrollView Design
+- Content should adapt to its contained elements
+- Smooth scrolling with appropriate friction
+- Visual indicators for scroll position (optional)
+- Properly handle event propagation within scrollable areas
 
 ### 3. Widget System
 
@@ -119,33 +107,6 @@ Reusable, self-contained UI components that handle their own internal state:
 3. **Responsive Design**: Adapt to container size and screen resolution
 4. **Minimal Dependencies**: Limit dependencies between widgets
 5. **Consistent API**: Similar patterns for configuration and callbacks
-
-### 4. Scrolling Implementation
-
-The scrolling view requires special attention:
-
-```
-┌─────────────────────────────────────────────┐
-│               ScrollView                    │
-│                                             │
-│  ┌─────────────────────────────────────────┐│
-│  │              Viewport                   ││
-│  │  ┌─────────────────────────────────────┐││
-│  │  │           Content                   │││
-│  │  │                                     │││
-│  │  └─────────────────────────────────────┘││
-│  └─────────────────────────────────────────┘│
-└─────────────────────────────────────────────┘
-```
-
-#### Scrolling Features:
-
-1. **Touch Drag Detection**: Track touch events to determine scroll intent
-2. **Inertial Scrolling**: Continue scrolling with decreasing velocity after touch release
-3. **Bounce Effects**: Visual feedback at content boundaries
-4. **Event Capture**: Properly handle events within scrollable areas
-5. **Variable Sizing**: Adapt to both content size and viewport size
-6. **Efficient Rendering**: Only render visible content when possible
 
 ## Build System Design
 
@@ -173,11 +134,9 @@ The scrolling view requires special attention:
 #### Build System Features:
 
 1. **Self-Contained Build**: All dependencies included in Docker image
-2. **Multi-Stage Builds**: Separate compilation from packaging
-3. **Volume Mounting**: Share source code and build artifacts with host
-4. **Caching**: Optimize build times with proper caching
-5. **Target-Specific Configurations**: Conditional compilation for platform differences
-6. **Consistent Versions**: Lock dependencies to specific versions
+2. **Volume Mounting**: Share source code and build artifacts with host
+3. **Caching**: Optimize build times with Docker volumes for caching
+4. **Target-Specific Configurations**: Conditional compilation for platform differences
 
 ## Logging and Debugging System
 
@@ -196,24 +155,16 @@ The scrolling view requires special attention:
 │  ┌─────────────────────────────────────────┐│
 │  │           Logging System                ││
 │  └─────────────────────────────────────────┘│
-│                     │                       │
-│                     ▼                       │
-│  ┌─────────────┐  ┌───────────┐  ┌────────┐ │
-│  │ Console     │  │File Output│  │Remote  │ │
-│  │ Output      │  │           │  │Logging │ │
-│  └─────────────┘  └───────────┘  └────────┘ │
 └─────────────────────────────────────────────┘
 ```
 
 #### Logging Features:
 
 1. **Multiple Log Levels**: ERROR, WARN, INFO, DEBUG, TRACE
-2. **Context Enrichment**: Include source context (file/line), component, and thread information
+2. **Context Enrichment**: Include source context, component, and thread information
 3. **Filterable**: Runtime control of log levels by category
-4. **Performance Tracking**: Measure and log performance metrics
-5. **Event Logging**: Detailed logging of touch events and UI interactions
-6. **Visual Debug Mode**: Overlay showing touch points and event propagation
-7. **Conditional Compilation**: More detailed logging in debug builds
+4. **Event Logging**: Detailed logging of touch events and UI interactions
+5. **Visual Debug Mode**: Optional overlay showing debug information
 
 ## Responsive Design Approach
 
@@ -238,149 +189,68 @@ The scrolling view requires special attention:
 #### Responsive Design Features:
 
 1. **Layout Units**: Define layouts in relative units rather than absolute pixels
-2. **Breakpoints**: Different layouts for significantly different screen sizes
-3. **Component Adaptation**: UI components that resize appropriately
-4. **Font Scaling**: Adjust text size based on screen resolution
-5. **Touch Target Sizing**: Ensure minimum touch target sizes regardless of screen resolution
-6. **Aspect Ratio Preservation**: Maintain proper proportions for visual elements
+2. **Component Adaptation**: UI components that resize appropriately
+3. **Touch Target Sizing**: Ensure minimum touch target sizes regardless of screen resolution
 
-## State Management
+## Deployment Configuration
 
-For a moderate state management system:
+### Target System Setup
 
 ```
 ┌─────────────────────────────────────────────┐
-│                App State                    │
+│             Target Device                   │
 │                                             │
-│  ┌─────────────┐  ┌───────────┐  ┌────────┐ │
-│  │ UI State    │  │Page State │  │App     │ │
-│  │             │  │           │  │Config  │ │
-│  └─────────────┘  └───────────┘  └────────┘ │
-└─────────────────────────────────────────────┘
-              │           │          │
-              ▼           ▼          ▼
-┌─────────────────────────────────────────────┐
-│                  Views                      │
+│  ┌─────────────────────────────────────────┐│
+│  │            Systemd Service              ││
+│  │                                         ││
+│  │  ┌─────────────┐    ┌──────────────┐   ││
+│  │  │ Application │    │Environment   │   ││
+│  │  │             │    │Variables     │   ││
+│  │  └─────────────┘    └──────────────┘   ││
+│  └─────────────────────────────────────────┘│
 └─────────────────────────────────────────────┘
 ```
 
-#### State Management Features:
+#### Deployment Features:
 
-1. **Centralized State**: Single source of truth for application state
-2. **Immutable Updates**: State changes through well-defined update functions
-3. **Change Notification**: Components receive updates when relevant state changes
-4. **State Persistence**: Save and restore state as needed
-5. **State Scoping**: Localize state to components when appropriate
-6. **Serialization**: Convert state to/from JSON or other formats as needed
+1. **Auto-Start**: Application launches on system boot
+2. **Environment Configuration**: Proper environment variables for embedded operation
+3. **Screen Configuration**: Set dimensions and orientation via command line
+4. **Error Recovery**: Automatic restart on crash
+5. **Logging**: Capture stdout/stderr to log files
 
 ## Implementation Phases
 
-### Phase 1: Project Setup and Foundation
+### Phase 1: Project Setup and Core Infrastructure
 1. Basic project structure
 2. Docker build configuration
 3. Logging infrastructure
 4. Core platform abstraction
 
-### Phase 2: Event System Implementation
-1. Touch event handling
-2. Gesture detection
-3. Event propagation rules
+### Phase 2: Component Development
+1. Button components
+2. Scrollable views
+3. Page navigation system
+4. Event handling system
 
-### Phase 3: UI Component Framework
-1. Base widget implementation
-2. Button component
-3. Text display component
-4. ScrollView implementation
-
-### Phase 4: Page Navigation System
-1. Page manager
-2. Swipe navigation
-3. Page transitions
-
-### Phase 5: Application Integration
-1. Sample page layouts
-2. State management integration
-3. End-to-end testing
-
-## Development Environment
-
-### Development Workflow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Development Host (MacOS)                │
-│                                                             │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────┐    │
-│  │ Source Code │──▶│ Docker Build│──▶│ Host Binary     │    │
-│  └─────────────┘   └─────────────┘   └─────────────────┘    │
-│         │                │                    │              │
-│         │                │                    ▼              │
-│         │                │           ┌─────────────────┐    │
-│         │                │           │ Local Testing   │    │
-│         │                │           └─────────────────┘    │
-│         │                │                                  │
-│         │                ▼                                  │
-│         │       ┌─────────────────┐                        │
-│         │       │ Target Binary   │                        │
-│         │       └─────────────────┘                        │
-│         │                │                                  │
-│         ▼                ▼                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                Version Control                       │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-            │                                    │
-            │                                    │
-            ▼                                    ▼
-┌─────────────────────────┐        ┌───────────────────────────┐
-│ Target Device           │        │ Continuous Integration    │
-│ (Raspberry Pi CM5)      │        │                           │
-└─────────────────────────┘        └───────────────────────────┘
-```
-
-### Testing Approach
-
-1. **Manual Testing**: Initial testing of UI interactions
-2. **Integration Testing**: Test components working together
-3. **Visual Testing**: Compare UI rendering across platforms
-4. **Performance Testing**: Measure response times and resource usage
-
-## Technical Specifications
-
-### Slint UI Framework Integration
-
-1. **Component Definition**: Define UI components using Slint's declarative language
-2. **Event Binding**: Connect Slint events to Rust handlers
-3. **Property Binding**: Two-way binding between UI and application state
-4. **Custom Rendering**: Platform-specific rendering optimizations when needed
-5. **Backend Selection**: Proper backend selection based on target platform
-
-### Cross-Platform Considerations
-
-1. **Conditional Compilation**: Use feature flags for platform-specific code
-2. **Framebuffer Access**: Direct framebuffer access on target via LinuxKMS
-3. **Input Sources**: Unified input handling for touch events from different sources
-4. **Performance Profiling**: Platform-specific performance measurements
-5. **Resource Management**: Appropriate resource usage for platform capabilities
+### Phase 3: Integration and Refinement
+1. Connect all components
+2. Optimize performance
+3. Testing and debugging
+4. Cross-platform validation
 
 ## Coding Standards
 
-1. **Modular Design**: Clear separation of concerns with well-defined interfaces
-2. **Clean Code**: Self-documenting code with meaningful names
-3. **Error Handling**: Comprehensive error handling without silent failures
-4. **Documentation**: Thorough documentation, including architecture decisions
-5. **Consistent Style**: Follow Rust idioms and code style guidelines
-6. **Performance Awareness**: Consider performance implications of design choices
+1. **Clean Code**: Self-documenting code with meaningful names and minimal comments
+2. **Error Handling**: Comprehensive error handling
+3. **Performance Awareness**: Consider resource constraints on target platform
+4. **Simple Makefile**: Maintain a simple build system with clear, focused targets
+5. **Relative Sizing**: Use relative measurements (%, fractions) rather than fixed pixel values
 
-## Future Considerations
+## Technical Requirements
 
-1. **Theming Support**: Framework for visual theming and customization
-2. **Plugin System**: Extension points for additional functionality
-3. **Automated Testing**: UI automation testing infrastructure
-4. **State Persistence**: Saving application state between sessions
-5. **Remote Debugging**: Tools for debugging on target device
-6. **Performance Optimization**: Platform-specific optimizations
-
-## Conclusion
-
-This design plan outlines a robust architecture for a touch-based UI application that prioritizes proper event handling, scalable component design, and cross-platform compatibility. By focusing on software engineering principles and a clean architecture, the application will provide a solid foundation for future enhancements while addressing the core requirements of touch interaction and multi-page navigation.
+- **Rust**: Version 1.70+ recommended
+- **Slint**: Version 1.11.0
+- **Docker**: For cross-compilation
+- **Embedded Target**: Raspberry Pi 4 or similar with touchscreen
+- **Screen Resolution**: Default 640x480 in portrait orientation
