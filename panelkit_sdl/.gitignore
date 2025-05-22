@@ -54,6 +54,10 @@ Icon
 *.dylib
 *.dll
 
+# Binaries
+deploy/panelkit
+build-arm64/panelkit
+
 # CMake generated files
 CMakeLists.txt.user
 CMakeScripts/

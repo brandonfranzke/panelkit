@@ -1,0 +1,13 @@
+[Unit]
+Description=PanelKit SDL Application
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/panelkit
+Restart=always
+User=root
+Environment=SDL_FBDEV=/dev/fb0
+Environment=SDL_VIDEODRIVER=fbcon
+
+[Install]
+WantedBy=multi-user.target
