@@ -10,8 +10,6 @@ cmake_install.cmake
 
 # Executables
 panelkit
-panelkit_*
-!panelkit_sdl/
 *.out
 *.exe
 *.app

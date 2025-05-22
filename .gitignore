@@ -3,9 +3,9 @@
 */CMakeFiles/
 */CMakeCache.txt
 */cmake_install.cmake
-*/Makefile
+*/build/Makefile
 CMakeCache.txt
-Makefile
+build/Makefile
 cmake_install.cmake
 
 # Binaries and object files
@@ -18,8 +18,6 @@ cmake_install.cmake
 *.exe
 *.out
 *.app
-panelkit*
-!panelkit_sdl/
 
 # Debug files
 *.dSYM/
@@ -36,13 +34,11 @@ panelkit*
 .vscode/
 *.swp
 *.swo
-*~
 
 # OS specific
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon
 ._*
 .Spotlight-V100
 .Trashes
