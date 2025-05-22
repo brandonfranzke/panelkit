@@ -1,6 +1,6 @@
 # PanelKit SDL
 
-A touch-optimized UI application built with SDL2 for embedded Linux devices. Features a multi-page interface with gesture recognition, API integration, and optimized for direct framebuffer rendering on Raspberry Pi CM5.
+A touch-optimized UI application built with SDL2 for embedded Linux devices. Features a multi-page interface with gesture recognition, API integration, and **SDL+DRM rendering** for minimal dependencies on Raspberry Pi CM5.
 
 ## Features
 
@@ -32,6 +32,10 @@ panelkit_sdl/
 │   ├── Makefile          # Target setup commands
 │   ├── panelkit.service  # Systemd service
 │   └── README.md         # Deployment guide
+├── test_drm/             # SDL+DRM integration (PRODUCTION READY)
+│   ├── sdl_drm_renderer.h/c  # Core SDL+DRM library
+│   ├── example_usage.c   # Clean integration example
+│   └── README.md         # Full technical documentation
 ├── Makefile              # Main build system
 └── CMakeLists.txt        # CMake configuration
 ```
@@ -86,10 +90,25 @@ make start          # Start the service
 make logs           # View logs
 ```
 
+## Graphics Solutions
+
+### SDL+DRM Integration (Recommended)
+**PRODUCTION READY** - Minimal dependencies with proper timing
+- **Dependencies**: libdrm only (~200KB)
+- **Benefits**: Hardware-synchronized, no tearing, static linking
+- **Trade-offs**: Software rendering, Linux DRM only
+- **See**: `test_drm/README.md` for full technical details
+
+### Standard SDL2+KMSDRM (Alternative)
+- **Dependencies**: Mesa+GBM stack (~169MB)
+- **Benefits**: Hardware acceleration, cross-platform
+- **Trade-offs**: Large dependency chain
+
 ## Dependencies
 
-- **Build**: CMake, Docker (for cross-compilation)
-- **Runtime**: SDL2, SDL2_ttf, libcurl, pthread
+- **Build**: CMake, Docker (for cross-compilation)  
+- **Runtime (SDL+DRM)**: libdrm only (~200KB)
+- **Runtime (Standard)**: SDL2, SDL2_ttf, libcurl, Mesa+GBM
 - **Target**: ARM64 Linux, systemd
 
 ## Controls
