@@ -1,28 +1,53 @@
-# Rust build artifacts
-/target/
-**/*.rs.bk
-Cargo.lock
+# C/C++ build artifacts
+*/build/
+*/CMakeFiles/
+*/CMakeCache.txt
+*/cmake_install.cmake
+*/Makefile
+CMakeCache.txt
+Makefile
+cmake_install.cmake
 
-# Build outputs
-/build/
-/dist/
+# Binaries and object files
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+panelkit*
+!panelkit_sdl/
 
-# Editor files
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Docker build artifacts
+.docker_build/
+.docker_cache/
+
+# Editor/IDE files
 .idea/
 .vscode/
 *.swp
+*.swo
 *~
 
 # OS specific
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
 .Spotlight-V100
 .Trashes
 Thumbs.db
 ehthumbs.db
-
-# Docker
-.docker_build/
-.docker_cache/
 
 # Log files
 *.log
@@ -32,13 +57,27 @@ logs/
 *.bak
 *.old
 
-# Dependency directories
-vendor/
-
 # Local environment
 .env
 .env.local
-**/.claude/settings.local.json
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Archive files
+*.tar
+*.tar.gz
+*.zip
+*.7z
 
 # Claude Code
 CLAUDE.md
+**/.claude/settings.local.json
+
+# Font artifacts (keep source fonts, ignore generated)
+*/embedded_font.h.bak
+
+# Cross-compilation artifacts
+**/arm64-toolchain.cmake.bak
