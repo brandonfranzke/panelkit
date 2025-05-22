@@ -9,6 +9,16 @@
 #include <curl/curl.h>
 #include <pthread.h>
 
+// Embedded font data
+#include "embedded_font.h"
+
+// Available fonts to test:
+//#define FONT_PATH "../fonts/LiberationSans-Regular.ttf"  // Liberation Sans (Helvetica-like)
+// #define FONT_PATH "../fonts/roboto-regular.ttf"                  // Roboto (Google's font)
+// #define FONT_PATH "../fonts/noto-sans-regular.ttf"               // Noto Sans (Google)
+// #define FONT_PATH "../fonts/dejavu-sans.ttf"             // DejaVu Sans (good for embedded)
+// #define FONT_PATH "/System/Library/Fonts/Helvetica.ttc" // Helvetica (macOS only)
+
 // Screen dimensions
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
@@ -215,10 +225,14 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Load fonts
-    font = TTF_OpenFont("/System/Library/Fonts/Helvetica.ttc", 24);
-    large_font = TTF_OpenFont("/System/Library/Fonts/Helvetica.ttc", 32);
-    small_font = TTF_OpenFont("/System/Library/Fonts/Helvetica.ttc", 18); // Smaller font for API data
+    // Load embedded fonts
+    SDL_RWops* font_rw_24 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
+    SDL_RWops* font_rw_32 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
+    SDL_RWops* font_rw_18 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
+    
+    font = TTF_OpenFontRW(font_rw_24, 1, 24);           // 1 = freesrc
+    large_font = TTF_OpenFontRW(font_rw_32, 1, 32);     // 1 = freesrc  
+    small_font = TTF_OpenFontRW(font_rw_18, 1, 18);     // 1 = freesrc
     if (font == NULL || large_font == NULL || small_font == NULL) {
         printf("Font loading failed: %s\n", TTF_GetError());
         SDL_DestroyRenderer(renderer);
