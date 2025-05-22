@@ -3,6 +3,7 @@
 # Configuration
 APP         = panelkit
 TARGET_DIR  = /tmp/panelkit
+INSTALL_DIR = /usr/local/bin
 LOG_DIR     = /var/log/panelkit
 SERVICE_DIR = /etc/systemd/system
 
@@ -47,19 +48,21 @@ install: setup
 		echo "Error: Service file not found at $(TARGET_DIR)/$(APP).service"; \
 		exit 1; \
 	fi
+	sudo systemctl stop $(APP) || true
+	sudo cp $(TARGET_DIR)/$(APP) $(INSTALL_DIR)/
+	sudo chmod +x $(INSTALL_DIR)/$(APP)
 	sudo cp $(TARGET_DIR)/$(APP).service $(SERVICE_DIR)/
-	chmod +x $(TARGET_DIR)/$(APP)
 	sudo systemctl daemon-reload
 	sudo systemctl enable $(APP)
 	@echo "Service installed and enabled"
 
-start:
+start: install
 	sudo systemctl start $(APP)
 
 stop:
 	sudo systemctl stop $(APP)
 
-restart:
+restart: install
 	sudo systemctl restart $(APP)
 
 status:

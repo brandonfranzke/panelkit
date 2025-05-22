@@ -6,15 +6,15 @@ Wants=graphical-session.target
 [Service]
 Type=simple
 ExecStartPre=/bin/mkdir -p /var/log/panelkit
-ExecStart=/tmp/panelkit/panelkit
+ExecStart=/usr/local/bin/panelkit
 Restart=always
 RestartSec=5
 User=root
 StandardOutput=append:/var/log/panelkit/panelkit.log
 StandardError=append:/var/log/panelkit/panelkit.log
 Environment=SDL_FBDEV=/dev/fb0
-Environment=SDL_VIDEODRIVER=fbcon
 Environment=SDL_AUDIODRIVER=dummy
+Environment=SDL_VIDEODRIVER=fbcon
 TimeoutStartSec=30
 TimeoutStopSec=10
 

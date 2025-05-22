@@ -18,7 +18,7 @@ TARGET_HOST     = panelkit
 TARGET_USER     = 
 TARGET_PATH     = /tmp/panelkit
 
-.PHONY: help clean host target deploy font
+.PHONY: help clean host target deploy font run
 
 # Default target shows help
 help:
@@ -36,6 +36,7 @@ help:
 	@echo "  font    - Embed font ($(DEFAULT_FONT)) into C header"
 	@echo "  host    - Build for host development/testing"
 	@echo "  target  - Cross-compile for target device ($(TARGET_ARCH))"
+	@echo "  run     - Build and run on host"
 	@echo "  deploy  - Deploy to target device ($(TARGET_USER)@$(TARGET_HOST))"
 	@echo "  clean   - Clean all build artifacts"
 	@echo ""
@@ -58,6 +59,14 @@ host: font
 target: font
 	@./$(SCRIPTS_DIR)/build_target.sh
 
+run: host
+	@if [ ! -f "$(BUILD_DIR)/host/$(PROJECT_NAME)" ]; then \
+		echo "Error: Host binary not found. Run 'make host' first."; \
+		exit 1; \
+	fi
+	@echo "Running $(PROJECT_NAME) on host..."
+	@./$(BUILD_DIR)/host/$(PROJECT_NAME)
+
 deploy: target
 	@if [ ! -f "$(BUILD_DIR)/target/$(PROJECT_NAME)" ]; then \
 		echo "Error: Target binary not found. Run 'make target' first."; \
@@ -66,6 +75,7 @@ deploy: target
 	@$(SCRIPTS_DIR)/deploy.sh --host $(TARGET_HOST) \
 		$(if $(TARGET_USER),--user $(TARGET_USER)) \
 		--target-dir $(TARGET_PATH)
+
 
 clean:
 	@echo "Cleaning build artifacts..."

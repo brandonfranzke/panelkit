@@ -4,8 +4,8 @@
 set -e
 
 # Configuration
-PI_HOST="${PI_HOST:-raspberrypi.local}"
-PI_USER="${PI_USER:-pi}"
+PI_HOST="${PI_HOST:-panelkit}"
+PI_USER="${PI_USER:-brandon}"
 DEPLOY_DIR="/home/${PI_USER}/test_drm"
 
 echo "Deploying to ${PI_USER}@${PI_HOST}:${DEPLOY_DIR}"
