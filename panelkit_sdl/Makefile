@@ -14,9 +14,9 @@ HOST_ARCH       = $(shell uname -m | sed 's/x86_64/x86_64/' | sed 's/aarch64/arm
 DEFAULT_FONT    = font-sans-regular.ttf
 
 # Deployment Configuration
-TARGET_HOST     = target
-TARGET_USER     = pi
-TARGET_PATH     = /usr/local/bin
+TARGET_HOST     = panelkit
+TARGET_USER     = 
+TARGET_PATH     = /tmp/panelkit
 
 .PHONY: help clean host target deploy font
 
@@ -40,8 +40,8 @@ help:
 	@echo "  clean   - Clean all build artifacts"
 	@echo ""
 	@echo "Build outputs:"
-	@echo "  Host:   ./$(BUILD_DIR)/$(HOST_ARCH)/$(PROJECT_NAME)"
-	@echo "  Target: ./$(BUILD_DIR)/$(TARGET_ARCH)/$(PROJECT_NAME)"
+	@echo "  Host:   ./$(BUILD_DIR)/host/$(PROJECT_NAME)"
+	@echo "  Target: ./$(BUILD_DIR)/target/$(PROJECT_NAME)"
 	@echo ""
 	@echo "To customize variables, edit this Makefile or use:"
 	@echo "  make font DEFAULT_FONT=font-sans-dejavu.ttf"
@@ -59,11 +59,13 @@ target: font
 	@./$(SCRIPTS_DIR)/build_target.sh
 
 deploy: target
-	@if [ ! -f "$(BUILD_DIR)/$(TARGET_ARCH)/$(PROJECT_NAME)" ]; then \
+	@if [ ! -f "$(BUILD_DIR)/target/$(PROJECT_NAME)" ]; then \
 		echo "Error: Target binary not found. Run 'make target' first."; \
 		exit 1; \
 	fi
-	@./$(SCRIPTS_DIR)/deploy.sh $(TARGET_HOST) $(TARGET_USER)
+	@$(SCRIPTS_DIR)/deploy.sh --host $(TARGET_HOST) \
+		$(if $(TARGET_USER),--user $(TARGET_USER)) \
+		--target-dir $(TARGET_PATH)
 
 clean:
 	@echo "Cleaning build artifacts..."

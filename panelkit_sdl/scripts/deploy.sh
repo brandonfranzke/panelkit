@@ -1,22 +1,69 @@
 #!/bin/bash
 
 # Deploy built binary to target device
-# Usage: ./deploy.sh <TARGET_HOST> [user]
+# Usage: ./deploy.sh --host <TARGET_HOST> [--user <USER>] [--target-dir <DIRECTORY>]
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-if [ $# -lt 1 ]; then
-    echo -e "${RED}Usage: $0 <TARGET_HOST> [user]${NC}"
+show_usage() {
+    echo -e "${RED}Usage: $0 --host <TARGET_HOST> [OPTIONS]${NC}"
+    echo ""
+    echo "Required:"
+    echo "  --host <TARGET_HOST>      SSH host or IP address"
+    echo ""
+    echo "Optional:"
+    echo "  --user <USER>             SSH user (uses SSH config if not specified)"
+    echo "  --target-dir <DIRECTORY>  Target directory (default: /tmp/panelkit)"
+    echo "  --help                    Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0 --host panelkit"
+    echo "  $0 --host 192.168.1.100 --user pi"
+    echo "  $0 --host panelkit --target-dir /opt/panelkit"
+}
+
+# Default values
+TARGET_HOST=""
+USER=""
+TARGET_DIRECTORY="/tmp/panelkit"
+BINARY_PATH="build/target/panelkit"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --host)
+            TARGET_HOST="$2"
+            shift 2
+            ;;
+        --user)
+            USER="$2"
+            shift 2
+            ;;
+        --target-dir)
+            TARGET_DIRECTORY="$2"
+            shift 2
+            ;;
+        --help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [ -z "$TARGET_HOST" ]; then
+    echo -e "${RED}Error: --host is required${NC}"
+    show_usage
     exit 1
 fi
-
-TARGET_HOST="$1"
-USER="$2"  # Optional user (may use SSH config)
-BINARY_PATH="../build/arm64/panelkit"
-SERVICE_PATH="../deploy/panelkit.service"
 
 # Check if binary exists
 if [ ! -f "$BINARY_PATH" ]; then
@@ -32,53 +79,38 @@ else
     SSH_TARGET="$TARGET_HOST"
 fi
 
-echo -e "${YELLOW}Deploying PanelKit to $SSH_TARGET${NC}"
+echo -e "${YELLOW}Deploying PanelKit to $SSH_TARGET:$TARGET_DIRECTORY${NC}"
 
-# Step 1: Copy binary
-echo -e "${YELLOW}1. Copying binary...${NC}"
-if scp "$BINARY_PATH" "$SSH_TARGET:/tmp/"; then
+# Step 1: Create target directory
+echo -e "${YELLOW}1. Creating target directory...${NC}"
+if ssh "$SSH_TARGET" "mkdir -p $TARGET_DIRECTORY"; then
+    echo -e "${GREEN}Target directory created${NC}"
+else
+    echo -e "${RED}Failed to create target directory${NC}"
+    exit 1
+fi
+
+# Step 2: Copy binary
+echo -e "${YELLOW}2. Copying binary...${NC}"
+if scp "$BINARY_PATH" "$SSH_TARGET:$TARGET_DIRECTORY/"; then
     echo -e "${GREEN}Binary copied successfully${NC}"
 else
     echo -e "${RED}Failed to copy binary${NC}"
     exit 1
 fi
 
-# Step 2: Install binary
-echo -e "${YELLOW}2. Installing binary...${NC}"
-if ssh "$SSH_TARGET" "sudo mv /tmp/panelkit /usr/local/bin/ && sudo chmod +x /usr/local/bin/panelkit"; then
-    echo -e "${GREEN}Binary installed successfully${NC}"
+# Step 3: Copy all deploy/ contents
+echo -e "${YELLOW}3. Copying deploy files...${NC}"
+if scp -r deploy/* "$SSH_TARGET:$TARGET_DIRECTORY/"; then
+    echo -e "${GREEN}Deploy files copied successfully${NC}"
 else
-    echo -e "${RED}Failed to install binary${NC}"
+    echo -e "${RED}Failed to copy deploy files${NC}"
     exit 1
 fi
-
-# Step 3: Copy and enable systemd service
-echo -e "${YELLOW}3. Installing systemd service...${NC}"
-if scp "$SERVICE_PATH" "$SSH_TARGET:/tmp/"; then
-    echo -e "${GREEN}Service file copied${NC}"
-else
-    echo -e "${RED}Failed to copy service file${NC}"
-    exit 1
-fi
-
-if ssh "$SSH_TARGET" "sudo mv /tmp/panelkit.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable panelkit.service"; then
-    echo -e "${GREEN}Service installed and enabled${NC}"
-else
-    echo -e "${RED}Failed to install service${NC}"
-    exit 1
-fi
-
-# Step 4: Start the service
-echo -e "${YELLOW}4. Starting service...${NC}"
-if ssh "$SSH_TARGET" "sudo systemctl start panelkit.service"; then
-    echo -e "${GREEN}Service started successfully${NC}"
-else
-    echo -e "${RED}Failed to start service${NC}"
-    exit 1
-fi
-
-# Step 5: Check status
-echo -e "${YELLOW}5. Checking service status...${NC}"
-ssh "$SSH_TARGET" "systemctl status panelkit.service --no-pager"
 
 echo -e "${GREEN}Deployment completed successfully!${NC}"
+echo -e "${YELLOW}Files deployed to: $SSH_TARGET:$TARGET_DIRECTORY${NC}"
+echo "Binary: $TARGET_DIRECTORY/panelkit"
+echo "Service: $TARGET_DIRECTORY/panelkit.service"
+echo "README: $TARGET_DIRECTORY/README.md"
+echo "Makefile: $TARGET_DIRECTORY/Makefile"

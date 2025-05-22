@@ -3,13 +3,15 @@ build/
 */CMakeFiles/
 */CMakeCache.txt
 */cmake_install.cmake
-*/Makefile
+*/build/Makefile
 CMakeCache.txt
-Makefile
+build/Makefile
 cmake_install.cmake
 
 # Executables
+panelkit
 panelkit_*
+!panelkit_sdl/
 *.out
 *.exe
 *.app

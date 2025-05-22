@@ -1,5 +1,5 @@
 // Embedded font data - auto-generated from font-sans-regular.ttf
-// Generated: Thu May 22 00:37:17 PDT 2025
+// Generated: Thu May 22 01:21:18 PDT 2025
 
 #ifndef EMBEDDED_FONT_H
 #define EMBEDDED_FONT_H

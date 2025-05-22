@@ -11,21 +11,9 @@ NC='\033[0m' # No Color
 
 echo -e "${YELLOW}Building PanelKit for host development${NC}"
 
-# Detect architecture
-ARCH=$(uname -m)
-case $ARCH in
-    x86_64)
-        BUILD_DIR="build/x86_64"
-        ;;
-    arm64|aarch64)
-        BUILD_DIR="build/arm64"
-        ;;
-    *)
-        BUILD_DIR="build/$ARCH"
-        ;;
-esac
+BUILD_DIR="build/host"
 
-echo -e "${YELLOW}Host architecture: $ARCH${NC}"
+echo -e "${YELLOW}Host architecture: $(uname -m)${NC}"
 echo -e "${YELLOW}Build directory: $BUILD_DIR${NC}"
 
 # Create build directory

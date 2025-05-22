@@ -1,16 +1,17 @@
 # PanelKit Design Documentation
 
-This document consolidates the design principles, architecture, and implementation guidelines for the PanelKit project, now implemented using SDL2.
+This document consolidates the design principles, architecture, and implementation guidelines for the PanelKit project, implemented using SDL2 for embedded Linux devices.
 
 ## Project Objectives and Requirements
 
-PanelKit is designed as a touch-centric UI application targeting both development machines (macOS) and embedded Linux devices (Raspberry Pi). The primary goals are:
+PanelKit is designed as a touch-centric UI application targeting both development machines (macOS/Linux) and embedded Linux devices (Raspberry Pi CM5). The primary goals are:
 
 1. Create a responsive, touch-first interface for embedded devices
-2. Simplify cross-compilation between development and target environments
+2. Simplify cross-compilation between development and target environments  
 3. Optimize UI elements for touchscreen interaction
 4. Establish a clean, maintainable codebase with minimal dependencies
 5. Enable seamless deployment to target hardware
+6. Provide reliable logging and debugging capabilities
 
 ## Architecture Overview
 
@@ -110,25 +111,45 @@ The application demonstrates integration with external services:
 ## Build System Approach
 
 The build system is designed with these principles:
-- Simple CMake configuration with minimal complexity
-- Easily extendable for cross-compilation if needed
-- Clear separation between development and deployment commands
-- Convenient build script with clean and build targets
 
-### Target Environment Requirements
-- LinuxFB backend for direct framebuffer access on embedded targets
-- Software renderer for maximum compatibility
-- Systemd service for auto-start on boot
-- Portrait orientation (640x480) as default
-- No external input devices (keyboard/mouse) required on target
+### Development and Cross-Compilation
+- **Host builds**: Fast iteration for development using `build/host/` directory
+- **Target builds**: ARM64 cross-compilation using Docker in `build/target/` directory
+- **Separate CMake caches**: Prevents conflicts when switching between host and target builds
+- **Font embedding**: Integrated as build prerequisite with configurable font selection
+
+### Deployment Automation
+- **Long option arguments**: Clear command-line interface using `--host`, `--user`, `--target-dir`
+- **SSH configuration**: Support for SSH config files and optional user specification
+- **File-based deployment**: Copy files to target without automatic installation
+- **Target-side Makefile**: Separate Makefile on target for setup, installation, and service management
+
+### Configuration Management
+- **Variable-driven Makefile**: Centralized configuration with reasonable defaults
+- **Font selection**: Easy switching between embedded fonts
+- **Target customization**: Override deployment settings per environment
+
+## Target Environment Requirements
+
+### System Configuration
+- **Direct framebuffer**: LinuxFB backend for direct framebuffer access on embedded targets
+- **Software renderer**: Maximum compatibility without GPU dependencies
+- **Systemd service**: Auto-start on boot with proper restart policies
+- **File-based logging**: Logs to `/var/log/panelkit/panelkit.log` for remote debugging
+
+### Runtime Environment
+- **Portrait orientation**: Default 640x480 resolution
+- **No external input**: Keyboard/mouse not required on target
+- **Minimal dependencies**: Statically linked where possible
+- **Permission setup**: Automated configuration for framebuffer and video group access
 
 ## Technical Environment
 
-- **Development**: macOS or Linux
-- **Target**: Raspberry Pi or similar with touchscreen
+- **Development**: macOS or Linux with Docker support
+- **Target**: ARM64 Linux (Raspberry Pi CM5)
 - **Graphics Library**: SDL2 with SDL2_ttf for text rendering
-- **Languages**: C
-- **Build Tools**: CMake, Make, gcc/clang
+- **Languages**: C with minimal external dependencies
+- **Build Tools**: CMake, Make, Docker, gcc/clang
 
 ## Code Style Direction
 
@@ -148,21 +169,32 @@ The build system is designed with these principles:
 - **API Integration**: Background API requests with threading
 
 ### Platform Adaptation
-- Environment variable configuration for different backends
-- Command-line arguments for screen dimensions and orientation
-- Conditional compilation for platform-specific code
+- **Environment variable configuration**: Different backends for different platforms
+- **Command-line arguments**: Screen dimensions and orientation configuration
+- **Conditional compilation**: Platform-specific code where necessary
 
 ## Deployment Process
 
-1. Build the application for the target platform
-2. Deploy binary to the target device
-3. Configure systemd service for auto-start
-4. Set up appropriate permissions for framebuffer access
+### Build Phase
+1. **Font embedding**: Generate embedded font header
+2. **Cross-compilation**: Build ARM64 binary using Docker
+3. **Validation**: Verify binary dependencies and architecture
+
+### Deployment Phase
+1. **File transfer**: Copy binary and deployment files to target
+2. **Permission setup**: Configure system permissions and groups
+3. **Service installation**: Install and enable systemd service
+4. **Service management**: Start, stop, monitor application
+
+### Debugging and Monitoring
+1. **File-based logging**: Easy access to logs for troubleshooting
+2. **Service status**: Standard systemd commands for monitoring
+3. **Remote debugging**: Log files can be easily transferred for analysis
 
 ## Next Steps and Enhancements
 
-1. Implement cross-compilation support for ARM targets
-2. Add configuration file support for customization
-3. Enhance API integration with caching and error handling
-4. Add support for more complex UI layouts and components
-5. Improve internationalization and localization support
+1. **Enhanced API integration**: Add caching and error handling
+2. **Configuration file support**: Runtime customization without rebuilds
+3. **Additional UI components**: More complex layouts and interactions
+4. **Performance optimizations**: Ensure smooth operation on constrained hardware
+5. **Internationalization**: Improved Unicode and localization support

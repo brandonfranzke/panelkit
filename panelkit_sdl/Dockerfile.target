@@ -109,8 +109,8 @@ WORKDIR /project
 
 # Build command will be passed as CMD
 CMD ["bash", "-c", "\
-    mkdir -p build/arm64 \
-    && cd build/arm64 \
+    mkdir -p build/target \
+    && cd build/target \
     && cmake -DCMAKE_TOOLCHAIN_FILE=/build/arm64-toolchain.cmake -DEMBEDDED_BUILD=ON ../.. \
     && make -j$(nproc) \
     && echo 'Embedded build completed successfully' \

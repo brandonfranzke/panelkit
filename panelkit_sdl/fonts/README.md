@@ -34,23 +34,32 @@ To change the embedded font used in the application:
 The `embed_font.sh` script converts any TTF font to a C header file for embedding:
 
 ```bash
-./embed_font.sh <font-file.ttf>
+./embed_font.sh <font-file.ttf> [output-directory]
 ```
+
+The script automatically places the output in `../src/` by default, or you can specify a custom output directory.
+
+### Build System Integration
+
+Font embedding is integrated into the main build system:
+
+```bash
+# Embed default font
+make font
+
+# Embed specific font
+make font DEFAULT_FONT=font-sans-dejavu.ttf
+```
+
+The font embedding happens automatically as a prerequisite for both host and target builds.
 
 ### Script Configuration
 
-Edit these variables at the top of `embed_font.sh` to customize:
-- `OUTPUT_DIR` - Where to place the embedded_font.h file
-- `OUTPUT_FILE` - Name of the output header file  
-- `VARIABLE_NAME` - C variable name for font data
-- `SIZE_VARIABLE` - C variable name for font size
-
-## Testing Fonts
-
-To test a font before embedding:
-1. Update the `#define FONT_PATH` in `app.c` to point to your font file
-2. Build and run: `./build.sh`
-3. Once satisfied, embed it with the script above
+The script uses these default settings:
+- **Output file**: `embedded_font.h`
+- **Variable name**: `embedded_font_data`
+- **Size variable**: `embedded_font_size`
+- **Output directory**: `../src/` (relative to fonts/ directory)
 
 ## Benefits of Embedded Fonts
 

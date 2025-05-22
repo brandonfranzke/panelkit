@@ -21,11 +21,11 @@ fi
 echo -e "${YELLOW}Running target cross-compilation...${NC}"
 if docker run --rm -v "$(pwd):/project" panelkit-sdl-target; then
     echo -e "${GREEN}Build successful!${NC}"
-    echo -e "${YELLOW}Binary location: ./build/arm64/panelkit${NC}"
+    echo -e "${YELLOW}Binary location: ./build/target/panelkit${NC}"
     
     # Show what libraries the binary depends on
     echo -e "${YELLOW}Checking binary dependencies...${NC}"
-    docker run --rm -v "$(pwd):/project" panelkit-sdl-target /bin/bash -c "cd /project && ldd build/arm64/panelkit"
+    docker run --rm -v "$(pwd):/project" panelkit-sdl-target /bin/bash -c "cd /project && ldd build/target/panelkit"
     
     echo -e "${GREEN}Target cross-compilation completed successfully!${NC}"
 else

@@ -1,49 +1,118 @@
 # PanelKit SDL
 
-A touch-optimized UI application built with SDL2 featuring a multi-page interface with gesture recognition and API integration.
+A touch-optimized UI application built with SDL2 for embedded Linux devices. Features a multi-page interface with gesture recognition, API integration, and optimized for direct framebuffer rendering on Raspberry Pi CM5.
 
 ## Features
 
 - Multi-page interface with smooth swipe transitions
-- iPhone-style page indicators
+- iPhone-style page indicators  
 - Vertical scrolling for content
 - API integration with randomuser.me
 - Gesture detection (tap, drag, swipe)
 - Fixed content areas with scrolling buttons
 - Responsive UI elements
+- Cross-compilation support for ARM64 targets
+- Systemd service integration
+- File-based logging for debugging
+
+## Project Structure
+
+```
+panelkit_sdl/
+├── src/                    # Source files
+│   ├── app.c              # Main application
+│   ├── api_functions.c    # API integration
+│   └── embedded_font.h    # Embedded font data
+├── scripts/               # Build and deployment scripts
+│   ├── build_host.sh      # Host development build
+│   ├── build_target.sh    # ARM64 cross-compilation
+│   └── deploy.sh          # Deployment automation
+├── fonts/                 # Font files and embedding
+├── deploy/                # Target device files
+│   ├── Makefile          # Target setup commands
+│   ├── panelkit.service  # Systemd service
+│   └── README.md         # Deployment guide
+├── Makefile              # Main build system
+└── CMakeLists.txt        # CMake configuration
+```
+
+## Building
+
+### Development (Host)
+```bash
+make host           # Build for development/testing
+```
+
+### Target (ARM64 Cross-compilation)
+```bash
+make target         # Cross-compile for ARM64 Linux
+```
+
+### Font Management
+```bash
+make font           # Embed default font
+make font DEFAULT_FONT=font-sans-dejavu.ttf  # Use different font
+```
+
+### Clean Build
+```bash
+make clean          # Remove all build artifacts
+```
+
+## Deployment
+
+Deploy to target device using long options for clarity:
+
+```bash
+# Basic deployment
+make deploy TARGET_HOST=panelkit
+
+# With custom user and directory
+make deploy TARGET_HOST=192.168.1.100 TARGET_USER=pi TARGET_PATH=/opt/panelkit
+
+# Direct script usage
+./scripts/deploy.sh --host panelkit --user pi --target-dir /tmp/panelkit
+```
+
+### Target Device Setup
+
+After deployment, on the target device:
+
+```bash
+cd /tmp/panelkit
+make setup          # Setup permissions and directories
+make install        # Install binary and systemd service
+make start          # Start the service
+make logs           # View logs
+```
+
+## Dependencies
+
+- **Build**: CMake, Docker (for cross-compilation)
+- **Runtime**: SDL2, SDL2_ttf, libcurl, pthread
+- **Target**: ARM64 Linux, systemd
+
+## Controls
+
+- **Swipe horizontally**: Navigate between pages
+- **Swipe vertically**: Scroll content  
+- **Tap**: Activate buttons
+- **D key**: Toggle debug overlay
+- **ESC key**: Exit application
+
+## Logging
+
+Logs are written to `/var/log/panelkit/panelkit.log` for easy remote debugging and analysis.
+
+## Configuration
+
+Key variables in `Makefile`:
+- `TARGET_HOST`: SSH hostname or IP
+- `TARGET_USER`: SSH user (optional, uses SSH config if empty)
+- `TARGET_PATH`: Deployment directory
+- `DEFAULT_FONT`: Font to embed
 
 ## Pages
 
 - **Page 1**: Text display with customizable color
 - **Page 2**: Interactive buttons and API data display
-
-## Building and Running
-
-This project uses CMake for building. A convenient build script is provided:
-
-```bash
-# Build and run the application
-./build.sh
-
-# Build only, without running
-./build.sh build
-
-# Clean build files
-./build.sh clean
-```
-
-## Dependencies
-
-- SDL2
-- SDL2_ttf
-- libcurl
-- pthread
-- Standard C libraries
-
-## Controls
-
-- **Swipe horizontally**: Navigate between pages
-- **Swipe vertically**: Scroll content
-- **Tap**: Activate buttons
-- **D key**: Toggle debug overlay
-- **ESC key**: Exit application
