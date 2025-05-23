@@ -12,13 +12,16 @@ HOST_ARCH       = $(shell uname -m | sed 's/x86_64/x86_64/' | sed 's/aarch64/arm
 
 # Font Configuration  
 DEFAULT_FONT    = font-sans-regular.ttf
+FONT_GEN_DIR    = $(FONTS_DIR)/generated
+FONT_HEADER     = $(FONT_GEN_DIR)/embedded_font.h
+FONT_SOURCE     = $(FONTS_DIR)/$(DEFAULT_FONT)
 
 # Deployment Configuration
 TARGET_HOST     = panelkit
 TARGET_USER     = 
 TARGET_PATH     = /tmp/panelkit
 
-.PHONY: help clean host target deploy font run
+.PHONY: help clean host target deploy run
 
 # Default target shows help
 help:
@@ -33,7 +36,6 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  help    - Show this help message (default)"
-	@echo "  font    - Embed font ($(DEFAULT_FONT)) into C header"
 	@echo "  host    - Build for host development/testing"
 	@echo "  target  - Cross-compile for target device ($(TARGET_ARCH))"
 	@echo "  run     - Build and run on host"
@@ -49,14 +51,19 @@ help:
 	@echo "  make target TARGET_HOST=192.168.1.100"
 	@echo "  make deploy TARGET_USER=brandon"
 
-font:
-	@echo "Embedding font: $(DEFAULT_FONT)"
-	@cd $(FONTS_DIR) && ./embed_font.sh $(DEFAULT_FONT) ../$(SRC_DIR)
+# Create font generation directory
+$(FONT_GEN_DIR):
+	@mkdir -p $@
 
-host: font
+# Generate embedded font header only if source font is newer
+$(FONT_HEADER): $(FONT_SOURCE) | $(FONT_GEN_DIR)
+	@echo "Embedding font: $(DEFAULT_FONT)"
+	@cd $(FONTS_DIR) && ./embed_font.sh $(DEFAULT_FONT) generated
+
+host: $(FONT_HEADER)
 	@./$(SCRIPTS_DIR)/build_host.sh
 
-target: font
+target: $(FONT_HEADER)
 	@./$(SCRIPTS_DIR)/build_target.sh
 
 run: host
@@ -80,4 +87,5 @@ deploy: target
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(BUILD_DIR)/
+	@rm -rf $(FONT_GEN_DIR)/
 	@echo "Build artifacts cleaned"

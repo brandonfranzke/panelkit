@@ -62,3 +62,6 @@ cmake-build-*/
 # Temporary files
 *.log
 *.tmp
+
+# Generated font files
+fonts/generated/

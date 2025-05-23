@@ -89,6 +89,8 @@ else()
     include_directories(${SDL2_INCLUDE_DIRS} ${SDL2_TTF_INCLUDE_DIRS})
 endif()
 include_directories(${CURL_INCLUDE_DIRS})
+# Include generated font directory
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/fonts/generated)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
