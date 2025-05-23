@@ -86,10 +86,19 @@ RUN mkdir build && cd build && \
     -DSDL_DIRECTX=OFF \
     -DSDL_RENDER_D3D=OFF \
     -DSDL_DUMMYVIDEO=ON \
-    -DSDL_KMSDRM=ON \
+    -DSDL_OFFSCREEN=ON \
+    -DSDL_KMSDRM=OFF \
+    -DSDL_FBDEV=OFF \
     -DSDL_OPENGL=OFF \
     -DSDL_OPENGLES=OFF \
     -DSDL_VULKAN=OFF \
+    -DSDL_LOADSO=OFF \
+    -DSDL_DLOPEN=OFF \
+    -DSDL_THREADS=ON \
+    -DSDL_TIMERS=ON \
+    -DSDL_FILE=ON \
+    -DSDL_FILESYSTEM=ON \
+    -DSDL_POWER=OFF \
     && make -j$(nproc) \
     && make install
 
@@ -115,8 +124,36 @@ RUN mkdir build && cd build && \
     && make -j$(nproc) \
     && make install
 
-# Install minimal curl (static)
-RUN apt-get install -y libcurl4-openssl-dev:arm64
+# Build static curl
+WORKDIR /build
+RUN wget https://curl.se/download/curl-8.5.0.tar.gz && \
+    tar xzf curl-8.5.0.tar.gz && \
+    cd curl-8.5.0 && \
+    ./configure \
+        --host=aarch64-linux-gnu \
+        --prefix=/usr/local/aarch64 \
+        --disable-shared \
+        --enable-static \
+        --with-openssl \
+        --disable-ldap \
+        --disable-rtsp \
+        --disable-telnet \
+        --disable-tftp \
+        --disable-pop3 \
+        --disable-imap \
+        --disable-smb \
+        --disable-smtp \
+        --disable-gopher \
+        --disable-mqtt \
+        --disable-manual \
+        --disable-docs \
+        --without-libidn2 \
+        --without-librtmp \
+        --without-libpsl \
+        --without-nghttp2 \
+        --without-zstd \
+        && make -j$(nproc) \
+        && make install
 
 WORKDIR /project
 

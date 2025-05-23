@@ -12,6 +12,7 @@
 
 // Core includes
 #include "core/logger.h"
+#include "display/display_backend.h"
 
 // Embedded font data
 #include "embedded_font.h"
@@ -23,21 +24,28 @@
 // #define FONT_PATH "../fonts/dejavu-sans.ttf"             // DejaVu Sans (good for embedded)
 // #define FONT_PATH "/System/Library/Fonts/Helvetica.ttc" // Helvetica (macOS only)
 
-// Screen dimensions
+// Default screen dimensions
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
 
-// Button dimensions (per specification)
-#define BUTTON_WIDTH (SCREEN_WIDTH / 2)
-#define BUTTON_HEIGHT ((SCREEN_HEIGHT * 2) / 3)
+// Actual runtime dimensions (will be set from display backend)
+static int actual_width = SCREEN_WIDTH;
+static int actual_height = SCREEN_HEIGHT;
+
+// Button dimensions (calculated dynamically)
+#define BUTTON_WIDTH (actual_width / 2)
+#define BUTTON_HEIGHT ((actual_height * 2) / 3)
 #define BUTTON_PADDING 20
 
 // Page indicator
 #define PAGE_INDICATOR_RADIUS 4
 #define PAGE_INDICATOR_SPACING 16
-#define PAGE_INDICATOR_Y (SCREEN_HEIGHT - 20)
+#define PAGE_INDICATOR_Y_OFFSET 20  // Distance from bottom
 #define PAGE_INDICATOR_CONTAINER_PADDING 12
 #define PAGE_INDICATOR_CONTAINER_HEIGHT 24 // Fixed height for pill/capsule
+
+// Helper macros for dynamic dimensions
+#define PAGE_INDICATOR_Y (actual_height - PAGE_INDICATOR_Y_OFFSET)
 
 // Gesture thresholds
 #define CLICK_TIMEOUT_MS 300         // Time in ms to consider a press a "click" vs "hold"
@@ -83,6 +91,7 @@ typedef struct {
 // Global variables
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
+DisplayBackend* display_backend = NULL;  // Display abstraction
 TTF_Font* font = NULL;
 TTF_Font* large_font = NULL;
 TTF_Font* small_font = NULL; // Smaller font for API data
@@ -220,56 +229,101 @@ int main(int argc, char* argv[]) {
         log_debug("  argv[%d] = %s", i, argv[i]);
     }
     
-    // Initialize SDL
-    log_state_change("SDL", "NONE", "INITIALIZING");
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        LOG_SDL_ERROR("SDL initialization failed");
+    // Parse command line for display options
+    DisplayBackendType backend_type = DISPLAY_BACKEND_AUTO;
+    int display_width = SCREEN_WIDTH;
+    int display_height = SCREEN_HEIGHT;
+    bool portrait_mode = false;
+    
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--display-backend") == 0 && i + 1 < argc) {
+            const char* backend = argv[i + 1];
+            if (strcmp(backend, "sdl") == 0) {
+                backend_type = DISPLAY_BACKEND_SDL;
+            } else if (strcmp(backend, "sdl_drm") == 0) {
+                backend_type = DISPLAY_BACKEND_SDL_DRM;
+            }
+            log_info("Display backend requested: %s", backend);
+            i++; // Skip the argument value
+        } else if (strcmp(argv[i], "--portrait") == 0) {
+            portrait_mode = true;
+            log_info("Portrait mode requested");
+        } else if (strcmp(argv[i], "--width") == 0 && i + 1 < argc) {
+            display_width = atoi(argv[i + 1]);
+            log_info("Custom width requested: %d", display_width);
+            i++; // Skip the argument value
+        } else if (strcmp(argv[i], "--height") == 0 && i + 1 < argc) {
+            display_height = atoi(argv[i + 1]);
+            log_info("Custom height requested: %d", display_height);
+            i++; // Skip the argument value
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            printf("PanelKit - Touch UI Application\n");
+            printf("Usage: %s [options]\n", argv[0]);
+            printf("Options:\n");
+            printf("  --display-backend <sdl|sdl_drm>  Select display backend\n");
+            printf("  --portrait                       Use portrait mode (swap width/height)\n");
+            printf("  --width <pixels>                 Set display width\n");
+            printf("  --height <pixels>                Set display height\n");
+            printf("  --help, -h                       Show this help\n");
+            logger_shutdown();
+            return 0;
+        }
+    }
+    
+    // Apply portrait mode if requested
+    if (portrait_mode) {
+        int temp = display_width;
+        display_width = display_height;
+        display_height = temp;
+        log_info("Portrait mode: %dx%d", display_width, display_height);
+    }
+    
+    // Initialize display backend
+    log_state_change("Display", "NONE", "INITIALIZING");
+    DisplayConfig display_config = {
+        .width = display_width,
+        .height = display_height,
+        .title = "PanelKit",
+        .backend_type = backend_type,
+        .fullscreen = false,
+        .vsync = true
+    };
+    
+    display_backend = display_backend_create(&display_config);
+    if (!display_backend) {
+        log_error("Failed to create display backend");
         logger_shutdown();
         return 1;
     }
-    log_state_change("SDL", "INITIALIZING", "READY");
+    
+    // Get window and renderer from backend
+    window = display_backend->window;
+    renderer = display_backend->renderer;
+    
+    // Update screen dimensions from actual display
+    actual_width = display_backend->actual_width;
+    actual_height = display_backend->actual_height;
+    
+    if (actual_width != SCREEN_WIDTH || actual_height != SCREEN_HEIGHT) {
+        log_info("Display size adjusted: %dx%d -> %dx%d",
+                 SCREEN_WIDTH, SCREEN_HEIGHT,
+                 actual_width, actual_height);
+    }
+    
+    log_state_change("Display", "INITIALIZING", "READY");
+    log_display_info(display_backend->actual_width, 
+                     display_backend->actual_height,
+                     display_backend->name);
     
     // Initialize SDL_ttf
     log_state_change("SDL_ttf", "NONE", "INITIALIZING");
     if (TTF_Init() < 0) {
         log_error("SDL_ttf initialization failed: %s", TTF_GetError());
-        SDL_Quit();
+        display_backend_destroy(display_backend);
         logger_shutdown();
         return 1;
     }
     log_state_change("SDL_ttf", "INITIALIZING", "READY");
-    
-    // Create window
-    log_info("Creating window: %dx%d", SCREEN_WIDTH, SCREEN_HEIGHT);
-    window = SDL_CreateWindow("PanelKit", 
-                            SDL_WINDOWPOS_CENTERED, 
-                            SDL_WINDOWPOS_CENTERED, 
-                            SCREEN_WIDTH, SCREEN_HEIGHT, 
-                            SDL_WINDOW_SHOWN);
-    if (window == NULL) {
-        LOG_SDL_ERROR("Window creation failed");
-        TTF_Quit();
-        SDL_Quit();
-        logger_shutdown();
-        return 1;
-    }
-    log_state_change("Window", "NONE", "CREATED");
-    
-    // Create renderer
-    log_info("Creating renderer");
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    if (renderer == NULL) {
-        LOG_SDL_ERROR("Renderer creation failed");
-        SDL_DestroyWindow(window);
-        TTF_Quit();
-        SDL_Quit();
-        logger_shutdown();
-        return 1;
-    }
-    log_state_change("Renderer", "NONE", "CREATED");
-    
-    // Log display info after renderer creation
-    log_display_info(SCREEN_WIDTH, SCREEN_HEIGHT, "SDL");
     
     // Load embedded fonts
     SDL_RWops* font_rw_24 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
@@ -281,10 +335,8 @@ int main(int argc, char* argv[]) {
     small_font = TTF_OpenFontRW(font_rw_18, 1, 18);     // 1 = freesrc
     if (font == NULL || large_font == NULL || small_font == NULL) {
         log_error("Font loading failed: %s", TTF_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
+        display_backend_destroy(display_backend);
         TTF_Quit();
-        SDL_Quit();
         logger_shutdown();
         return 1;
     }
@@ -508,16 +560,16 @@ int main(int argc, char* argv[]) {
             render_page(current_page, 0);
         } else {
             // Transitioning between pages (either by dragging or animating)
-            float current_offset = page_transition * SCREEN_WIDTH;
+            float current_offset = page_transition * actual_width;
             
             if (target_page > current_page) {
                 // Moving to next page, current slides left (negative transition)
                 render_page(current_page, current_offset);
-                render_page(target_page, SCREEN_WIDTH + current_offset);
+                render_page(target_page, actual_width + current_offset);
             } else if (target_page < current_page) {
                 // Moving to previous page, current slides right (positive transition)
                 render_page(current_page, current_offset);
-                render_page(target_page, -SCREEN_WIDTH + current_offset);
+                render_page(target_page, -actual_width + current_offset);
             } else {
                 // Elastic bounce at edges (without showing another page)
                 render_page(current_page, current_offset);
@@ -532,7 +584,7 @@ int main(int argc, char* argv[]) {
         // Draw debug overlay if enabled
         if (show_debug) {
             // Draw semi-transparent background
-            SDL_Rect debug_bg = {0, 0, SCREEN_WIDTH, 60};
+            SDL_Rect debug_bg = {0, 0, actual_width, 60};
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
             SDL_RenderFillRect(renderer, &debug_bg);
@@ -548,19 +600,22 @@ int main(int argc, char* argv[]) {
                 
             sprintf(status, "Page: %d | Gesture: %s | FPS: %d", 
                     current_page + 1, gesture_name, fps);
-            draw_text(status, SCREEN_WIDTH / 2, 15, (SDL_Color){255, 255, 255, 255});
+            draw_text(status, actual_width / 2, 15, (SDL_Color){255, 255, 255, 255});
             
             // Gesture info
             char gesture_info[128];
             sprintf(gesture_info, "Button: %d | Page: %d | Transition: %.2f", 
                     gesture_button, gesture_page, page_transition);
-            draw_text(gesture_info, SCREEN_WIDTH / 2, 40, (SDL_Color){200, 200, 200, 255});
+            draw_text(gesture_info, actual_width / 2, 40, (SDL_Color){200, 200, 200, 255});
             
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
         
         // Present renderer
         SDL_RenderPresent(renderer);
+        
+        // Present to display hardware (needed for DRM backend)
+        display_backend_present(display_backend);
         
         // Cap frame rate
         frame_time = SDL_GetTicks() - frame_start;
@@ -580,10 +635,11 @@ int main(int argc, char* argv[]) {
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
     TTF_CloseFont(small_font);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    
+    // Display backend handles window/renderer cleanup
+    display_backend_destroy(display_backend);
+    
     TTF_Quit();
-    SDL_Quit();
     
     log_info("=== PanelKit Shutdown Complete ===");
     logger_shutdown();
@@ -630,7 +686,7 @@ void initialize_pages() {
     
     // Calculate max scroll for page 2 (add space for title)
     int total_content_height = 90 + BUTTON_PADDING + pages[1].button_count * (BUTTON_HEIGHT + BUTTON_PADDING);
-    pages[1].max_scroll = total_content_height - SCREEN_HEIGHT;
+    pages[1].max_scroll = total_content_height - actual_height;
     if (pages[1].max_scroll < 0) pages[1].max_scroll = 0;
 }
 
@@ -658,22 +714,22 @@ void render_page(int page_index, float offset_x) {
     // Create clip rect for the page - use full height since indicators will float on top
     SDL_Rect page_rect = {
         (int)offset_x, 0, 
-        SCREEN_WIDTH, SCREEN_HEIGHT
+        actual_width, actual_height
     };
     SDL_RenderSetClipRect(renderer, &page_rect);
     
     if (page_index == 0) {
         // Page 1 - Text page
         // Draw page title
-        draw_large_text(pages[0].title, SCREEN_WIDTH / 2 + (int)offset_x, 60, 
+        draw_large_text(pages[0].title, actual_width / 2 + (int)offset_x, 60, 
                       (SDL_Color){255, 255, 255, 255});
         
         // Draw text content
-        draw_text(page1_text, SCREEN_WIDTH / 2 + (int)offset_x, 120, 
+        draw_text(page1_text, actual_width / 2 + (int)offset_x, 120, 
                 text_colors[page1_text_color]);
         
         // Draw color change button
-        int button_x = (SCREEN_WIDTH - BUTTON_WIDTH) / 2;
+        int button_x = (actual_width - BUTTON_WIDTH) / 2;
         int button_y = 200;
         
         // Determine button state
@@ -704,13 +760,13 @@ void render_page(int page_index, float offset_x) {
         SDL_Rect button_area_rect = {
             (int)offset_x, 0, 
             BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING, // Width includes left padding, button width, and right padding
-            SCREEN_HEIGHT
+            actual_height
         };
         SDL_RenderSetClipRect(renderer, &button_area_rect);
         
         // Draw page title in the button area (scrolls with content)
         int title_y = 60 - scroll_position;
-        if (title_y >= 0 && title_y <= SCREEN_HEIGHT) {
+        if (title_y >= 0 && title_y <= actual_height) {
             draw_large_text(pages[1].title, (BUTTON_PADDING + BUTTON_WIDTH) / 2 + (int)offset_x, title_y, 
                           (SDL_Color){255, 255, 255, 255});
         }
@@ -720,7 +776,7 @@ void render_page(int page_index, float offset_x) {
             int button_y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING) + 90 - scroll_position; // Add space for title
             
             // Skip buttons that are completely outside the visible area
-            if (button_y + BUTTON_HEIGHT < 0 || button_y > SCREEN_HEIGHT) {
+            if (button_y + BUTTON_HEIGHT < 0 || button_y > actual_height) {
                 continue;
             }
             
@@ -745,8 +801,8 @@ void render_page(int page_index, float offset_x) {
         // Now set clip rect for the fixed API data area on the right side
         SDL_Rect api_area_rect = {
             BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING + (int)offset_x, 0,
-            SCREEN_WIDTH - (BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING),
-            SCREEN_HEIGHT
+            actual_width - (BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING),
+            actual_height
         };
         SDL_RenderSetClipRect(renderer, &api_area_rect);
         
@@ -768,7 +824,7 @@ void render_page_indicators(int current, int total, float transition) {
     // Calculate precise positions for proper symmetry
     int container_width = indicator_width + PAGE_INDICATOR_CONTAINER_PADDING * 2;
     int container_height = PAGE_INDICATOR_CONTAINER_HEIGHT; // Fixed height for capsule
-    int container_x = (SCREEN_WIDTH - container_width) / 2;
+    int container_x = (actual_width - container_width) / 2;
     int container_y = PAGE_INDICATOR_Y - container_height / 2;
     
     // The radius for the capsule ends is exactly half the height
@@ -938,7 +994,7 @@ void update_gesture(int x, int y) {
     else if (current_gesture == GESTURE_DRAG_HORZ) {
         // Horizontal dragging - page swiping
         int delta_x = x - gesture_start_x;
-        float normalized_delta = (float)delta_x / SCREEN_WIDTH; // Convert to 0.0-1.0 scale
+        float normalized_delta = (float)delta_x / actual_width; // Convert to 0.0-1.0 scale
         
         // Start dragging transition if not already in one
         if (transition_state == TRANSITION_NONE) {
@@ -1134,7 +1190,7 @@ int get_button_at_position(int x, int y, int scroll_offset) {
     // Check which page we're on
     if (current_page == 0) {
         // Page 1 has just one centered button
-        int button_x = (SCREEN_WIDTH - BUTTON_WIDTH) / 2;
+        int button_x = (actual_width - BUTTON_WIDTH) / 2;
         int button_y = 200;
         int button_height = BUTTON_HEIGHT / 2;
         

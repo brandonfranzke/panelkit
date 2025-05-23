@@ -27,9 +27,9 @@ if(EMBEDDED_BUILD)
     set(SDL2_INCLUDE_DIRS "/usr/local/aarch64/include/SDL2")
     set(SDL2_TTF_INCLUDE_DIRS "/usr/local/aarch64/include/SDL2")
     
-    # Static curl with minimal dynamic deps
-    set(CURL_STATIC_LIBRARIES "-L/usr/lib/aarch64-linux-gnu -l:libcurl.a")
-    set(CURL_INCLUDE_DIRS "/usr/include/aarch64-linux-gnu;/usr/include")
+    # Static curl from our custom build
+    set(CURL_STATIC_LIBRARIES "/usr/local/aarch64/lib/libcurl.a")
+    set(CURL_INCLUDE_DIRS "/usr/local/aarch64/include")
     
     message(STATUS "Using minimal SDL2 from: ${CMAKE_PREFIX_PATH}")
 else()
@@ -85,6 +85,9 @@ set(SOURCES
 # Core library sources
 add_subdirectory(src/core)
 
+# Display backend sources
+add_subdirectory(src/display)
+
 # Include directories
 if(APPLE AND NOT EMBEDDED_BUILD)
     include_directories(${SDL2_INCLUDE_DIRS}/SDL2 ${SDL2_TTF_INCLUDE_DIRS}/SDL2)
@@ -105,6 +108,7 @@ if(EMBEDDED_BUILD)
     # Embedded build - minimal dependencies for SDL2 framebuffer-only + curl
     target_link_libraries(${PROJECT_NAME} 
         panelkit_core
+        panelkit_display
         ${SDL2_STATIC_LIBRARIES}
         ${SDL2_TTF_STATIC_LIBRARIES}
         ${CURL_STATIC_LIBRARIES}
@@ -113,24 +117,10 @@ if(EMBEDDED_BUILD)
         z
         brotlidec
         brotlicommon
-        # Network/security
+        # Network/security (minimal curl dependencies)
         ssl
         crypto
-        # Curl dependencies
-        psl
-        ssh2
-        ldap
-        lber
-        gssapi_krb5
-        krb5
-        k5crypto
-        com_err
-        krb5support
-        idn2
-        unistring
-        zstd
-        rtmp
-        nghttp2
+        z
         # System libraries
         m
         pthread
@@ -142,6 +132,7 @@ else()
     # Development build - standard dynamic linking
     target_link_libraries(${PROJECT_NAME} 
         panelkit_core
+        panelkit_display
         ${SDL2_LIBRARIES} 
         ${SDL2_TTF_LIBRARIES} 
         ${CURL_LIBRARIES} 

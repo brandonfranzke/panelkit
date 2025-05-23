@@ -21,18 +21,17 @@ TARGET_HOST     = panelkit
 TARGET_USER     = 
 TARGET_PATH     = /tmp/panelkit
 
+# Display Configuration for host testing
+DISPLAY_WIDTH   = 
+DISPLAY_HEIGHT  = 
+PORTRAIT        = 1
+DISPLAY_BACKEND = 
+
 .PHONY: help clean host target deploy run
 
 # Default target shows help
 help:
 	@echo "PanelKit SDL Build System"
-	@echo ""
-	@echo "Configuration:"
-	@echo "  PROJECT_NAME = $(PROJECT_NAME)"
-	@echo "  TARGET_HOST  = $(TARGET_HOST)"
-	@echo "  TARGET_USER  = $(TARGET_USER)"
-	@echo "  TARGET_ARCH  = $(TARGET_ARCH)"
-	@echo "  HOST_ARCH    = $(HOST_ARCH)"
 	@echo ""
 	@echo "Available targets:"
 	@echo "  help    - Show this help message (default)"
@@ -42,11 +41,30 @@ help:
 	@echo "  deploy  - Deploy to target device ($(TARGET_USER)@$(TARGET_HOST))"
 	@echo "  clean   - Clean all build artifacts"
 	@echo ""
+	@echo "Configuration:"
+	@echo "  PROJECT_NAME = $(PROJECT_NAME)"
+	@echo "  TARGET_HOST  = $(TARGET_HOST)"
+	@echo "  TARGET_USER  = $(TARGET_USER)"
+	@echo "  TARGET_ARCH  = $(TARGET_ARCH)"
+	@echo "  HOST_ARCH    = $(HOST_ARCH)"
+	@echo ""
+	@echo "Display Configuration (for 'make run'):"
+	@echo "  DISPLAY_WIDTH   = $(DISPLAY_WIDTH)"
+	@echo "  DISPLAY_HEIGHT  = $(DISPLAY_HEIGHT)"
+	@echo "  PORTRAIT        = $(PORTRAIT)"
+	@echo "  DISPLAY_BACKEND = $(DISPLAY_BACKEND)"
+	@echo ""
 	@echo "Build outputs:"
 	@echo "  Host:   ./$(BUILD_DIR)/host/$(PROJECT_NAME)"
 	@echo "  Target: ./$(BUILD_DIR)/target/$(PROJECT_NAME)"
 	@echo ""
-	@echo "To customize variables, edit this Makefile or use:"
+	@echo "Display testing examples:"
+	@echo "  make run                                    # Default (640x480)"
+	@echo "  make run PORTRAIT=1                         # Portrait mode (480x640)"
+	@echo "  make run DISPLAY_WIDTH=800 DISPLAY_HEIGHT=600  # Custom size"
+	@echo "  make run DISPLAY_BACKEND=sdl                # Force SDL backend"
+	@echo ""
+	@echo "Other examples:"
 	@echo "  make font DEFAULT_FONT=font-sans-dejavu.ttf"
 	@echo "  make target TARGET_HOST=192.168.1.100"
 	@echo "  make deploy TARGET_USER=brandon"
@@ -71,8 +89,13 @@ run: host
 		echo "Error: Host binary not found. Run 'make host' first."; \
 		exit 1; \
 	fi
-	@echo "Running $(PROJECT_NAME) on host..."
-	@./$(BUILD_DIR)/host/$(PROJECT_NAME)
+	$(eval RUN_ARGS := )
+	$(if $(DISPLAY_BACKEND),$(eval RUN_ARGS += --display-backend $(DISPLAY_BACKEND)))
+	$(if $(DISPLAY_WIDTH),$(eval RUN_ARGS += --width $(DISPLAY_WIDTH)))
+	$(if $(DISPLAY_HEIGHT),$(eval RUN_ARGS += --height $(DISPLAY_HEIGHT)))
+	$(if $(PORTRAIT),$(eval RUN_ARGS += --portrait))
+	@echo "Running $(PROJECT_NAME) on host$(if $(RUN_ARGS), with args:$(RUN_ARGS))..."
+	@./$(BUILD_DIR)/host/$(PROJECT_NAME) $(RUN_ARGS)
 
 deploy: target
 	@if [ ! -f "$(BUILD_DIR)/target/$(PROJECT_NAME)" ]; then \
