@@ -24,6 +24,19 @@ RUN apt-get update && apt-get install -y \
     librtmp-dev:arm64 \
     libnghttp2-dev:arm64
 
+# Build and install zlog from source for ARM64 (static library)
+WORKDIR /build
+RUN wget https://github.com/HardySimpson/zlog/archive/refs/tags/1.2.18.tar.gz && \
+    tar xzf 1.2.18.tar.gz && \
+    cd zlog-1.2.18 && \
+    # Build static library with position-independent code
+    CC=aarch64-linux-gnu-gcc CFLAGS="-fPIC" make && \
+    # Install to our cross-compilation prefix
+    make PREFIX=/usr/local/aarch64 install && \
+    # Ensure we have the static library
+    aarch64-linux-gnu-ar rcs /usr/local/aarch64/lib/libzlog.a src/*.o && \
+    cd .. && rm -rf zlog-1.2.18 1.2.18.tar.gz
+
 # Set up cross-compilation environment
 ENV PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 ENV CC=aarch64-linux-gnu-gcc

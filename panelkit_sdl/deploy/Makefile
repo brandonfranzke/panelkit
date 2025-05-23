@@ -5,6 +5,7 @@ APP         = panelkit
 TARGET_DIR  = /tmp/panelkit
 INSTALL_DIR = /usr/local/bin
 LOG_DIR     = /var/log/panelkit
+CONFIG_DIR  = /etc/panelkit
 SERVICE_DIR = /etc/systemd/system
 
 .PHONY: help setup install start stop restart status logs clean
@@ -34,6 +35,7 @@ setup:
 	sudo usermod -a -G input,video $(USER)
 	sudo chmod a+rw /dev/dri/card0 /dev/fb0 || true
 	sudo mkdir -p $(LOG_DIR)
+	sudo mkdir -p $(CONFIG_DIR)
 	mkdir -p $(TARGET_DIR)
 	@echo "Setup completed"
 
@@ -52,6 +54,10 @@ install: setup
 	sudo cp $(TARGET_DIR)/$(APP) $(INSTALL_DIR)/
 	sudo chmod +x $(INSTALL_DIR)/$(APP)
 	sudo cp $(TARGET_DIR)/$(APP).service $(SERVICE_DIR)/
+	@if [ -d "$(TARGET_DIR)/config" ]; then \
+		sudo cp -r $(TARGET_DIR)/config/* $(CONFIG_DIR)/; \
+		echo "Configuration files installed to $(CONFIG_DIR)"; \
+	fi
 	sudo systemctl daemon-reload
 	sudo systemctl enable $(APP)
 	@echo "Service installed and enabled"

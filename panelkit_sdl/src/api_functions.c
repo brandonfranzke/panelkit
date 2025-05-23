@@ -8,6 +8,7 @@
 #include <string.h>
 #include <curl/curl.h>
 #include <pthread.h>
+#include "core/logger.h"
 
 // External API response struct and renderer
 extern SDL_Renderer* renderer;
@@ -196,7 +197,7 @@ void parse_api_response() {
     api_response.is_ready = true;
     api_response.is_loading = false;
     
-    printf("Loaded user: %s, %d, %s\n", api_response.name, api_response.age, api_response.location);
+    log_info("API user loaded: %s, age %d, %s", api_response.name, api_response.age, api_response.location);
 }
 
 // Thread function to fetch API data
@@ -230,7 +231,7 @@ void* fetch_api_data(void* arg) {
         
         // Check for errors
         if (res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            log_error("API request failed: %s", curl_easy_strerror(res));
             pthread_mutex_lock(&api_response.mutex);
             api_response.is_loading = false;
             pthread_mutex_unlock(&api_response.mutex);
@@ -264,7 +265,7 @@ void update_api_data(Uint32 current_time, bool force_refresh) {
         if (pthread_create(&thread, NULL, fetch_api_data, NULL) == 0) {
             pthread_detach(thread);
             last_api_call_time = current_time;
-            printf("Starting API request %s\n", force_refresh ? "(forced)" : "(scheduled)");
+            log_debug("Starting API request %s", force_refresh ? "(forced)" : "(scheduled)");
         }
     }
 }
@@ -335,6 +336,7 @@ void init_api() {
     
     // Initialize curl globally
     curl_global_init(CURL_GLOBAL_DEFAULT);
+    log_info("API system initialized");
     
     // Initial API request
     last_api_call_time = SDL_GetTicks();

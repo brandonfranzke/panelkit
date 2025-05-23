@@ -108,6 +108,15 @@ else
     exit 1
 fi
 
+# Step 4: Copy configuration files
+echo -e "${YELLOW}4. Copying configuration files...${NC}"
+if scp -r config "$SSH_TARGET:$TARGET_DIRECTORY/"; then
+    echo -e "${GREEN}Configuration files copied successfully${NC}"
+else
+    echo -e "${RED}Failed to copy configuration files${NC}"
+    exit 1
+fi
+
 echo -e "${GREEN}Deployment completed successfully!${NC}"
 echo -e "${YELLOW}Files deployed to: $SSH_TARGET:$TARGET_DIRECTORY${NC}"
 echo "Binary: $TARGET_DIRECTORY/panelkit"

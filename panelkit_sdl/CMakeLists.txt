@@ -82,6 +82,9 @@ set(SOURCES
     src/api_functions.c
 )
 
+# Core library sources
+add_subdirectory(src/core)
+
 # Include directories
 if(APPLE AND NOT EMBEDDED_BUILD)
     include_directories(${SDL2_INCLUDE_DIRS}/SDL2 ${SDL2_TTF_INCLUDE_DIRS}/SDL2)
@@ -91,6 +94,8 @@ endif()
 include_directories(${CURL_INCLUDE_DIRS})
 # Include generated font directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/fonts/generated)
+# Include src directory for core/logger.h
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -99,6 +104,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 if(EMBEDDED_BUILD)
     # Embedded build - minimal dependencies for SDL2 framebuffer-only + curl
     target_link_libraries(${PROJECT_NAME} 
+        panelkit_core
         ${SDL2_STATIC_LIBRARIES}
         ${SDL2_TTF_STATIC_LIBRARIES}
         ${CURL_STATIC_LIBRARIES}
@@ -135,6 +141,7 @@ if(EMBEDDED_BUILD)
 else()
     # Development build - standard dynamic linking
     target_link_libraries(${PROJECT_NAME} 
+        panelkit_core
         ${SDL2_LIBRARIES} 
         ${SDL2_TTF_LIBRARIES} 
         ${CURL_LIBRARIES} 

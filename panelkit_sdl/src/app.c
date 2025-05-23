@@ -8,6 +8,10 @@
 #include <string.h>
 #include <curl/curl.h>
 #include <pthread.h>
+#include <unistd.h>
+
+// Core includes
+#include "core/logger.h"
 
 // Embedded font data
 #include "embedded_font.h"
@@ -186,44 +190,86 @@ void cleanup_api();
 void parse_api_response();
 
 int main(int argc, char* argv[]) {
-    (void)argc;
-    (void)argv;
+    // Initialize logging first
+    const char* config_paths[] = {
+        "/etc/panelkit/zlog.conf",      // Production location
+        "config/zlog.conf",              // Development location
+        NULL
+    };
+    
+    const char* config_file = NULL;
+    for (int i = 0; config_paths[i] != NULL; i++) {
+        if (access(config_paths[i], R_OK) == 0) {
+            config_file = config_paths[i];
+            break;
+        }
+    }
+    
+    if (!logger_init(config_file, "panelkit")) {
+        fprintf(stderr, "Warning: Using fallback logging\n");
+    }
+    
+    // Log startup
+    log_info("=== PanelKit Starting ===");
+    log_system_info();
+    log_build_info();
+    
+    // Log command line arguments
+    log_debug("Command line: %d arguments", argc);
+    for (int i = 0; i < argc; i++) {
+        log_debug("  argv[%d] = %s", i, argv[i]);
+    }
     
     // Initialize SDL
+    log_state_change("SDL", "NONE", "INITIALIZING");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("SDL initialization failed: %s\n", SDL_GetError());
+        LOG_SDL_ERROR("SDL initialization failed");
+        logger_shutdown();
         return 1;
     }
+    log_state_change("SDL", "INITIALIZING", "READY");
     
     // Initialize SDL_ttf
+    log_state_change("SDL_ttf", "NONE", "INITIALIZING");
     if (TTF_Init() < 0) {
-        printf("SDL_ttf initialization failed: %s\n", TTF_GetError());
+        log_error("SDL_ttf initialization failed: %s", TTF_GetError());
         SDL_Quit();
+        logger_shutdown();
         return 1;
     }
+    log_state_change("SDL_ttf", "INITIALIZING", "READY");
     
     // Create window
-    window = SDL_CreateWindow("Multi-Page App", 
+    log_info("Creating window: %dx%d", SCREEN_WIDTH, SCREEN_HEIGHT);
+    window = SDL_CreateWindow("PanelKit", 
                             SDL_WINDOWPOS_CENTERED, 
                             SDL_WINDOWPOS_CENTERED, 
                             SCREEN_WIDTH, SCREEN_HEIGHT, 
                             SDL_WINDOW_SHOWN);
     if (window == NULL) {
-        printf("Window creation failed: %s\n", SDL_GetError());
+        LOG_SDL_ERROR("Window creation failed");
         TTF_Quit();
         SDL_Quit();
+        logger_shutdown();
         return 1;
     }
+    log_state_change("Window", "NONE", "CREATED");
     
     // Create renderer
+    log_info("Creating renderer");
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) {
-        printf("Renderer creation failed: %s\n", SDL_GetError());
+        LOG_SDL_ERROR("Renderer creation failed");
         SDL_DestroyWindow(window);
         TTF_Quit();
         SDL_Quit();
+        logger_shutdown();
         return 1;
     }
+    log_state_change("Renderer", "NONE", "CREATED");
+    
+    // Log display info after renderer creation
+    log_display_info(SCREEN_WIDTH, SCREEN_HEIGHT, "SDL");
     
     // Load embedded fonts
     SDL_RWops* font_rw_24 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
@@ -234,13 +280,15 @@ int main(int argc, char* argv[]) {
     large_font = TTF_OpenFontRW(font_rw_32, 1, 32);     // 1 = freesrc  
     small_font = TTF_OpenFontRW(font_rw_18, 1, 18);     // 1 = freesrc
     if (font == NULL || large_font == NULL || small_font == NULL) {
-        printf("Font loading failed: %s\n", TTF_GetError());
+        log_error("Font loading failed: %s", TTF_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         TTF_Quit();
         SDL_Quit();
+        logger_shutdown();
         return 1;
     }
+    log_info("Fonts loaded successfully");
     
     // Initialize pages
     initialize_pages();
@@ -248,17 +296,18 @@ int main(int argc, char* argv[]) {
     // Initialize API
     init_api();
     
-    printf("Multi-Page Application\n");
-    printf("====================\n");
-    printf("Controls:\n");
-    printf("  • Swipe horizontally to switch pages\n");
-    printf("  • Swipe vertically to scroll content\n");
-    printf("  • Tap buttons to activate them\n");
-    printf("  • D: Toggle debug info\n");
-    printf("  • ESC: Quit\n\n");
-    printf("Pages:\n");
-    printf("  • Page 1: Text page with color changing button\n");
-    printf("  • Page 2: Buttons page with page navigation\n");
+    log_info("PanelKit initialized successfully");
+    log_info("Controls:");
+    log_info("  • Swipe horizontally to switch pages");
+    log_info("  • Swipe vertically to scroll content");
+    log_info("  • Tap buttons to activate them");
+    log_info("  • D: Toggle debug info");
+    log_info("  • ESC: Quit");
+    log_debug("Pages:");
+    log_debug("  • Page 1: Text page with color changing button");
+    log_debug("  • Page 2: Buttons page with page navigation");
+    
+    log_state_change("Application", "INITIALIZED", "RUNNING");
     
     // Timing variables
     Uint32 frame_start;
@@ -290,7 +339,7 @@ int main(int argc, char* argv[]) {
                     else if (e.key.keysym.sym == SDLK_d) {
                         // Toggle debug overlay
                         show_debug = !show_debug;
-                        printf("%s debug overlay\n", show_debug ? "Showing" : "Hiding");
+                        log_info("Debug overlay: %s", show_debug ? "enabled" : "disabled");
                     }
                     else if (e.key.keysym.sym == SDLK_LEFT) {
                         // Previous page
@@ -518,9 +567,15 @@ int main(int argc, char* argv[]) {
         if (frame_time < 16) {
             SDL_Delay(16 - frame_time); // ~60 FPS
         }
+        
+        // Log frame time periodically
+        log_frame_time((float)(SDL_GetTicks() - frame_start));
     }
     
     // Cleanup
+    log_state_change("Application", "RUNNING", "SHUTDOWN");
+    log_info("Shutting down...");
+    
     cleanup_api();
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
@@ -529,6 +584,9 @@ int main(int argc, char* argv[]) {
     SDL_DestroyWindow(window);
     TTF_Quit();
     SDL_Quit();
+    
+    log_info("=== PanelKit Shutdown Complete ===");
+    logger_shutdown();
     
     return 0;
 }
@@ -591,7 +649,7 @@ void transition_to_page(int page_index) {
             page_transition = 0.0f;
         }
         
-        printf("Starting transition to page %d\n", page_index + 1);
+        log_event("PAGE_TRANSITION", "from=%d to=%d", current_page, page_index);
     }
 }
 
@@ -703,7 +761,8 @@ void render_page(int page_index, float offset_x) {
 }
 
 // Render page indicator dots
-void render_page_indicators(int current, int total, float transition) { // transition param used in transition visuals
+void render_page_indicators(int current, int total, float transition) {
+    (void)transition; // Used for transition effects below
     int indicator_width = total * (PAGE_INDICATOR_RADIUS * 2 + PAGE_INDICATOR_SPACING) - PAGE_INDICATOR_SPACING;
     
     // Calculate precise positions for proper symmetry
@@ -818,8 +877,7 @@ void begin_gesture(int x, int y, int button_index) {
     last_mouse_x = x;
     last_mouse_y = y;
     
-    printf("Gesture started: POTENTIAL at (%d, %d), button: %d\n", 
-           x, y, button_index);
+    log_debug("Gesture started at (%d, %d), button: %d", x, y, button_index);
 }
 
 // Update an ongoing gesture
@@ -840,11 +898,11 @@ void update_gesture(int x, int y) {
         if (abs(distance_x) > abs(distance_y)) {
             // Horizontal drag - page swipe
             current_gesture = GESTURE_DRAG_HORZ;
-            printf("Gesture changed to DRAG_HORZ (distance: %.1f px)\n", distance);
+            log_debug("Gesture: horizontal drag detected (%.1f px)", distance);
         } else {
             // Vertical drag - content scroll
             current_gesture = GESTURE_DRAG_VERT;
-            printf("Gesture changed to DRAG_VERT (distance: %.1f px)\n", distance);
+            log_debug("Gesture: vertical drag detected (%.1f px)", distance);
         }
     }
     
@@ -873,7 +931,7 @@ void update_gesture(int x, int y) {
         
         // Log significant changes
         if (old_scroll != pages[current_page].scroll_position && abs(delta_y) > 5) {
-            printf("Scroll position: %d (delta: %d)\n", 
+            log_debug("Scroll position: %d (delta: %d)", 
                    pages[current_page].scroll_position, delta_y);
         }
     }
@@ -935,11 +993,11 @@ void end_gesture(int x, int y) {
     int distance_y = y - gesture_start_y;
     float distance = sqrt(distance_x * distance_x + distance_y * distance_y);
     
-    printf("Gesture ended: %s, time: %d ms, distance: %.1f px\n", 
+    log_debug("Gesture ended: %s, time: %dms, distance: %.1fpx", 
            current_gesture == GESTURE_POTENTIAL ? "POTENTIAL" :
            current_gesture == GESTURE_DRAG_VERT ? "DRAG_VERT" :
            current_gesture == GESTURE_DRAG_HORZ ? "DRAG_HORZ" :
-           current_gesture == GESTURE_HOLD ? "HOLD" : "?",
+           current_gesture == GESTURE_HOLD ? "HOLD" : "UNKNOWN",
            time_elapsed, distance);
     
     // If this was a potential gesture that didn't exceed thresholds,
@@ -976,12 +1034,12 @@ void end_gesture(int x, int y) {
                 // Continue to target page
                 page_transition = drag_offset;
                 transition_state = TRANSITION_ANIMATING;
-                printf("Swiping to page %d\n", target_page + 1);
+                log_event("PAGE_SWIPE", "to=%d", target_page);
             } else {
                 // Snap back to current page
                 transition_state = TRANSITION_ANIMATING;
                 // Keep same target and current page, but animate back to 0 offset
-                printf("Swiping back to page %d\n", current_page + 1);
+                log_debug("Swipe cancelled, returning to page %d", current_page);
             }
         } else {
             // Reset if dragging at page boundary
@@ -1003,7 +1061,7 @@ void end_gesture(int x, int y) {
 // Cancel the current gesture
 void cancel_gesture() {
     if (current_gesture != GESTURE_NONE) {
-        printf("Gesture canceled\n");
+        log_debug("Gesture cancelled");
         current_gesture = GESTURE_NONE;
         gesture_button = -1;
     }
@@ -1011,7 +1069,7 @@ void cancel_gesture() {
 
 // Handle a button click
 void handle_click(int button_index) {
-    printf("Button %d clicked on page %d\n", button_index + 1, gesture_page + 1);
+    log_event("BUTTON_CLICK", "button=%d page=%d", button_index, gesture_page);
     
     // Handle button actions based on page and button index
     if (gesture_page == 0) {
@@ -1019,7 +1077,7 @@ void handle_click(int button_index) {
         switch (button_index) {
             case 0: // Change text color
                 page1_text_color = (page1_text_color + 1) % 7;
-                printf("Changed text color to %d\n", page1_text_color);
+                log_info("Text color changed to index %d", page1_text_color);
                 break;
         }
     }
@@ -1029,7 +1087,7 @@ void handle_click(int button_index) {
             case 0: // Blue
                 // Set background to blue
                 bg_color = (SDL_Color){41, 128, 185, 255}; // Blue
-                printf("Set background to blue\n");
+                log_info("Background color set to blue");
                 break;
                 
             case 1: // Random
@@ -1037,14 +1095,14 @@ void handle_click(int button_index) {
                 bg_color.r = rand() % 256;
                 bg_color.g = rand() % 256;
                 bg_color.b = rand() % 256;
-                printf("Set background to random color (RGB: %d,%d,%d)\n", 
+                log_info("Background color set to RGB(%d,%d,%d)", 
                        bg_color.r, bg_color.g, bg_color.b);
                 break;
                 
             case 2: // Time
                 // Toggle time display
                 show_time = !show_time;
-                printf("%s time display\n", show_time ? "Showing" : "Hiding");
+                log_info("Time display: %s", show_time ? "enabled" : "disabled");
                 break;
                 
             case 3: // Go to Page 1
@@ -1056,7 +1114,7 @@ void handle_click(int button_index) {
                 
             case 4: // Refresh User
                 // Force refresh API data
-                printf("Refreshing user data...\n");
+                log_info("Refreshing user data");
                 Uint32 current_time = SDL_GetTicks();
                 update_api_data(current_time, true); // Force refresh
                 last_api_call_time = current_time;   // Reset the timer
@@ -1064,7 +1122,7 @@ void handle_click(int button_index) {
                 
             case 5: // Exit
                 // Exit application
-                printf("Exit button pressed, quitting...\n");
+                log_info("Exit button pressed");
                 quit = true;
                 break;
         }
