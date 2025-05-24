@@ -83,7 +83,10 @@ endif()
 # Source files
 set(SOURCES
     src/app.c
-    src/api_functions.c
+    # src/api_functions.c  # Temporarily disabled - API functions are in app.c
+    src/ui/gestures.c
+    src/ui/pages.c
+    src/ui/rendering.c
 )
 
 # Core library sources
@@ -109,6 +112,8 @@ include_directories(${CURL_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/fonts/generated)
 # Include src directory for core/logger.h
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Include src/ui directory for UI modules
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/ui)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})

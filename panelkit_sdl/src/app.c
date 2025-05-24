@@ -13,18 +13,15 @@
 #include "core/logger.h"
 #include "core/build_info.h"
 #include "display/display_backend.h"
-#include "input/input_handler.h"
-#include "input/input_debug.h"
+// Input handling is done directly through SDL events
+
+// UI modules
+#include "ui/gestures.h"
+#include "ui/pages.h"
+#include "ui/rendering.h"
 
 // Embedded font data
 #include "embedded_font.h"
-
-// Available fonts to test:
-//#define FONT_PATH "../fonts/LiberationSans-Regular.ttf"  // Liberation Sans (Helvetica-like)
-// #define FONT_PATH "../fonts/roboto-regular.ttf"                  // Roboto (Google's font)
-// #define FONT_PATH "../fonts/noto-sans-regular.ttf"               // Noto Sans (Google)
-// #define FONT_PATH "../fonts/dejavu-sans.ttf"             // DejaVu Sans (good for embedded)
-// #define FONT_PATH "/System/Library/Fonts/Helvetica.ttc" // Helvetica (macOS only)
 
 // Default screen dimensions
 #define SCREEN_WIDTH 640
@@ -39,62 +36,11 @@ static int actual_height = SCREEN_HEIGHT;
 #define BUTTON_HEIGHT ((actual_height * 2) / 3)
 #define BUTTON_PADDING 20
 
-// Page indicator
-#define PAGE_INDICATOR_RADIUS 4
-#define PAGE_INDICATOR_SPACING 16
-#define PAGE_INDICATOR_Y_OFFSET 20  // Distance from bottom
-#define PAGE_INDICATOR_CONTAINER_PADDING 12
-#define PAGE_INDICATOR_CONTAINER_HEIGHT 24 // Fixed height for pill/capsule
-
-// Helper macros for dynamic dimensions
-#define PAGE_INDICATOR_Y (actual_height - PAGE_INDICATOR_Y_OFFSET)
-
-// Gesture thresholds
-#define CLICK_TIMEOUT_MS 300         // Time in ms to consider a press a "click" vs "hold"
-#define DRAG_THRESHOLD_PX 10         // Minimum movement in pixels to consider a drag
-#define HOLD_THRESHOLD_MS 500        // Time in ms to consider a press a "hold" vs "click"
-#define PAGE_SWIPE_THRESHOLD_PX 100  // Minimum horizontal movement to trigger page change
-
-// Gesture states
-typedef enum {
-    GESTURE_NONE,         // No gesture in progress
-    GESTURE_POTENTIAL,    // Press detected, waiting to determine gesture type
-    GESTURE_CLICK,        // Quick press and release (under thresholds)
-    GESTURE_DRAG_VERT,    // Vertical dragging (scrolling)
-    GESTURE_DRAG_HORZ,    // Horizontal dragging (page swiping)
-    GESTURE_HOLD          // Press and hold (over time threshold)
-} GestureState;
-
-// Page transition states
-typedef enum {
-    TRANSITION_NONE,      // No transition in progress
-    TRANSITION_DRAGGING,  // User is actively dragging between pages
-    TRANSITION_ANIMATING  // Automatic animation after drag release
-} TransitionState;
-
-// Button states
-typedef enum {
-    BUTTON_NORMAL,
-    BUTTON_HOVER,
-    BUTTON_PRESSED,
-    BUTTON_HELD
-} ButtonState;
-
-// Page definition
-typedef struct {
-    int scroll_position;         // Vertical scroll position for this page
-    int max_scroll;              // Maximum scroll value for this page
-    const char* title;           // Page title
-    int button_count;            // Number of buttons on this page
-    char button_texts[9][64];    // Text for each button
-    SDL_Color button_colors[9];  // Color for each button
-} Page;
-
 // Global variables
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 DisplayBackend* display_backend = NULL;  // Display abstraction
-InputHandler* input_handler = NULL;     // Input abstraction
+// No input handler - we use SDL events directly
 TTF_Font* font = NULL;
 TTF_Font* large_font = NULL;
 TTF_Font* small_font = NULL; // Smaller font for API data
@@ -106,22 +52,18 @@ SDL_Color bg_color = {33, 33, 33, 255}; // Dark gray
 // Time display
 bool show_time = true; // Whether to show time on the third button
 
-// Pages
-int current_page = 0;  // Start on page 1 (0-indexed, so 0 is the first page)
-int total_pages = 2;   // Total number of pages
-Page pages[2];         // Array of pages
-float page_transition = 0.0f;  // For smooth page transitions (0.0 = current page, 1.0 = target page)
-int target_page = -1;          // Page we're transitioning to, or -1 if not transitioning
-TransitionState transition_state = TRANSITION_NONE; // Current transition state
-float drag_offset = 0.0f;      // Current drag offset for page transitions
-
-// Page indicator visibility
-bool show_indicators = false;   // Only show indicators during swipe and briefly after
-Uint32 indicator_hide_time = 0; // When to hide the indicators
-int indicator_alpha = 153;      // Indicator alpha value (60% opacity)
-bool indicator_fading = false;  // Whether indicator is currently fading out
-Uint32 fade_start_time = 0;     // When the fade animation started
-#define FADE_DURATION 400       // Fade duration in milliseconds
+// Page 1 specific
+char page1_text[256] = "Welcome to Page 1! Swipe right to see buttons.";
+int page1_text_color = 0; // 0=white, 1=red, 2=green, 3=blue, etc.
+SDL_Color text_colors[] = {
+    {255, 255, 255, 255}, // White
+    {255, 100, 100, 255}, // Red
+    {100, 255, 100, 255}, // Green
+    {100, 100, 255, 255}, // Blue
+    {255, 255, 100, 255}, // Yellow
+    {255, 100, 255, 255}, // Purple
+    {100, 255, 255, 255}, // Cyan
+};
 
 // API-related variables
 Uint32 last_api_call_time = 0;  // Used by API functions
@@ -146,29 +88,6 @@ typedef struct {
 
 ApiResponse api_response = {0};
 
-// Page 1 specific
-char page1_text[256] = "Welcome to Page 1! Swipe right to see buttons.";
-int page1_text_color = 0; // 0=white, 1=red, 2=green, 3=blue, etc.
-SDL_Color text_colors[] = {
-    {255, 255, 255, 255}, // White
-    {255, 100, 100, 255}, // Red
-    {100, 255, 100, 255}, // Green
-    {100, 100, 255, 255}, // Blue
-    {255, 255, 100, 255}, // Yellow
-    {255, 100, 255, 255}, // Purple
-    {100, 255, 255, 255}, // Cyan
-};
-
-// Gesture state tracking
-GestureState current_gesture = GESTURE_NONE;
-int gesture_button = -1;        // Button involved in current gesture, if any
-int gesture_page = -1;          // Page involved in current gesture, if any
-Uint32 gesture_start_time = 0;  // When the gesture started
-int gesture_start_x = 0;        // Starting X position
-int gesture_start_y = 0;        // Starting Y position
-int last_mouse_x = 0;           // Last mouse X for delta calculations
-int last_mouse_y = 0;           // Last mouse Y for delta calculations
-
 // Debug info
 bool show_debug = true;
 Uint32 frame_count = 0;
@@ -176,24 +95,12 @@ Uint32 fps_timer = 0;
 Uint32 fps = 0;
 
 // Function prototypes
-void render_button(int x, int y, int w, int h, const char* text, SDL_Color color, ButtonState state);
-void draw_text(const char* text, int x, int y, SDL_Color color);
-void draw_text_left(const char* text, int x, int y, SDL_Color color);
-void draw_small_text_left(const char* text, int x, int y, SDL_Color color, int max_width);
-void draw_large_text(const char* text, int x, int y, SDL_Color color);
-void begin_gesture(int x, int y, int button_index);
-void update_gesture(int x, int y);
-void end_gesture(int x, int y);
-void cancel_gesture();
-void handle_click(int button_index);
-void handle_touch_down(int x, int y, const char* source);
-void handle_touch_up(int x, int y, const char* source);
-void handle_touch_motion(int x, int y, const char* source);
-int get_button_at_position(int x, int y, int scroll_offset);
 void initialize_pages();
 void render_page(int page_index, float offset_x);
-void render_page_indicators(int current, int total, float transition);
-void transition_to_page(int page_index);
+int get_button_at_position(int x, int y, int scroll_offset);
+void handle_click(int button_index);
+void handle_drag(int delta_x, int delta_y, bool is_horizontal);
+void handle_swipe(float offset, bool is_complete);
 
 // API functions
 size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata);
@@ -203,6 +110,38 @@ void render_api_data(SDL_Renderer* renderer, int x, int y);
 void init_api();
 void cleanup_api();
 void parse_api_response();
+
+// Callback for button hit testing
+int button_hit_test(int x, int y, int page_index) {
+    Page* page = pages_get(page_index);
+    if (!page) return -1;
+    
+    return get_button_at_position(x, y, page->scroll_position);
+}
+
+// Callback for gesture clicks
+void on_gesture_click(int button_index) {
+    handle_click(button_index);
+}
+
+// Callback for gesture drags
+void on_gesture_drag(int delta_x, int delta_y, bool is_horizontal) {
+    if (!is_horizontal) {
+        // Vertical drag - update scroll
+        int current_page = pages_get_current();
+        pages_update_scroll(current_page, delta_y);
+    }
+}
+
+// Callback for gesture swipes
+void on_gesture_swipe(float offset, bool is_complete) {
+    pages_handle_swipe(offset, is_complete);
+}
+
+// Callback for page rendering
+void on_page_render(int page_index, float offset_x) {
+    render_page(page_index, offset_x);
+}
 
 int main(int argc, char* argv[]) {
     // Initialize logging first
@@ -304,422 +243,234 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Get window and renderer from backend
+    // Get the actual window and renderer
     window = display_backend->window;
     renderer = display_backend->renderer;
     
-    // Update screen dimensions from actual display
-    actual_width = display_backend->actual_width;
-    actual_height = display_backend->actual_height;
-    
-    if (actual_width != SCREEN_WIDTH || actual_height != SCREEN_HEIGHT) {
-        log_info("Display size adjusted: %dx%d -> %dx%d",
-                 SCREEN_WIDTH, SCREEN_HEIGHT,
-                 actual_width, actual_height);
+    if (!window || !renderer) {
+        log_error("Failed to get window or renderer from display backend");
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
     }
     
     log_state_change("Display", "INITIALIZING", "READY");
-    log_display_info(display_backend->actual_width, 
-                     display_backend->actual_height,
-                     display_backend->name);
     
-    // Initialize input handler
-    log_state_change("Input", "NONE", "INITIALIZING");
-    InputConfig input_config = {
-        .source_type = INPUT_SOURCE_SDL_NATIVE,  // Default to SDL native
-        .device_path = NULL,                      // Auto-detect
-        .auto_detect_devices = true,
-        .enable_mouse_emulation = false
-    };
-    
-    // If using SDL+DRM backend, switch to evdev input source
-    if (display_backend->type == DISPLAY_BACKEND_SDL_DRM) {
-        log_info("SDL+DRM backend detected, switching to evdev input source");
-        input_config.source_type = INPUT_SOURCE_LINUX_EVDEV;
-    }
-    
-    input_handler = input_handler_create(&input_config);
-    if (!input_handler) {
-        log_error("Failed to create input handler");
-        display_backend_destroy(display_backend);
-        logger_shutdown();
-        return 1;
-    }
-    
-    if (!input_handler_start(input_handler)) {
-        log_error("Failed to start input handler");
-        input_handler_destroy(input_handler);
-        display_backend_destroy(display_backend);
-        logger_shutdown();
-        return 1;
-    }
-    
-    log_state_change("Input", "INITIALIZING", "READY");
-    
-    // Log detailed SDL and input state (debug builds only)
-#ifdef DEBUG
-    build_log_sdl_info();
-    input_debug_log_state(input_handler);
-    input_debug_log_sdl_state();
-    
-    // If evdev, log device capabilities
-    if (input_handler->config.source_type == INPUT_SOURCE_LINUX_EVDEV &&
-        input_handler->config.device_path) {
-        input_debug_log_device_caps(input_handler->config.device_path);
-    }
-#endif
+    // Update actual dimensions from display
+    SDL_GetWindowSize(window, &actual_width, &actual_height);
+    log_info("Display initialized: %dx%d", actual_width, actual_height);
     
     // Initialize SDL_ttf
-    log_state_change("SDL_ttf", "NONE", "INITIALIZING");
-    if (TTF_Init() < 0) {
+    if (TTF_Init() == -1) {
         log_error("SDL_ttf initialization failed: %s", TTF_GetError());
-        input_handler_destroy(input_handler);
         display_backend_destroy(display_backend);
         logger_shutdown();
         return 1;
     }
-    log_state_change("SDL_ttf", "INITIALIZING", "READY");
     
-    // Load embedded fonts
-    SDL_RWops* font_rw_24 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
-    SDL_RWops* font_rw_32 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
-    SDL_RWops* font_rw_18 = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
-    
-    font = TTF_OpenFontRW(font_rw_24, 1, 24);           // 1 = freesrc
-    large_font = TTF_OpenFontRW(font_rw_32, 1, 32);     // 1 = freesrc  
-    small_font = TTF_OpenFontRW(font_rw_18, 1, 18);     // 1 = freesrc
-    if (font == NULL || large_font == NULL || small_font == NULL) {
-        log_error("Font loading failed: %s", TTF_GetError());
-        input_handler_destroy(input_handler);
-        display_backend_destroy(display_backend);
+    // Load embedded font from memory
+    SDL_RWops* font_rw = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
+    if (!font_rw) {
+        log_error("Failed to create RWops from embedded font data");
         TTF_Quit();
+        display_backend_destroy(display_backend);
         logger_shutdown();
         return 1;
     }
-    log_info("Fonts loaded successfully");
+    
+    // Load font at different sizes - don't close RWops, TTF_OpenFontRW handles it
+    font = TTF_OpenFontRW(font_rw, 1, 18);  // The '1' means SDL will free the RWops
+    if (!font) {
+        log_error("Failed to load font from embedded data: %s", TTF_GetError());
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Load same font at larger size
+    SDL_RWops* large_font_rw = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
+    large_font = TTF_OpenFontRW(large_font_rw, 1, 36);
+    if (!large_font) {
+        log_error("Failed to load large font: %s", TTF_GetError());
+        TTF_CloseFont(font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Load same font at smaller size
+    SDL_RWops* small_font_rw = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
+    small_font = TTF_OpenFontRW(small_font_rw, 1, 14);
+    if (!small_font) {
+        log_error("Failed to load small font: %s", TTF_GetError());
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    log_info("Fonts loaded successfully from embedded data");
+    
+    // Note: We don't use the input handler abstraction anymore
+    // We process SDL events directly for unified touch/mouse handling
+    
+    // Initialize modules
+    gestures_init(on_gesture_click, on_gesture_drag, on_gesture_swipe, button_hit_test);
+    pages_init(2, on_page_render);  // 2 pages
+    pages_set_dimensions(actual_width, actual_height);
+    rendering_init(renderer, font, large_font, small_font);
+    rendering_set_dimensions(actual_width, actual_height);
     
     // Initialize pages
     initialize_pages();
     
-    // Initialize API
+    // Initialize CURL for API calls
     init_api();
     
-    log_info("PanelKit initialized successfully");
-    log_info("Controls:");
-    log_info("  • Swipe horizontally to switch pages");
-    log_info("  • Swipe vertically to scroll content");
-    log_info("  • Tap buttons to activate them");
-    log_info("  • D: Toggle debug info");
-    log_info("  • ESC: Quit");
-    log_debug("Pages:");
-    log_debug("  • Page 1: Text page with color changing button");
-    log_debug("  • Page 2: Buttons page with page navigation");
-    
-    log_state_change("Application", "INITIALIZED", "RUNNING");
-    
-    // Timing variables
-    Uint32 frame_start;
-    Uint32 frame_time;
-    
-    // Initialize FPS timer
-    fps_timer = SDL_GetTicks();
+    // Force initial API fetch immediately
+    Uint32 init_time = SDL_GetTicks();
+    update_api_data(init_time, true); // Force refresh
+    last_api_call_time = init_time;
     
     // Main loop
+    Uint32 last_time = SDL_GetTicks();
     while (!quit) {
-        frame_start = SDL_GetTicks();
-        
-        // Get current mouse position
-        int mouse_x, mouse_y;
-        SDL_GetMouseState(&mouse_x, &mouse_y);
-        
-        // Event handling
-        SDL_Event e;
-        while (SDL_PollEvent(&e) != 0) {
-            switch (e.type) {
-                case SDL_QUIT:
-                    quit = true;
-                    break;
-                
-                case SDL_KEYDOWN:
-                    if (e.key.keysym.sym == SDLK_ESCAPE) {
-                        quit = true;
-                    }
-                    else if (e.key.keysym.sym == SDLK_d) {
-                        // Toggle debug overlay
-                        show_debug = !show_debug;
-                        log_info("Debug overlay: %s", show_debug ? "enabled" : "disabled");
-                    }
-                    else if (e.key.keysym.sym == SDLK_LEFT) {
-                        // Previous page
-                        if (current_page > 0 && target_page == -1) {
-                            transition_to_page(current_page - 1);
-                        }
-                    }
-                    else if (e.key.keysym.sym == SDLK_RIGHT) {
-                        // Next page
-                        if (current_page < total_pages - 1 && target_page == -1) {
-                            transition_to_page(current_page + 1);
-                        }
-                    }
-                    else if (e.key.keysym.sym == SDLK_UP) {
-                        // Scroll up
-                        pages[current_page].scroll_position -= 50;
-                        if (pages[current_page].scroll_position < 0) {
-                            pages[current_page].scroll_position = 0;
-                        }
-                    }
-                    else if (e.key.keysym.sym == SDLK_DOWN) {
-                        // Scroll down
-                        pages[current_page].scroll_position += 50;
-                        if (pages[current_page].scroll_position > pages[current_page].max_scroll) {
-                            pages[current_page].scroll_position = pages[current_page].max_scroll;
-                        }
-                    }
-                    break;
-                
-                case SDL_MOUSEBUTTONDOWN:
-                    if (e.button.button == SDL_BUTTON_LEFT) {
-                        // Translate mouse event to touch event for unified handling
-                        handle_touch_down(e.button.x, e.button.y, "mouse");
-                    }
-                    break;
-                
-                case SDL_MOUSEBUTTONUP:
-                    if (e.button.button == SDL_BUTTON_LEFT) {
-                        // Translate mouse event to touch event for unified handling
-                        handle_touch_up(e.button.x, e.button.y, "mouse");
-                    }
-                    break;
-                
-                case SDL_MOUSEMOTION:
-                    // Translate mouse motion to touch motion for unified handling
-                    handle_touch_motion(e.motion.x, e.motion.y, "mouse");
-                    break;
-                
-                case SDL_FINGERDOWN:
-                    // Touch events: convert normalized coordinates to pixel coordinates
-                    {
-                        int touch_x = (int)(e.tfinger.x * actual_width);
-                        int touch_y = (int)(e.tfinger.y * actual_height);
-                        handle_touch_down(touch_x, touch_y, "touch");
-                    }
-                    break;
-                
-                case SDL_FINGERUP:
-                    // Touch release: convert normalized coordinates to pixel coordinates
-                    {
-                        int touch_x = (int)(e.tfinger.x * actual_width);
-                        int touch_y = (int)(e.tfinger.y * actual_height);
-                        handle_touch_up(touch_x, touch_y, "touch");
-                    }
-                    break;
-                
-                case SDL_FINGERMOTION:
-                    // Touch movement: convert normalized coordinates to pixel coordinates
-                    {
-                        int touch_x = (int)(e.tfinger.x * actual_width);
-                        int touch_y = (int)(e.tfinger.y * actual_height);
-                        handle_touch_motion(touch_x, touch_y, "touch");
-                    }
-                    break;
-            }
-        }
-        
-        // Process page transition animation
-        if (transition_state == TRANSITION_DRAGGING) {
-            // During dragging, page_transition follows drag_offset directly
-            page_transition = drag_offset;
-        }
-        else if (transition_state == TRANSITION_ANIMATING) {
-            // Automatic animation after drag ends (moderate swipe speed)
-            float transition_speed = 0.06f; // Slower, more natural swipe
-            
-            if (target_page > current_page) {
-                // Moving to next page (negative transition)
-                if (page_transition > -1.0f) {
-                    page_transition -= transition_speed; // Move toward -1.0
-                } else {
-                    // Transition complete
-                    page_transition = 0.0f;
-                    current_page = target_page;
-                    target_page = -1;
-                    transition_state = TRANSITION_NONE;
-                }
-            } else if (target_page < current_page) {
-                // Moving to previous page (positive transition)
-                if (page_transition < 1.0f) {
-                    page_transition += transition_speed; // Move toward 1.0
-                } else {
-                    // Transition complete
-                    page_transition = 0.0f;
-                    current_page = target_page;
-                    target_page = -1;
-                    transition_state = TRANSITION_NONE;
-                }
-            } else {
-                // Snapping back to current page
-                float direction = (page_transition > 0) ? -1.0f : 1.0f;
-                page_transition += direction * transition_speed;
-                
-                // Check if we've returned to initial position
-                if ((direction < 0 && page_transition <= 0.0f) || 
-                    (direction > 0 && page_transition >= 0.0f)) {
-                    page_transition = 0.0f;
-                    target_page = -1;
-                    transition_state = TRANSITION_NONE;
-                }
-            }
-        }
-        
-        // Check for hold timeout (switch from potential to hold)
-        if (current_gesture == GESTURE_POTENTIAL) {
-            Uint32 time_elapsed = SDL_GetTicks() - gesture_start_time;
-            if (time_elapsed > HOLD_THRESHOLD_MS) {
-                current_gesture = GESTURE_HOLD;
-                printf("Gesture changed to HOLD (timeout)\n");
-            }
-        }
-        
-        // Update timers
         Uint32 current_time = SDL_GetTicks();
         
-        // Frame rate calculation
+        // Note: SDL event processing happens below
+        
+        // Process SDL events for unified input handling
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) {
+                quit = true;
+            }
+            // Handle SDL touch events
+            else if (e.type == SDL_FINGERDOWN) {
+                int touch_x = (int)(e.tfinger.x * actual_width);
+                int touch_y = (int)(e.tfinger.y * actual_height);
+                handle_touch_down(touch_x, touch_y, "touch");
+            }
+            else if (e.type == SDL_FINGERUP) {
+                int touch_x = (int)(e.tfinger.x * actual_width);
+                int touch_y = (int)(e.tfinger.y * actual_height);
+                handle_touch_up(touch_x, touch_y, "touch");
+            }
+            else if (e.type == SDL_FINGERMOTION) {
+                int touch_x = (int)(e.tfinger.x * actual_width);
+                int touch_y = (int)(e.tfinger.y * actual_height);
+                handle_touch_motion(touch_x, touch_y, "touch");
+            }
+            // Handle mouse events as touch
+            else if (e.type == SDL_MOUSEBUTTONDOWN) {
+                handle_touch_down(e.button.x, e.button.y, "mouse");
+            }
+            else if (e.type == SDL_MOUSEBUTTONUP) {
+                handle_touch_up(e.button.x, e.button.y, "mouse");
+            }
+            else if (e.type == SDL_MOUSEMOTION && (e.motion.state & SDL_BUTTON_LMASK)) {
+                handle_touch_motion(e.motion.x, e.motion.y, "mouse");
+            }
+        }
+        
+        // Update page transitions
+        pages_update_transition();
+        gestures_set_current_page(pages_get_current());
+        
+        // Update API data periodically
+        update_api_data(current_time, false);
+        
+        // Clear screen
+        SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+        SDL_RenderClear(renderer);
+        
+        // Render current page(s)
+        int current_page = pages_get_current();
+        int target_page = pages_get_target_page();
+        float transition_offset = pages_get_transition_offset();
+        
+        if (target_page != -1) {
+            // Render both pages during transition
+            float current_offset = transition_offset * actual_width;
+            float target_offset = current_offset + (target_page > current_page ? actual_width : -actual_width);
+            
+            render_page(current_page, current_offset);
+            render_page(target_page, target_offset);
+        } else {
+            // Render single page
+            render_page(current_page, 0);
+        }
+        
+        // Render page indicators if visible
+        if (pages_should_show_indicators()) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, pages_get_indicator_alpha());
+            render_page_indicators(current_page, pages_get_total(), transition_offset);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        }
+        
+        // Draw debug overlay if enabled (at bottom of screen - two lines)
+        if (show_debug) {
+            const char* gesture_name = 
+                gestures_get_state() == GESTURE_NONE ? "NONE" :
+                gestures_get_state() == GESTURE_POTENTIAL ? "POTENTIAL" :
+                gestures_get_state() == GESTURE_CLICK ? "CLICK" :
+                gestures_get_state() == GESTURE_DRAG_VERT ? "DRAG_VERT" :
+                gestures_get_state() == GESTURE_DRAG_HORZ ? "DRAG_HORZ" : "HOLD";
+                
+            const char* transition_state = 
+                pages_get_transition_state() == TRANSITION_NONE ? "NONE" :
+                pages_get_transition_state() == TRANSITION_DRAGGING ? "DRAGGING" : "ANIMATING";
+            
+            // First line: Page | FPS | Gesture
+            char debug_line1[256];
+            snprintf(debug_line1, sizeof(debug_line1), "Page: %d | FPS: %d | Gesture: %s", 
+                    current_page + 1, fps, gesture_name);
+            draw_text_left(debug_line1, 10, actual_height - 55, (SDL_Color){255, 255, 255, 128});
+            
+            // Second line: Button | Transition | Scroll
+            Page* current_page_data = pages_get(current_page);
+            char debug_line2[256];
+            snprintf(debug_line2, sizeof(debug_line2), "Button: %d | Transition: %s (%.2f) | Scroll: %d/%d", 
+                    gestures_get_button(), transition_state, transition_offset,
+                    current_page_data ? current_page_data->scroll_position : 0,
+                    current_page_data ? current_page_data->max_scroll : 0);
+            draw_text_left(debug_line2, 10, actual_height - 30, (SDL_Color){200, 200, 200, 128});
+        }
+        
+        // Calculate FPS
         frame_count++;
-        if (current_time - fps_timer > 1000) {
+        if (current_time - fps_timer >= 1000) {
             fps = frame_count;
             frame_count = 0;
             fps_timer = current_time;
         }
         
-        // Handle indicator fading
-        if (show_indicators && current_time > indicator_hide_time && transition_state == TRANSITION_NONE) {
-            if (!indicator_fading) {
-                indicator_fading = true;
-                fade_start_time = current_time;
-            } else {
-                // Calculate fade progress
-                Uint32 fade_time = current_time - fade_start_time;
-                if (fade_time >= FADE_DURATION) {
-                    // Fade complete
-                    show_indicators = false;
-                    indicator_fading = false;
-                    indicator_alpha = 153; // Reset to default
-                } else {
-                    // Calculate alpha based on fade progress
-                    float progress = (float)fade_time / FADE_DURATION;
-                    indicator_alpha = (int)(153 * (1.0f - progress));
-                }
-            }
-        }
-        
-        // Check if we need to update API data
-        update_api_data(current_time, false);
-        
-        // Clear screen with current background color
-        SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-        SDL_RenderClear(renderer);
-        
-        // Update time button text if needed
-        if (show_time) {
-            time_t now = time(NULL);
-            struct tm* timeinfo = localtime(&now);
-            strftime(pages[1].button_texts[2], sizeof(pages[1].button_texts[0]), 
-                    "%H:%M:%S\n%Y-%m-%d", timeinfo);
-        } else {
-            strcpy(pages[1].button_texts[2], "Time (off)");
-        }
-        
-        // Determine which pages to draw and their offsets
-        if (transition_state == TRANSITION_NONE) {
-            // Not transitioning, just draw current page
-            render_page(current_page, 0);
-        } else {
-            // Transitioning between pages (either by dragging or animating)
-            float current_offset = page_transition * actual_width;
-            
-            if (target_page > current_page) {
-                // Moving to next page, current slides left (negative transition)
-                render_page(current_page, current_offset);
-                render_page(target_page, actual_width + current_offset);
-            } else if (target_page < current_page) {
-                // Moving to previous page, current slides right (positive transition)
-                render_page(current_page, current_offset);
-                render_page(target_page, -actual_width + current_offset);
-            } else {
-                // Elastic bounce at edges (without showing another page)
-                render_page(current_page, current_offset);
-            }
-        }
-        
-        // Render page indicators (only when they should be visible)
-        if (show_indicators || transition_state != TRANSITION_NONE) {
-            render_page_indicators(current_page, total_pages, page_transition);
-        }
-        
-        // Draw debug overlay if enabled
-        if (show_debug) {
-            // Draw semi-transparent background
-            SDL_Rect debug_bg = {0, 0, actual_width, 60};
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
-            SDL_RenderFillRect(renderer, &debug_bg);
-            
-            // Status line
-            char status[128];
-            const char* gesture_name = 
-                current_gesture == GESTURE_NONE ? "NONE" :
-                current_gesture == GESTURE_POTENTIAL ? "POTENTIAL" :
-                current_gesture == GESTURE_CLICK ? "CLICK" :
-                current_gesture == GESTURE_DRAG_VERT ? "DRAG_VERT" :
-                current_gesture == GESTURE_DRAG_HORZ ? "DRAG_HORZ" : "HOLD";
-                
-            sprintf(status, "Page: %d | Gesture: %s | FPS: %d", 
-                    current_page + 1, gesture_name, fps);
-            draw_text(status, actual_width / 2, 15, (SDL_Color){255, 255, 255, 255});
-            
-            // Gesture info
-            char gesture_info[128];
-            sprintf(gesture_info, "Button: %d | Page: %d | Transition: %.2f", 
-                    gesture_button, gesture_page, page_transition);
-            draw_text(gesture_info, actual_width / 2, 40, (SDL_Color){200, 200, 200, 255});
-            
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        }
-        
-        // Present renderer
+        // Update screen
         SDL_RenderPresent(renderer);
-        
-        // Present to display hardware (needed for DRM backend)
         display_backend_present(display_backend);
         
-        // Cap frame rate
-        frame_time = SDL_GetTicks() - frame_start;
+        // Frame limiting
+        Uint32 frame_time = SDL_GetTicks() - current_time;
         if (frame_time < 16) {
-            SDL_Delay(16 - frame_time); // ~60 FPS
+            SDL_Delay(16 - frame_time);
         }
-        
-        // Log frame time periodically
-        log_frame_time((float)(SDL_GetTicks() - frame_start));
     }
     
     // Cleanup
-    log_state_change("Application", "RUNNING", "SHUTDOWN");
-    log_info("Shutting down...");
+    log_state_change("Application", "RUNNING", "SHUTTING_DOWN");
     
     cleanup_api();
+    // No input handler to destroy
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
     TTF_CloseFont(small_font);
-    
-    // Cleanup input handler
-    if (input_handler) {
-        input_handler_destroy(input_handler);
-    }
-    
-    // Display backend handles window/renderer cleanup
-    display_backend_destroy(display_backend);
-    
     TTF_Quit();
+    display_backend_destroy(display_backend);
     
     log_info("=== PanelKit Shutdown Complete ===");
     logger_shutdown();
@@ -727,112 +478,101 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-// Initialize all pages
+// Initialize all pages - exact same implementation as original
 void initialize_pages() {
+    Page* page0 = pages_get(0);
+    Page* page1 = pages_get(1);
+    
     // Page 1 - Text page
-    pages[0].scroll_position = 0;
-    pages[0].max_scroll = 0; // No scrolling needed
-    pages[0].title = "Text Page";
-    pages[0].button_count = 1;
-    strcpy(pages[0].button_texts[0], "Change Text Color");
-    pages[0].button_colors[0] = (SDL_Color){52, 152, 219, 255}; // Blue
+    page0->scroll_position = 0;
+    page0->max_scroll = 0; // No scrolling needed
+    page0->title = "Text Page";
+    page0->button_count = 1;
+    strcpy(page0->button_texts[0], "Change Text Color");
+    page0->button_colors[0] = (SDL_Color){52, 152, 219, 255}; // Blue
     
     // Page 2 - Buttons page
-    pages[1].scroll_position = 0;
-    pages[1].title = "Buttons Page";
-    pages[1].button_count = 9;
+    page1->scroll_position = 0;
+    page1->title = "Buttons Page";
+    page1->button_count = 9;
     
     // Button texts
-    strcpy(pages[1].button_texts[0], "Blue");
-    strcpy(pages[1].button_texts[1], "Random");
-    strcpy(pages[1].button_texts[2], "Time"); // Will be updated with time
-    strcpy(pages[1].button_texts[3], "Go to Page 1");
-    strcpy(pages[1].button_texts[4], "Refresh User");
-    strcpy(pages[1].button_texts[5], "Exit App");
-    strcpy(pages[1].button_texts[6], "Button 7");
-    strcpy(pages[1].button_texts[7], "Button 8");
-    strcpy(pages[1].button_texts[8], "Button 9");
+    strcpy(page1->button_texts[0], "Blue");
+    strcpy(page1->button_texts[1], "Random");
+    strcpy(page1->button_texts[2], "Time"); // Will be updated with time
+    strcpy(page1->button_texts[3], "Go to Page 1");
+    strcpy(page1->button_texts[4], "Refresh User");
+    strcpy(page1->button_texts[5], "Exit App");
+    strcpy(page1->button_texts[6], "Button 7");
+    strcpy(page1->button_texts[7], "Button 8");
+    strcpy(page1->button_texts[8], "Button 9");
     
     // Button colors
-    pages[1].button_colors[0] = (SDL_Color){41, 128, 185, 255};  // Blue
-    pages[1].button_colors[1] = (SDL_Color){142, 68, 173, 255};  // Purple
-    pages[1].button_colors[2] = (SDL_Color){142, 142, 142, 255}; // Gray
-    pages[1].button_colors[3] = (SDL_Color){231, 76, 60, 255};   // Red
-    pages[1].button_colors[4] = (SDL_Color){39, 174, 96, 255};  // Green (for refresh)
-    pages[1].button_colors[5] = (SDL_Color){192, 57, 43, 255};   // Dark Red (for exit)
-    pages[1].button_colors[6] = (SDL_Color){52, 152, 219, 255};  // Blue
-    pages[1].button_colors[7] = (SDL_Color){241, 196, 15, 255};  // Yellow
-    pages[1].button_colors[8] = (SDL_Color){230, 126, 34, 255};  // Orange
+    page1->button_colors[0] = (SDL_Color){41, 128, 185, 255};  // Blue
+    page1->button_colors[1] = (SDL_Color){142, 68, 173, 255};  // Purple
+    page1->button_colors[2] = (SDL_Color){142, 142, 142, 255}; // Gray
+    page1->button_colors[3] = (SDL_Color){231, 76, 60, 255};   // Red
+    page1->button_colors[4] = (SDL_Color){39, 174, 96, 255};  // Green (for refresh)
+    page1->button_colors[5] = (SDL_Color){192, 57, 43, 255};   // Dark Red (for exit)
+    page1->button_colors[6] = (SDL_Color){52, 152, 219, 255};  // Blue
+    page1->button_colors[7] = (SDL_Color){241, 196, 15, 255};  // Yellow
+    page1->button_colors[8] = (SDL_Color){230, 126, 34, 255};  // Orange
     
     // Calculate max scroll for page 2 (add space for title)
-    int total_content_height = 90 + BUTTON_PADDING + pages[1].button_count * (BUTTON_HEIGHT + BUTTON_PADDING);
-    pages[1].max_scroll = total_content_height - actual_height;
-    if (pages[1].max_scroll < 0) pages[1].max_scroll = 0;
+    int total_content_height = 90 + BUTTON_PADDING + page1->button_count * (BUTTON_HEIGHT + BUTTON_PADDING);
+    page1->max_scroll = total_content_height - actual_height;
+    if (page1->max_scroll < 0) page1->max_scroll = 0;
 }
 
-// Start a page transition
-void transition_to_page(int page_index) {
-    if (page_index >= 0 && page_index < total_pages && page_index != current_page) {
-        target_page = page_index;
-        transition_state = TRANSITION_ANIMATING;
-        
-        // Set initial transition value
-        if (target_page > current_page) {
-            // Moving forward (current slides left, new comes from right)
-            page_transition = 0.0f;
-        } else {
-            // Moving backward (current slides right, new comes from left)
-            page_transition = 0.0f;
-        }
-        
-        log_event("PAGE_TRANSITION", "from=%d to=%d", current_page, page_index);
-    }
-}
-
-// Render a specific page at the given horizontal offset
+// Render a page - exact same implementation as original
 void render_page(int page_index, float offset_x) {
-    // Create clip rect for the page - use full height since indicators will float on top
-    SDL_Rect page_rect = {
-        (int)offset_x, 0, 
-        actual_width, actual_height
+    Page* page = pages_get(page_index);
+    if (!page) return;
+    
+    // Save current clip rect
+    SDL_Rect old_clip;
+    SDL_RenderGetClipRect(renderer, &old_clip);
+    
+    // Set clip rect for this page (with offset)
+    SDL_Rect page_clip = {
+        (int)offset_x,
+        0,
+        actual_width,
+        actual_height
     };
-    SDL_RenderSetClipRect(renderer, &page_rect);
+    SDL_RenderSetClipRect(renderer, &page_clip);
     
     if (page_index == 0) {
-        // Page 1 - Text page
-        // Draw page title
-        draw_large_text(pages[0].title, actual_width / 2 + (int)offset_x, 60, 
-                      (SDL_Color){255, 255, 255, 255});
+        // Page 1: Text display
+        // Draw title
+        draw_large_text(page->title, (int)(actual_width/2 + offset_x), 60, (SDL_Color){255, 255, 255, 255});
         
-        // Draw text content
-        draw_text(page1_text, actual_width / 2 + (int)offset_x, 120, 
-                text_colors[page1_text_color]);
-        
-        // Draw color change button
+        // Draw single button
         int button_x = (actual_width - BUTTON_WIDTH) / 2;
         int button_y = 200;
+        int button_height = BUTTON_HEIGHT / 2;
         
-        // Determine button state
-        ButtonState state = BUTTON_NORMAL;
-        if (current_gesture != GESTURE_NONE && gesture_page == 0) {
-            if (gesture_button == 0) {
-                if (current_gesture == GESTURE_POTENTIAL || current_gesture == GESTURE_CLICK) {
-                    state = BUTTON_PRESSED;
-                } else if (current_gesture == GESTURE_HOLD) {
-                    state = BUTTON_HELD;
-                }
-            }
+        // Determine button state based on current gesture
+        ButtonState button_state = BUTTON_NORMAL;
+        if (gestures_get_state() != GESTURE_NONE && 
+            gestures_get_button() == 0 && 
+            gestures_get_page() == page_index &&
+            pages_get_current() == page_index) {
+            button_state = BUTTON_PRESSED;
         }
         
-        render_button(button_x + (int)offset_x, button_y, 
-                     BUTTON_WIDTH, BUTTON_HEIGHT / 2, // Half height
-                     pages[0].button_texts[0], 
-                     pages[0].button_colors[0], state);
-    } 
+        render_button((int)(button_x + offset_x), button_y, BUTTON_WIDTH, button_height,
+                     page->button_texts[0], page->button_colors[0], button_state);
+        
+        // Draw text content below button with proper spacing - split into two lines
+        SDL_Color current_text_color = text_colors[page1_text_color];
+        draw_text("Welcome to Page 1!", (int)(actual_width/2 + offset_x), button_y + button_height + 80, current_text_color);
+        draw_text("Swipe right to see buttons.", (int)(actual_width/2 + offset_x), button_y + button_height + 110, current_text_color);
+    }
     else if (page_index == 1) {
-        // Page 2 - Buttons page
+        // Page 2: Scrollable buttons
         // Get current scroll position
-        int scroll_position = pages[1].scroll_position;
+        int scroll_position = page->scroll_position;
         
         // Create separate clip rects for the scrollable and fixed areas
         
@@ -847,12 +587,27 @@ void render_page(int page_index, float offset_x) {
         // Draw page title in the button area (scrolls with content)
         int title_y = 60 - scroll_position;
         if (title_y >= 0 && title_y <= actual_height) {
-            draw_large_text(pages[1].title, (BUTTON_PADDING + BUTTON_WIDTH) / 2 + (int)offset_x, title_y, 
+            draw_large_text(page->title, (BUTTON_PADDING + BUTTON_WIDTH) / 2 + (int)offset_x, title_y, 
                           (SDL_Color){255, 255, 255, 255});
         }
         
+        // Update time for button 3
+        if (show_time) {
+            time_t rawtime;
+            struct tm* timeinfo;
+            time(&rawtime);
+            timeinfo = localtime(&rawtime);
+            // Format: HH:MM:SS on first line, YYYY-MMM-DD on second line
+            char time_str[32], date_str[32];
+            strftime(time_str, sizeof(time_str), "%H:%M:%S", timeinfo);
+            strftime(date_str, sizeof(date_str), "%Y-%b-%d", timeinfo); // %b gives short month name
+            snprintf(page->button_texts[2], 64, "%s\n%s", time_str, date_str);
+        } else {
+            strcpy(page->button_texts[2], "Time (off)");
+        }
+        
         // Render all buttons with scroll position applied
-        for (int i = 0; i < pages[1].button_count; i++) {
+        for (int i = 0; i < page->button_count; i++) {
             int button_y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING) + 90 - scroll_position; // Add space for title
             
             // Skip buttons that are completely outside the visible area
@@ -861,21 +616,16 @@ void render_page(int page_index, float offset_x) {
             }
             
             // Determine button state
-            ButtonState state = BUTTON_NORMAL;
-            if (current_gesture != GESTURE_NONE && gesture_page == 1) {
-                if (gesture_button == i) {
-                    if (current_gesture == GESTURE_POTENTIAL || current_gesture == GESTURE_CLICK) {
-                        state = BUTTON_PRESSED;
-                    } else if (current_gesture == GESTURE_HOLD) {
-                        state = BUTTON_HELD;
-                    }
-                }
+            ButtonState button_state = BUTTON_NORMAL;
+            if (gestures_get_state() != GESTURE_NONE && 
+                gestures_get_button() == i && 
+                gestures_get_page() == page_index &&
+                pages_get_current() == page_index) {
+                button_state = BUTTON_PRESSED;
             }
             
-            render_button(BUTTON_PADDING + (int)offset_x, button_y, 
-                         BUTTON_WIDTH, BUTTON_HEIGHT, 
-                         pages[1].button_texts[i], 
-                         pages[1].button_colors[i], state);
+            render_button((int)(BUTTON_PADDING + offset_x), button_y, BUTTON_WIDTH, BUTTON_HEIGHT,
+                         page->button_texts[i], page->button_colors[i], button_state);
         }
         
         // Now set clip rect for the fixed API data area on the right side
@@ -890,350 +640,56 @@ void render_page(int page_index, float offset_x) {
         // Position it to the right of the buttons with proper padding
         int api_data_x = BUTTON_PADDING + BUTTON_WIDTH + 20 + (int)offset_x;
         render_api_data(renderer, api_data_x, 150);
+        
     }
     
     // Clear clipping rectangle
     SDL_RenderSetClipRect(renderer, NULL);
 }
 
-// Render page indicator dots
-void render_page_indicators(int current, int total, float transition) {
-    (void)transition; // Used for transition effects below
-    int indicator_width = total * (PAGE_INDICATOR_RADIUS * 2 + PAGE_INDICATOR_SPACING) - PAGE_INDICATOR_SPACING;
+// Get the button at a specific position - exact same implementation as original
+int get_button_at_position(int x, int y, int scroll_offset) {
+    int current_page = pages_get_current();
     
-    // Calculate precise positions for proper symmetry
-    int container_width = indicator_width + PAGE_INDICATOR_CONTAINER_PADDING * 2;
-    int container_height = PAGE_INDICATOR_CONTAINER_HEIGHT; // Fixed height for capsule
-    int container_x = (actual_width - container_width) / 2;
-    int container_y = PAGE_INDICATOR_Y - container_height / 2;
-    
-    // The radius for the capsule ends is exactly half the height
-    int capsule_radius = container_height / 2;
-    
-    // Draw the pill/capsule with alpha blend (using current alpha value for fading)
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, indicator_alpha); // Current alpha for fading
-    
-    // Draw the capsule shape with inward-facing half-circles (<III>)
-    // First, draw the full pill rectangle
-    SDL_Rect full_rect = {
-        container_x,
-        container_y,
-        container_width,
-        container_height
-    };
-    SDL_RenderFillRect(renderer, &full_rect);
-    
-    // Now remove the corners to create inward-facing half-circles
-    for (int y = 0; y < container_height; y++) {
-        for (int x = 0; x < capsule_radius; x++) {
-            // Calculate distance from the imaginary circle centers outside the pill
-            float dx_left = x - capsule_radius;
-            float dy_left = y - capsule_radius;
-            float distance_left = sqrt(dx_left*dx_left + dy_left*dy_left);
-            
-            // If point is outside our "inward circle", erase it (draw with transparent color)
-            if (distance_left > capsule_radius) {
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); // Fully transparent
-                SDL_RenderDrawPoint(renderer, container_x + x, container_y + y);
-            }
-            
-            // Right side (mirrored)
-            float dx_right = x - capsule_radius;
-            float dy_right = y - capsule_radius;
-            float distance_right = sqrt(dx_right*dx_right + dy_right*dy_right);
-            if (distance_right > capsule_radius) {
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0); // Fully transparent
-                SDL_RenderDrawPoint(renderer, 
-                    container_x + container_width - x - 1, 
-                    container_y + y);
+    // Check which page we're on
+    if (current_page == 0) {
+        // Page 1 has just one centered button
+        int button_x = (actual_width - BUTTON_WIDTH) / 2;
+        int button_y = 200;
+        int button_height = BUTTON_HEIGHT / 2;
+        
+        if (x >= button_x && x < button_x + BUTTON_WIDTH &&
+            y >= button_y && y < button_y + button_height) {
+            return 0;
+        }
+    }
+    else if (current_page == 1) {
+        // Page 2 has multiple buttons with scrolling
+        
+        // Adjust y for scroll position
+        int adjusted_y = y + scroll_offset;
+        
+        // Check if x is within button width
+        if (x < BUTTON_PADDING || x >= BUTTON_PADDING + BUTTON_WIDTH) {
+            return -1;
+        }
+        
+        // Calculate which button is at this y position
+        Page* page = pages_get(current_page);
+        for (int i = 0; i < page->button_count; i++) {
+            int button_y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING);
+            if (adjusted_y >= button_y && adjusted_y < button_y + BUTTON_HEIGHT) {
+                return i;
             }
         }
     }
     
-    // Restore color for remaining drawing
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 153); // 60% opacity (153/255)
-    
-    // Position dots for perfect symmetry in the capsule
-    int total_indicator_space = (PAGE_INDICATOR_RADIUS * 2 + PAGE_INDICATOR_SPACING) * total - PAGE_INDICATOR_SPACING;
-    int start_x = container_x + (container_width - total_indicator_space) / 2;
-    
-    // Draw the indicator dots (with full opacity)
-    for (int i = 0; i < total; i++) {
-        int dot_x = start_x + i * (PAGE_INDICATOR_RADIUS * 2 + PAGE_INDICATOR_SPACING) + PAGE_INDICATOR_RADIUS;
-        
-        // Determine fill based on current page and transition
-        bool filled = (i == current);
-        int alpha = 255;
-        
-        // Adjust for transition
-        if (target_page != -1) {
-            if (i == current || i == target_page) {
-                float t = fabs(page_transition);
-                if (i == current) {
-                    alpha = (int)(255 * (1.0f - t));
-                } else {
-                    alpha = (int)(255 * t);
-                }
-            }
-        }
-        
-        // Choose color based on whether it's the active page
-        SDL_Color dot_color;
-        if (filled) {
-            dot_color = (SDL_Color){255, 255, 255, 255}; // White for active
-        } else {
-            dot_color = (SDL_Color){150, 150, 150, 255}; // Gray for inactive
-        }
-        
-        // Draw the indicator dot with full opacity but adjusted alpha for transitions
-        SDL_SetRenderDrawColor(renderer, dot_color.r, dot_color.g, dot_color.b, alpha);
-        
-        // Draw filled circle
-        for (int r = 0; r <= PAGE_INDICATOR_RADIUS; r++) {
-            for (int angle = 0; angle < 360; angle += 5) {
-                float rad = angle * M_PI / 180.0f;
-                int x = dot_x + (int)(r * cos(rad));
-                int y = PAGE_INDICATOR_Y + (int)(r * sin(rad));
-                SDL_RenderDrawPoint(renderer, x, y);
-            }
-        }
-    }
-    
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    return -1;
 }
 
-// Begin a new gesture
-void begin_gesture(int x, int y, int button_index) {
-    current_gesture = GESTURE_POTENTIAL;
-    gesture_button = button_index;
-    gesture_start_time = SDL_GetTicks();
-    gesture_start_x = x;
-    gesture_start_y = y;
-    last_mouse_x = x;
-    last_mouse_y = y;
-    
-    log_debug("Gesture started at (%d, %d), button: %d", x, y, button_index);
-}
-
-// Update an ongoing gesture
-void update_gesture(int x, int y) {
-    // Only update if there's an active gesture
-    if (current_gesture == GESTURE_NONE) {
-        return;
-    }
-    
-    // Calculate distance from start position
-    int distance_x = x - gesture_start_x;
-    int distance_y = y - gesture_start_y;
-    float distance = sqrt(distance_x * distance_x + distance_y * distance_y);
-    
-    // If we're in the potential state and exceed the drag threshold,
-    // determine if this is a horizontal or vertical drag
-    if (current_gesture == GESTURE_POTENTIAL && distance > DRAG_THRESHOLD_PX) {
-        if (abs(distance_x) > abs(distance_y)) {
-            // Horizontal drag - page swipe
-            current_gesture = GESTURE_DRAG_HORZ;
-            log_debug("Gesture: horizontal drag detected (%.1f px)", distance);
-        } else {
-            // Vertical drag - content scroll
-            current_gesture = GESTURE_DRAG_VERT;
-            log_debug("Gesture: vertical drag detected (%.1f px)", distance);
-        }
-    }
-    
-    // Show indicators whenever we detect horizontal dragging
-    if (current_gesture == GESTURE_DRAG_HORZ) {
-        show_indicators = true;
-        indicator_hide_time = SDL_GetTicks() + 2000; // Keep visible for 2 seconds after last drag
-    }
-
-    // Process based on gesture type
-    if (current_gesture == GESTURE_DRAG_VERT) {
-        // Vertical dragging - scroll content
-        int delta_y = last_mouse_y - y;
-        
-        // Update scroll position for current page
-        int old_scroll = pages[current_page].scroll_position;
-        pages[current_page].scroll_position += delta_y;
-        
-        // Enforce limits
-        if (pages[current_page].scroll_position < 0) {
-            pages[current_page].scroll_position = 0;
-        }
-        if (pages[current_page].scroll_position > pages[current_page].max_scroll) {
-            pages[current_page].scroll_position = pages[current_page].max_scroll;
-        }
-        
-        // Log significant changes
-        if (old_scroll != pages[current_page].scroll_position && abs(delta_y) > 5) {
-            log_debug("Scroll position: %d (delta: %d)", 
-                   pages[current_page].scroll_position, delta_y);
-        }
-    }
-    else if (current_gesture == GESTURE_DRAG_HORZ) {
-        // Horizontal dragging - page swiping
-        int delta_x = x - gesture_start_x;
-        float normalized_delta = (float)delta_x / actual_width; // Convert to 0.0-1.0 scale
-        
-        // Start dragging transition if not already in one
-        if (transition_state == TRANSITION_NONE) {
-            transition_state = TRANSITION_DRAGGING;
-            
-            // Determine potential target page based on drag direction
-            if (normalized_delta > 0 && current_page > 0) {
-                // Dragging right - previous page is potential target 
-                target_page = current_page - 1;
-            } 
-            else if (normalized_delta < 0 && current_page < total_pages - 1) {
-                // Dragging left - next page is potential target
-                target_page = current_page + 1;
-            }
-            else {
-                // Can't go beyond first/last page
-                target_page = current_page;
-            }
-        }
-        
-        // Update drag offset based on finger position (with limits)
-        if (target_page != current_page) {
-            // Calculate drag offset based on direction
-            if (target_page > current_page) {
-                // Dragging to next page (negative offset)
-                drag_offset = fmax(normalized_delta, -1.0f); // Limit to -1.0
-            } else {
-                // Dragging to previous page (positive offset) 
-                drag_offset = fmin(normalized_delta, 1.0f);  // Limit to 1.0
-            }
-        } else {
-            // Elastic resistance when trying to go beyond first/last page
-            drag_offset = normalized_delta * 0.3f; // Reduced movement to indicate boundary
-        }
-    }
-    
-    // Update last position
-    last_mouse_x = x;
-    last_mouse_y = y;
-}
-
-// End the current gesture
-void end_gesture(int x, int y) {
-    // Only process if there's an active gesture
-    if (current_gesture == GESTURE_NONE) {
-        return;
-    }
-    
-    // Calculate time elapsed and distance
-    Uint32 time_elapsed = SDL_GetTicks() - gesture_start_time;
-    int distance_x = x - gesture_start_x;
-    int distance_y = y - gesture_start_y;
-    float distance = sqrt(distance_x * distance_x + distance_y * distance_y);
-    
-    log_debug("Gesture ended: %s, time: %dms, distance: %.1fpx", 
-           current_gesture == GESTURE_POTENTIAL ? "POTENTIAL" :
-           current_gesture == GESTURE_DRAG_VERT ? "DRAG_VERT" :
-           current_gesture == GESTURE_DRAG_HORZ ? "DRAG_HORZ" :
-           current_gesture == GESTURE_HOLD ? "HOLD" : "UNKNOWN",
-           time_elapsed, distance);
-    
-    // If this was a potential gesture that didn't exceed thresholds,
-    // it's a click
-    if (current_gesture == GESTURE_POTENTIAL && 
-        time_elapsed < CLICK_TIMEOUT_MS && 
-        distance < DRAG_THRESHOLD_PX) {
-        
-        current_gesture = GESTURE_CLICK;
-        
-        // Handle button click if applicable
-        if (gesture_button >= 0 && gesture_page == current_page) {
-            handle_click(gesture_button);
-        }
-    }
-    
-    // Handle the end of a horizontal drag (page swipe)
-    if (current_gesture == GESTURE_DRAG_HORZ && transition_state == TRANSITION_DRAGGING) {
-        float half_threshold = 0.3f; // Snap to new page if dragged more than 30% of screen width
-        
-        // Determine which page to snap to based on drag distance
-        if (target_page != current_page) {
-            bool snap_to_target = false;
-            
-            if (target_page > current_page) {
-                // Next page: check if dragged far enough left
-                snap_to_target = (drag_offset <= -half_threshold);
-            } else {
-                // Previous page: check if dragged far enough right
-                snap_to_target = (drag_offset >= half_threshold);
-            }
-            
-            if (snap_to_target) {
-                // Continue to target page
-                page_transition = drag_offset;
-                transition_state = TRANSITION_ANIMATING;
-                log_event("PAGE_SWIPE", "to=%d", target_page);
-            } else {
-                // Snap back to current page
-                transition_state = TRANSITION_ANIMATING;
-                // Keep same target and current page, but animate back to 0 offset
-                log_debug("Swipe cancelled, returning to page %d", current_page);
-            }
-        } else {
-            // Reset if dragging at page boundary
-            transition_state = TRANSITION_NONE;
-            target_page = -1;
-            drag_offset = 0.0f;
-        }
-        
-        // Show indicators and set timer to hide them after 2 seconds
-        show_indicators = true;
-        indicator_hide_time = SDL_GetTicks() + 2000; // 2 seconds from now
-    }
-    
-    // Reset gesture state
-    current_gesture = GESTURE_NONE;
-    gesture_button = -1;
-}
-
-// Cancel the current gesture
-void cancel_gesture() {
-    if (current_gesture != GESTURE_NONE) {
-        log_debug("Gesture cancelled");
-        current_gesture = GESTURE_NONE;
-        gesture_button = -1;
-    }
-}
-
-// Unified touch event handlers that translate both mouse and touch events
-void handle_touch_down(int x, int y, const char* source) {
-    // Only start a gesture if not currently transitioning between pages
-    if (target_page == -1) {
-        // Get button under touch (if any)
-        int button_index = get_button_at_position(x, y, pages[current_page].scroll_position);
-        
-        // Start a new gesture
-        begin_gesture(x, y, button_index);
-        gesture_page = current_page;
-        
-        log_debug("Touch DOWN from %s at (%d,%d), button=%d", source, x, y, button_index);
-    } else {
-        log_debug("Touch DOWN from %s ignored - page transition in progress", source);
-    }
-}
-
-void handle_touch_up(int x, int y, const char* source) {
-    // End the current gesture (if any)
-    end_gesture(x, y);
-    log_debug("Touch UP from %s at (%d,%d)", source, x, y);
-}
-
-void handle_touch_motion(int x, int y, const char* source) {
-    // Update current gesture (if any)
-    update_gesture(x, y);
-    // Note: motion logging is verbose, so only log at trace level if needed
-}
-
-// Handle a button click
+// Handle a button click - exact same implementation as original
 void handle_click(int button_index) {
+    int gesture_page = gestures_get_page();
     log_event("BUTTON_CLICK", "button=%d page=%d", button_index, gesture_page);
     
     // Handle button actions based on page and button index
@@ -1272,8 +728,8 @@ void handle_click(int button_index) {
                 
             case 3: // Go to Page 1
                 // Go to Page 1
-                if (current_page != 0 && target_page == -1) {
-                    transition_to_page(0);
+                if (pages_get_current() != 0 && pages_get_target_page() == -1) {
+                    pages_transition_to(0);
                 }
                 break;
                 
@@ -1294,207 +750,252 @@ void handle_click(int button_index) {
     }
 }
 
-// Get the button at a specific position
-int get_button_at_position(int x, int y, int scroll_offset) {
-    // Check which page we're on
-    if (current_page == 0) {
-        // Page 1 has just one centered button
-        int button_x = (actual_width - BUTTON_WIDTH) / 2;
-        int button_y = 200;
-        int button_height = BUTTON_HEIGHT / 2;
-        
-        if (x >= button_x && x < button_x + BUTTON_WIDTH &&
-            y >= button_y && y < button_y + button_height) {
-            return 0;
-        }
+// API implementation functions - keeping exact same as original
+size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    size_t realsize = size * nmemb;
+    ApiResponse* response = (ApiResponse*)userdata;
+    
+    pthread_mutex_lock(&response->mutex);
+    
+    char* new_data = realloc(response->data, response->size + realsize + 1);
+    if (new_data == NULL) {
+        pthread_mutex_unlock(&response->mutex);
+        return 0;
     }
-    else if (current_page == 1) {
-        // Page 2 has multiple buttons with scrolling
+    
+    response->data = new_data;
+    memcpy(&response->data[response->size], ptr, realsize);
+    response->size += realsize;
+    response->data[response->size] = 0;
+    
+    pthread_mutex_unlock(&response->mutex);
+    
+    return realsize;
+}
+
+void* fetch_api_data(void* arg) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        log_error("Failed to initialize CURL");
+        return NULL;
+    }
+    
+    pthread_mutex_lock(&api_response.mutex);
+    api_response.is_loading = true;
+    
+    // Clear previous data
+    if (api_response.data) {
+        free(api_response.data);
+        api_response.data = NULL;
+        api_response.size = 0;
+    }
+    pthread_mutex_unlock(&api_response.mutex);
+    
+    // Set up CURL
+    curl_easy_setopt(curl, CURLOPT_URL, "https://randomuser.me/api/");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &api_response);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    
+    // Perform the request
+    CURLcode res = curl_easy_perform(curl);
+    
+    pthread_mutex_lock(&api_response.mutex);
+    if (res != CURLE_OK) {
+        log_error("CURL request failed: %s", curl_easy_strerror(res));
+        api_response.is_loading = false;
+    } else {
+        log_info("API data received: %zu bytes", api_response.size);
+        api_response.is_loading = false;
+        parse_api_response();
+        api_response.is_ready = true;
+    }
+    pthread_mutex_unlock(&api_response.mutex);
+    
+    curl_easy_cleanup(curl);
+    return NULL;
+}
+
+void update_api_data(Uint32 current_time, bool force_refresh) {
+    // Only update every 10 seconds or on force refresh
+    if (!force_refresh && (current_time - last_api_call_time < 10000)) {
+        return;
+    }
+    
+    // Don't start a new request if one is already in progress
+    pthread_mutex_lock(&api_response.mutex);
+    bool is_loading = api_response.is_loading;
+    pthread_mutex_unlock(&api_response.mutex);
+    
+    if (is_loading) {
+        return;
+    }
+    
+    // Start a new thread to fetch data
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, fetch_api_data, NULL) == 0) {
+        pthread_detach(thread);
+        last_api_call_time = current_time;
+    } else {
+        log_error("Failed to create API thread");
+    }
+}
+
+void render_api_data(SDL_Renderer* renderer, int x, int y) {
+    (void)renderer; // Unused parameter
+    
+    pthread_mutex_lock(&api_response.mutex);
+    
+    SDL_Color text_color = {255, 255, 255, 255};
+    
+    // Calculate the maximum width for text (with proper padding like buttons)
+    int right_padding = BUTTON_PADDING; // Use same padding as buttons
+    int max_width = actual_width - x - right_padding;
+    
+    // Set line height for smaller font - exact from original
+    int line_height = 25;
+    
+    if (api_response.is_loading) {
+        draw_small_text_left("Loading user data...", x, y, text_color, max_width);
+    }
+    else if (api_response.is_ready) {
+        // Render the API data nicely formatted - exact format from original
+        char buffer[256];
         
-        // Adjust y for scroll position
-        int adjusted_y = y + scroll_offset;
+        // Name
+        snprintf(buffer, sizeof(buffer), "Name: %s", api_response.name);
+        draw_small_text_left(buffer, x, y, text_color, max_width);
         
-        // Check if x is within button width
-        if (x < BUTTON_PADDING || x >= BUTTON_PADDING + BUTTON_WIDTH) {
-            return -1;
-        }
+        // Age
+        snprintf(buffer, sizeof(buffer), "Age: %d", api_response.age);
+        draw_small_text_left(buffer, x, y + line_height, text_color, max_width);
         
-        // Calculate which button is at this y position
-        for (int i = 0; i < pages[current_page].button_count; i++) {
-            int button_y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING);
-            if (adjusted_y >= button_y && adjusted_y < button_y + BUTTON_HEIGHT) {
-                return i;
+        // Nationality
+        snprintf(buffer, sizeof(buffer), "Nationality: %s", api_response.nationality);
+        draw_small_text_left(buffer, x, y + line_height * 2, text_color, max_width);
+        
+        // Location
+        snprintf(buffer, sizeof(buffer), "Location: %s", api_response.location);
+        draw_small_text_left(buffer, x, y + line_height * 3, text_color, max_width);
+        
+        // Email 
+        snprintf(buffer, sizeof(buffer), "Email: %s", api_response.email);
+        draw_small_text_left(buffer, x, y + line_height * 4, text_color, max_width);
+        
+        // Phone
+        snprintf(buffer, sizeof(buffer), "Phone: %s", api_response.phone);
+        draw_small_text_left(buffer, x, y + line_height * 5, text_color, max_width);
+        
+        // Picture URL info (just show that it's available)
+        draw_small_text_left("Image URL available", x, y + line_height * 6, text_color, max_width);
+    }
+    else {
+        draw_small_text_left("No user data loaded", x, y, text_color, max_width);
+    }
+    
+    pthread_mutex_unlock(&api_response.mutex);
+}
+
+void init_api() {
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    pthread_mutex_init(&api_response.mutex, NULL);
+}
+
+void cleanup_api() {
+    pthread_mutex_lock(&api_response.mutex);
+    if (api_response.data) {
+        free(api_response.data);
+        api_response.data = NULL;
+    }
+    pthread_mutex_unlock(&api_response.mutex);
+    
+    pthread_mutex_destroy(&api_response.mutex);
+    curl_global_cleanup();
+}
+
+// Simple JSON parser for the API response
+void parse_api_response() {
+    if (!api_response.data || api_response.size == 0) {
+        return;
+    }
+    
+    // Very simple parsing - in production you'd use a proper JSON library
+    char* data = api_response.data;
+    
+    // Extract name
+    char* name_start = strstr(data, "\"first\":\"");
+    if (name_start) {
+        name_start += 9;
+        char* name_end = strchr(name_start, '"');
+        if (name_end) {
+            int len = name_end - name_start;
+            if (len > 0 && len < 64) {
+                strncpy(api_response.name, name_start, len);
+                api_response.name[len] = '\0';
+                
+                // Add last name
+                char* last_start = strstr(data, "\"last\":\"");
+                if (last_start) {
+                    last_start += 8;
+                    char* last_end = strchr(last_start, '"');
+                    if (last_end) {
+                        strcat(api_response.name, " ");
+                        len = last_end - last_start;
+                        if (len > 0 && len < 63 - strlen(api_response.name)) {
+                            strncat(api_response.name, last_start, len);
+                        }
+                    }
+                }
             }
         }
     }
     
-    return -1;
-}
-
-// Render a button with text and state effects
-void render_button(int x, int y, int w, int h, const char* text, SDL_Color color, ButtonState state) {
-    // Adjust colors based on state
-    SDL_Color button_color = color;
-    
-    // Brighten when hovered
-    if (state == BUTTON_HOVER) {
-        button_color.r = (Uint8)fmin(color.r * 1.2, 255);
-        button_color.g = (Uint8)fmin(color.g * 1.2, 255);
-        button_color.b = (Uint8)fmin(color.b * 1.2, 255);
+    // Extract email
+    char* email_start = strstr(data, "\"email\":\"");
+    if (email_start) {
+        email_start += 9;
+        char* email_end = strchr(email_start, '"');
+        if (email_end) {
+            int len = email_end - email_start;
+            if (len > 0 && len < 128) {
+                strncpy(api_response.email, email_start, len);
+                api_response.email[len] = '\0';
+            }
+        }
     }
     
-    // Darken when pressed
-    if (state == BUTTON_PRESSED) {
-        button_color.r = (Uint8)(color.r * 0.8);
-        button_color.g = (Uint8)(color.g * 0.8);
-        button_color.b = (Uint8)(color.b * 0.8);
+    // Extract location (city, country)
+    char* city_start = strstr(data, "\"city\":\"");
+    if (city_start) {
+        city_start += 8;
+        char* city_end = strchr(city_start, '"');
+        if (city_end) {
+            int len = city_end - city_start;
+            if (len > 0 && len < 64) {
+                strncpy(api_response.location, city_start, len);
+                api_response.location[len] = '\0';
+                
+                // Add country
+                char* country_start = strstr(data, "\"country\":\"");
+                if (country_start) {
+                    country_start += 11;
+                    char* country_end = strchr(country_start, '"');
+                    if (country_end) {
+                        strcat(api_response.location, ", ");
+                        len = country_end - country_start;
+                        if (len > 0 && len < 127 - strlen(api_response.location)) {
+                            strncat(api_response.location, country_start, len);
+                        }
+                    }
+                }
+            }
+        }
     }
     
-    // Pulse when held
-    if (state == BUTTON_HELD) {
-        Uint32 pulse = (SDL_GetTicks() / 100) % 10;
-        float pulse_factor = 0.8f + (pulse / 10.0f) * 0.4f;
-        button_color.r = (Uint8)fmin(color.r * pulse_factor, 255);
-        button_color.g = (Uint8)fmin(color.g * pulse_factor, 255);
-        button_color.b = (Uint8)fmin(color.b * pulse_factor, 255);
+    // Extract age
+    char* age_start = strstr(data, "\"age\":");
+    if (age_start) {
+        age_start += 6;
+        api_response.age = atoi(age_start);
     }
-    
-    // Draw button background
-    SDL_Rect button_rect = {x, y, w, h};
-    SDL_SetRenderDrawColor(renderer, button_color.r, button_color.g, button_color.b, button_color.a);
-    SDL_RenderFillRect(renderer, &button_rect);
-    
-    // Draw button border
-    if (state != BUTTON_NORMAL) {
-        // Thicker border for interactive states
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_Rect outer_border = {x - 2, y - 2, w + 4, h + 4};
-        SDL_RenderDrawRect(renderer, &outer_border);
-    }
-    
-    // Normal border
-    SDL_SetRenderDrawColor(renderer, 
-                          button_color.r * 0.7, 
-                          button_color.g * 0.7, 
-                          button_color.b * 0.7, 
-                          button_color.a);
-    SDL_RenderDrawRect(renderer, &button_rect);
-    
-    // Draw text centered on button
-    draw_text(text, x + w/2, y + h/2, (SDL_Color){255, 255, 255, 255});
-}
-
-// Draw text centered at given position with normal font
-void draw_text(const char* text, int x, int y, SDL_Color color) {
-    SDL_Surface* text_surface = TTF_RenderText_Blended(font, text, color);
-    if (!text_surface) {
-        return;
-    }
-    
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-    if (!text_texture) {
-        SDL_FreeSurface(text_surface);
-        return;
-    }
-    
-    SDL_Rect text_rect = {
-        x - text_surface->w / 2, 
-        y - text_surface->h / 2, 
-        text_surface->w, 
-        text_surface->h
-    };
-    
-    SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
-    
-    SDL_DestroyTexture(text_texture);
-    SDL_FreeSurface(text_surface);
-}
-
-// Draw text centered at given position with large font
-void draw_large_text(const char* text, int x, int y, SDL_Color color) {
-    SDL_Surface* text_surface = TTF_RenderText_Blended(large_font, text, color);
-    if (!text_surface) {
-        return;
-    }
-    
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-    if (!text_texture) {
-        SDL_FreeSurface(text_surface);
-        return;
-    }
-    
-    SDL_Rect text_rect = {
-        x - text_surface->w / 2, 
-        y - text_surface->h / 2, 
-        text_surface->w, 
-        text_surface->h
-    };
-    
-    SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
-    
-    SDL_DestroyTexture(text_texture);
-    SDL_FreeSurface(text_surface);
-}
-
-// Draw text left-aligned at given position with normal font
-void draw_text_left(const char* text, int x, int y, SDL_Color color) {
-    SDL_Surface* text_surface = TTF_RenderText_Blended(font, text, color);
-    if (!text_surface) {
-        return;
-    }
-    
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-    if (!text_texture) {
-        SDL_FreeSurface(text_surface);
-        return;
-    }
-    
-    SDL_Rect text_rect = {
-        x, // Left-aligned, no centering
-        y - text_surface->h / 2, // Still center vertically 
-        text_surface->w, 
-        text_surface->h
-    };
-    
-    SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
-    
-    SDL_DestroyTexture(text_texture);
-    SDL_FreeSurface(text_surface);
-}
-
-// Draw text left-aligned with small font and width limit
-void draw_small_text_left(const char* text, int x, int y, SDL_Color color, int max_width) {
-    SDL_Surface* text_surface = TTF_RenderText_Blended(small_font, text, color);
-    if (!text_surface) {
-        return;
-    }
-    
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-    if (!text_texture) {
-        SDL_FreeSurface(text_surface);
-        return;
-    }
-    
-    // Calculate dimensions for rendering
-    int width = text_surface->w;
-    int height = text_surface->h;
-    
-    // If text exceeds max width, clip it
-    SDL_Rect src_rect = {0, 0, width, height};
-    if (width > max_width) {
-        src_rect.w = max_width;
-    }
-    
-    SDL_Rect dest_rect = {
-        x, // Left-aligned
-        y - height / 2, // Center vertically
-        src_rect.w, // Only show up to max_width
-        height
-    };
-    
-    // Render with clipping if needed
-    SDL_RenderCopy(renderer, text_texture, &src_rect, &dest_rect);
-    
-    SDL_DestroyTexture(text_texture);
-    SDL_FreeSurface(text_surface);
 }
