@@ -10,7 +10,7 @@
 #ifndef PANELKIT_DISPLAY_BACKEND_H
 #define PANELKIT_DISPLAY_BACKEND_H
 
-#include <SDL.h>
+#include "core/sdl_includes.h"
 #include <stdbool.h>
 
 /* Forward declaration */

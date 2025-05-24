@@ -1,6 +1,7 @@
 # Core components library
 add_library(panelkit_core STATIC
     logger.c
+    build_info.c
 )
 
 # Find zlog
@@ -29,7 +30,21 @@ endif()
 target_include_directories(panelkit_core PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${ZLOG_INCLUDE_DIRS}
+    ${CURL_INCLUDE_DIRS}
 )
+
+# SDL include directories (handle macOS homebrew case)
+if(APPLE AND NOT EMBEDDED_BUILD)
+    target_include_directories(panelkit_core PUBLIC
+        ${SDL2_INCLUDE_DIRS}/SDL2
+        ${SDL2_TTF_INCLUDE_DIRS}/SDL2
+    )
+else()
+    target_include_directories(panelkit_core PUBLIC
+        ${SDL2_INCLUDE_DIRS}
+        ${SDL2_TTF_INCLUDE_DIRS}
+    )
+endif()
 
 target_link_libraries(panelkit_core PUBLIC
     ${ZLOG_LIBRARIES}

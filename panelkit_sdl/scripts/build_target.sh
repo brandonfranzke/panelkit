@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}Building SDL2 from source for target deployment${NC}"
 
 # Build the minimal Docker image (this will take a while)
-echo -e "${YELLOW}Building target Docker image (may take 10-15 minutes)...${NC}"
+echo -e "${YELLOW}Building target Docker image...${NC}"
 if docker build -f Dockerfile.target -t panelkit-sdl-target .; then
     echo -e "${GREEN}Docker image built successfully!${NC}"
 else

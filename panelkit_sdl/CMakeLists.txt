@@ -6,13 +6,17 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Debug flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0 -Wall -Wextra")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -O0 -Wall -Wextra -DDEBUG")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -Wall -Wextra")
 
 # Embedded build configuration
 if(EMBEDDED_BUILD)
     # Minimal embedded build using custom SDL2 built from source
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;.so")
     message(STATUS "Embedded build using minimal SDL2 from source")
+    
+    # Add compile definition for embedded build
+    add_compile_definitions(EMBEDDED_BUILD)
     
     # Use custom-built SDL2 from source
     set(CMAKE_PREFIX_PATH "/usr/local/aarch64")
@@ -24,8 +28,8 @@ if(EMBEDDED_BUILD)
     set(SDL2_TTF_STATIC_LIBRARIES "/usr/local/aarch64/lib/libSDL2_ttf.a")
     
     # Set include directories
-    set(SDL2_INCLUDE_DIRS "/usr/local/aarch64/include/SDL2")
-    set(SDL2_TTF_INCLUDE_DIRS "/usr/local/aarch64/include/SDL2")
+    set(SDL2_INCLUDE_DIRS "/usr/local/aarch64/include")
+    set(SDL2_TTF_INCLUDE_DIRS "/usr/local/aarch64/include")
     
     # Static curl from our custom build
     set(CURL_STATIC_LIBRARIES "/usr/local/aarch64/lib/libcurl.a")
@@ -88,8 +92,14 @@ add_subdirectory(src/core)
 # Display backend sources
 add_subdirectory(src/display)
 
+# Input handler sources
+add_subdirectory(src/input)
+
 # Include directories
 if(APPLE AND NOT EMBEDDED_BUILD)
+    include_directories(${SDL2_INCLUDE_DIRS}/SDL2 ${SDL2_TTF_INCLUDE_DIRS}/SDL2)
+elseif(EMBEDDED_BUILD)
+    # For embedded build, SDL headers are in SDL2 subdirectory
     include_directories(${SDL2_INCLUDE_DIRS}/SDL2 ${SDL2_TTF_INCLUDE_DIRS}/SDL2)
 else()
     include_directories(${SDL2_INCLUDE_DIRS} ${SDL2_TTF_INCLUDE_DIRS})
@@ -109,6 +119,7 @@ if(EMBEDDED_BUILD)
     target_link_libraries(${PROJECT_NAME} 
         panelkit_core
         panelkit_display
+        ${PANELKIT_INPUT_LIB}
         ${SDL2_STATIC_LIBRARIES}
         ${SDL2_TTF_STATIC_LIBRARIES}
         ${CURL_STATIC_LIBRARIES}
@@ -133,6 +144,7 @@ else()
     target_link_libraries(${PROJECT_NAME} 
         panelkit_core
         panelkit_display
+        ${PANELKIT_INPUT_LIB}
         ${SDL2_LIBRARIES} 
         ${SDL2_TTF_LIBRARIES} 
         ${CURL_LIBRARIES} 

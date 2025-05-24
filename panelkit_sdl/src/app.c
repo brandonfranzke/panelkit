@@ -1,5 +1,4 @@
-#include <SDL.h>
-#include <SDL_ttf.h>
+#include "core/sdl_includes.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
@@ -12,7 +11,10 @@
 
 // Core includes
 #include "core/logger.h"
+#include "core/build_info.h"
 #include "display/display_backend.h"
+#include "input/input_handler.h"
+#include "input/input_debug.h"
 
 // Embedded font data
 #include "embedded_font.h"
@@ -92,6 +94,7 @@ typedef struct {
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 DisplayBackend* display_backend = NULL;  // Display abstraction
+InputHandler* input_handler = NULL;     // Input abstraction
 TTF_Font* font = NULL;
 TTF_Font* large_font = NULL;
 TTF_Font* small_font = NULL; // Smaller font for API data
@@ -183,6 +186,9 @@ void update_gesture(int x, int y);
 void end_gesture(int x, int y);
 void cancel_gesture();
 void handle_click(int button_index);
+void handle_touch_down(int x, int y, const char* source);
+void handle_touch_up(int x, int y, const char* source);
+void handle_touch_motion(int x, int y, const char* source);
 int get_button_at_position(int x, int y, int scroll_offset);
 void initialize_pages();
 void render_page(int page_index, float offset_x);
@@ -221,7 +227,9 @@ int main(int argc, char* argv[]) {
     // Log startup
     log_info("=== PanelKit Starting ===");
     log_system_info();
-    log_build_info();
+    
+    // Log comprehensive build info
+    build_log_info();
     
     // Log command line arguments
     log_debug("Command line: %d arguments", argc);
@@ -315,10 +323,57 @@ int main(int argc, char* argv[]) {
                      display_backend->actual_height,
                      display_backend->name);
     
+    // Initialize input handler
+    log_state_change("Input", "NONE", "INITIALIZING");
+    InputConfig input_config = {
+        .source_type = INPUT_SOURCE_SDL_NATIVE,  // Default to SDL native
+        .device_path = NULL,                      // Auto-detect
+        .auto_detect_devices = true,
+        .enable_mouse_emulation = false
+    };
+    
+    // If using SDL+DRM backend, switch to evdev input source
+    if (display_backend->type == DISPLAY_BACKEND_SDL_DRM) {
+        log_info("SDL+DRM backend detected, switching to evdev input source");
+        input_config.source_type = INPUT_SOURCE_LINUX_EVDEV;
+    }
+    
+    input_handler = input_handler_create(&input_config);
+    if (!input_handler) {
+        log_error("Failed to create input handler");
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    if (!input_handler_start(input_handler)) {
+        log_error("Failed to start input handler");
+        input_handler_destroy(input_handler);
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    log_state_change("Input", "INITIALIZING", "READY");
+    
+    // Log detailed SDL and input state (debug builds only)
+#ifdef DEBUG
+    build_log_sdl_info();
+    input_debug_log_state(input_handler);
+    input_debug_log_sdl_state();
+    
+    // If evdev, log device capabilities
+    if (input_handler->config.source_type == INPUT_SOURCE_LINUX_EVDEV &&
+        input_handler->config.device_path) {
+        input_debug_log_device_caps(input_handler->config.device_path);
+    }
+#endif
+    
     // Initialize SDL_ttf
     log_state_change("SDL_ttf", "NONE", "INITIALIZING");
     if (TTF_Init() < 0) {
         log_error("SDL_ttf initialization failed: %s", TTF_GetError());
+        input_handler_destroy(input_handler);
         display_backend_destroy(display_backend);
         logger_shutdown();
         return 1;
@@ -335,6 +390,7 @@ int main(int argc, char* argv[]) {
     small_font = TTF_OpenFontRW(font_rw_18, 1, 18);     // 1 = freesrc
     if (font == NULL || large_font == NULL || small_font == NULL) {
         log_error("Font loading failed: %s", TTF_GetError());
+        input_handler_destroy(input_handler);
         display_backend_destroy(display_backend);
         TTF_Quit();
         logger_shutdown();
@@ -423,29 +479,48 @@ int main(int argc, char* argv[]) {
                 
                 case SDL_MOUSEBUTTONDOWN:
                     if (e.button.button == SDL_BUTTON_LEFT) {
-                        // Only start a gesture if not currently transitioning between pages
-                        if (target_page == -1) {
-                            // Get button under mouse (if any)
-                            int button_index = get_button_at_position(
-                                e.button.x, e.button.y, pages[current_page].scroll_position);
-                            
-                            // Start a new gesture
-                            begin_gesture(e.button.x, e.button.y, button_index);
-                            gesture_page = current_page;
-                        }
+                        // Translate mouse event to touch event for unified handling
+                        handle_touch_down(e.button.x, e.button.y, "mouse");
                     }
                     break;
                 
                 case SDL_MOUSEBUTTONUP:
                     if (e.button.button == SDL_BUTTON_LEFT) {
-                        // End the current gesture (if any)
-                        end_gesture(e.button.x, e.button.y);
+                        // Translate mouse event to touch event for unified handling
+                        handle_touch_up(e.button.x, e.button.y, "mouse");
                     }
                     break;
                 
                 case SDL_MOUSEMOTION:
-                    // Update current gesture (if any)
-                    update_gesture(e.motion.x, e.motion.y);
+                    // Translate mouse motion to touch motion for unified handling
+                    handle_touch_motion(e.motion.x, e.motion.y, "mouse");
+                    break;
+                
+                case SDL_FINGERDOWN:
+                    // Touch events: convert normalized coordinates to pixel coordinates
+                    {
+                        int touch_x = (int)(e.tfinger.x * actual_width);
+                        int touch_y = (int)(e.tfinger.y * actual_height);
+                        handle_touch_down(touch_x, touch_y, "touch");
+                    }
+                    break;
+                
+                case SDL_FINGERUP:
+                    // Touch release: convert normalized coordinates to pixel coordinates
+                    {
+                        int touch_x = (int)(e.tfinger.x * actual_width);
+                        int touch_y = (int)(e.tfinger.y * actual_height);
+                        handle_touch_up(touch_x, touch_y, "touch");
+                    }
+                    break;
+                
+                case SDL_FINGERMOTION:
+                    // Touch movement: convert normalized coordinates to pixel coordinates
+                    {
+                        int touch_x = (int)(e.tfinger.x * actual_width);
+                        int touch_y = (int)(e.tfinger.y * actual_height);
+                        handle_touch_motion(touch_x, touch_y, "touch");
+                    }
                     break;
             }
         }
@@ -635,6 +710,11 @@ int main(int argc, char* argv[]) {
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
     TTF_CloseFont(small_font);
+    
+    // Cleanup input handler
+    if (input_handler) {
+        input_handler_destroy(input_handler);
+    }
     
     // Display backend handles window/renderer cleanup
     display_backend_destroy(display_backend);
@@ -1121,6 +1201,35 @@ void cancel_gesture() {
         current_gesture = GESTURE_NONE;
         gesture_button = -1;
     }
+}
+
+// Unified touch event handlers that translate both mouse and touch events
+void handle_touch_down(int x, int y, const char* source) {
+    // Only start a gesture if not currently transitioning between pages
+    if (target_page == -1) {
+        // Get button under touch (if any)
+        int button_index = get_button_at_position(x, y, pages[current_page].scroll_position);
+        
+        // Start a new gesture
+        begin_gesture(x, y, button_index);
+        gesture_page = current_page;
+        
+        log_debug("Touch DOWN from %s at (%d,%d), button=%d", source, x, y, button_index);
+    } else {
+        log_debug("Touch DOWN from %s ignored - page transition in progress", source);
+    }
+}
+
+void handle_touch_up(int x, int y, const char* source) {
+    // End the current gesture (if any)
+    end_gesture(x, y);
+    log_debug("Touch UP from %s at (%d,%d)", source, x, y);
+}
+
+void handle_touch_motion(int x, int y, const char* source) {
+    // Update current gesture (if any)
+    update_gesture(x, y);
+    // Note: motion logging is verbose, so only log at trace level if needed
 }
 
 // Handle a button click

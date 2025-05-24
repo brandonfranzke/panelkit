@@ -8,6 +8,7 @@ add_library(panelkit_display STATIC
 # Include directories
 target_include_directories(panelkit_display PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
 # SDL include directories (handle macOS homebrew case)

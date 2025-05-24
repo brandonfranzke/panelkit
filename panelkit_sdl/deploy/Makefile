@@ -8,7 +8,7 @@ LOG_DIR     = /var/log/panelkit
 CONFIG_DIR  = /etc/panelkit
 SERVICE_DIR = /etc/systemd/system
 
-.PHONY: help setup install start stop restart status logs clean
+.PHONY: help setup install uninstall start stop restart status logs clean
 
 # Default target shows help
 help:
@@ -20,15 +20,16 @@ help:
 	@echo "  LOG_DIR    = $(LOG_DIR)"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  help    - Show this help message (default)"
-	@echo "  setup   - Setup permissions and user service"
-	@echo "  install - Install binary and service files"
-	@echo "  start   - Start the service"
-	@echo "  stop    - Stop the service"
-	@echo "  restart - Restart the service"
-	@echo "  status  - Show service status"
-	@echo "  logs    - Follow service logs"
-	@echo "  clean   - Remove installed files and service"
+	@echo "  help      - Show this help message (default)"
+	@echo "  setup     - Setup permissions and user service"
+	@echo "  install   - Install binary and service files"
+	@echo "  uninstall - Remove installed files and service"
+	@echo "  start     - Start the service"
+	@echo "  stop      - Stop the service"
+	@echo "  restart   - Restart the service"
+	@echo "  status    - Show service status"
+	@echo "  logs      - Follow service logs"
+	@echo "  clean     - Remove deployed files from $(TARGET_DIR)"
 
 setup:
 	@echo "Setting up system permissions and directories..."
@@ -77,11 +78,18 @@ status:
 logs:
 	tail -f $(LOG_DIR)/$(APP).log
 
-clean:
-	@echo "Cleaning $(APP) service..."
+uninstall:
+	@echo "Uninstalling $(APP) service..."
 	sudo systemctl stop $(APP) || true
 	sudo systemctl disable $(APP) || true
 	sudo rm -f $(SERVICE_DIR)/$(APP).service
-	sudo systemctl daemon-reload
+	sudo rm -f $(INSTALL_DIR)/$(APP)
+	sudo rm -rf $(CONFIG_DIR)
 	sudo rm -rf $(LOG_DIR)
-	@echo "Service cleanup completed"
+	sudo systemctl daemon-reload
+	@echo "Service uninstalled"
+
+clean:
+	@echo "Cleaning deployed files from $(TARGET_DIR)..."
+	rm -rf $(TARGET_DIR)
+	@echo "Deployed files cleaned"

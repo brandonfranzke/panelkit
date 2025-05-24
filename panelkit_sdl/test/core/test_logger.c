@@ -3,7 +3,7 @@
  * @brief Test program for the logging system
  */
 
-#include "../src/core/logger.h"
+#include "../../src/core/logger.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
