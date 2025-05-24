@@ -83,10 +83,14 @@ endif()
 # Source files
 set(SOURCES
     src/app.c
-    # src/api_functions.c  # Temporarily disabled - API functions are in app.c
+    # src/api_functions.c  # Replaced by modular API system
     src/ui/gestures.c
     src/ui/pages.c
     src/ui/rendering.c
+    src/api/api_client.c
+    src/api/api_manager.c
+    src/json/json_parser.c
+    src/json/jsmn.c
 )
 
 # Core library sources
@@ -114,6 +118,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/fonts/generated)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Include src/ui directory for UI modules
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/ui)
+# Include src/api and src/json directories for API modules  
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/api)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/json)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})

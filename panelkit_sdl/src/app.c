@@ -20,6 +20,9 @@
 #include "ui/pages.h"
 #include "ui/rendering.h"
 
+// API modules
+#include "api/api_manager.h"
+
 // Embedded font data
 #include "embedded_font.h"
 
@@ -65,28 +68,9 @@ SDL_Color text_colors[] = {
     {100, 255, 255, 255}, // Cyan
 };
 
-// API-related variables
-Uint32 last_api_call_time = 0;  // Used by API functions
-
-// API data
-typedef struct {
-    char* data;
-    size_t size;
-    bool is_ready;
-    bool is_loading;
-    pthread_mutex_t mutex;
-    
-    // User data fields
-    char name[128];
-    char email[128];
-    char location[128];
-    char phone[64];
-    char picture_url[256];
-    char nationality[32];
-    int age;
-} ApiResponse;
-
-ApiResponse api_response = {0};
+// API manager
+ApiManager* api_manager = NULL;
+UserData current_user_data = {0};
 
 // Debug info
 bool show_debug = true;
@@ -102,14 +86,13 @@ void handle_click(int button_index);
 void handle_drag(int delta_x, int delta_y, bool is_horizontal);
 void handle_swipe(float offset, bool is_complete);
 
-// API functions
-size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata);
-void* fetch_api_data(void* arg);
-void update_api_data(Uint32 current_time, bool force_refresh);
+// API callback functions
+void on_api_data_received(const UserData* data, void* context);
+void on_api_error(ApiError error, const char* message, void* context);
+void on_api_state_changed(ApiState state, void* context);
+
+// Old API functions (to be replaced)
 void render_api_data(SDL_Renderer* renderer, int x, int y);
-void init_api();
-void cleanup_api();
-void parse_api_response();
 
 // Callback for button hit testing
 int button_hit_test(int x, int y, int page_index) {
@@ -328,13 +311,29 @@ int main(int argc, char* argv[]) {
     // Initialize pages
     initialize_pages();
     
-    // Initialize CURL for API calls
-    init_api();
+    // Initialize API manager
+    ApiManagerConfig api_config = api_manager_default_config();
+    api_config.auto_refresh = false; // We'll control refreshes manually
+    
+    api_manager = api_manager_create(&api_config);
+    if (!api_manager) {
+        log_error("Failed to create API manager");
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Set up API callbacks
+    api_manager_set_data_callback(api_manager, on_api_data_received, NULL);
+    api_manager_set_error_callback(api_manager, on_api_error, NULL);
+    api_manager_set_state_callback(api_manager, on_api_state_changed, NULL);
     
     // Force initial API fetch immediately
-    Uint32 init_time = SDL_GetTicks();
-    update_api_data(init_time, true); // Force refresh
-    last_api_call_time = init_time;
+    api_manager_fetch_user_async(api_manager);
     
     // Main loop
     Uint32 last_time = SDL_GetTicks();
@@ -381,8 +380,8 @@ int main(int argc, char* argv[]) {
         pages_update_transition();
         gestures_set_current_page(pages_get_current());
         
-        // Update API data periodically
-        update_api_data(current_time, false);
+        // Update API manager
+        api_manager_update(api_manager, current_time);
         
         // Clear screen
         SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
@@ -464,7 +463,9 @@ int main(int argc, char* argv[]) {
     // Cleanup
     log_state_change("Application", "RUNNING", "SHUTTING_DOWN");
     
-    cleanup_api();
+    if (api_manager) {
+        api_manager_destroy(api_manager);
+    }
     // No input handler to destroy
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
@@ -736,9 +737,7 @@ void handle_click(int button_index) {
             case 4: // Refresh User
                 // Force refresh API data
                 log_info("Refreshing user data");
-                Uint32 current_time = SDL_GetTicks();
-                update_api_data(current_time, true); // Force refresh
-                last_api_call_time = current_time;   // Reset the timer
+                api_manager_fetch_user_async(api_manager);
                 break;
                 
             case 5: // Exit
@@ -750,101 +749,9 @@ void handle_click(int button_index) {
     }
 }
 
-// API implementation functions - keeping exact same as original
-size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
-    size_t realsize = size * nmemb;
-    ApiResponse* response = (ApiResponse*)userdata;
-    
-    pthread_mutex_lock(&response->mutex);
-    
-    char* new_data = realloc(response->data, response->size + realsize + 1);
-    if (new_data == NULL) {
-        pthread_mutex_unlock(&response->mutex);
-        return 0;
-    }
-    
-    response->data = new_data;
-    memcpy(&response->data[response->size], ptr, realsize);
-    response->size += realsize;
-    response->data[response->size] = 0;
-    
-    pthread_mutex_unlock(&response->mutex);
-    
-    return realsize;
-}
-
-void* fetch_api_data(void* arg) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        log_error("Failed to initialize CURL");
-        return NULL;
-    }
-    
-    pthread_mutex_lock(&api_response.mutex);
-    api_response.is_loading = true;
-    
-    // Clear previous data
-    if (api_response.data) {
-        free(api_response.data);
-        api_response.data = NULL;
-        api_response.size = 0;
-    }
-    pthread_mutex_unlock(&api_response.mutex);
-    
-    // Set up CURL
-    curl_easy_setopt(curl, CURLOPT_URL, "https://randomuser.me/api/");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &api_response);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    
-    // Perform the request
-    CURLcode res = curl_easy_perform(curl);
-    
-    pthread_mutex_lock(&api_response.mutex);
-    if (res != CURLE_OK) {
-        log_error("CURL request failed: %s", curl_easy_strerror(res));
-        api_response.is_loading = false;
-    } else {
-        log_info("API data received: %zu bytes", api_response.size);
-        api_response.is_loading = false;
-        parse_api_response();
-        api_response.is_ready = true;
-    }
-    pthread_mutex_unlock(&api_response.mutex);
-    
-    curl_easy_cleanup(curl);
-    return NULL;
-}
-
-void update_api_data(Uint32 current_time, bool force_refresh) {
-    // Only update every 10 seconds or on force refresh
-    if (!force_refresh && (current_time - last_api_call_time < 10000)) {
-        return;
-    }
-    
-    // Don't start a new request if one is already in progress
-    pthread_mutex_lock(&api_response.mutex);
-    bool is_loading = api_response.is_loading;
-    pthread_mutex_unlock(&api_response.mutex);
-    
-    if (is_loading) {
-        return;
-    }
-    
-    // Start a new thread to fetch data
-    pthread_t thread;
-    if (pthread_create(&thread, NULL, fetch_api_data, NULL) == 0) {
-        pthread_detach(thread);
-        last_api_call_time = current_time;
-    } else {
-        log_error("Failed to create API thread");
-    }
-}
 
 void render_api_data(SDL_Renderer* renderer, int x, int y) {
     (void)renderer; // Unused parameter
-    
-    pthread_mutex_lock(&api_response.mutex);
     
     SDL_Color text_color = {255, 255, 255, 255};
     
@@ -855,147 +762,74 @@ void render_api_data(SDL_Renderer* renderer, int x, int y) {
     // Set line height for smaller font - exact from original
     int line_height = 25;
     
-    if (api_response.is_loading) {
+    ApiState state = api_manager_get_state(api_manager);
+    
+    if (state == API_STATE_LOADING) {
         draw_small_text_left("Loading user data...", x, y, text_color, max_width);
     }
-    else if (api_response.is_ready) {
+    else if (state == API_STATE_SUCCESS && current_user_data.is_valid) {
         // Render the API data nicely formatted - exact format from original
         char buffer[256];
         
         // Name
-        snprintf(buffer, sizeof(buffer), "Name: %s", api_response.name);
+        snprintf(buffer, sizeof(buffer), "Name: %s", current_user_data.name);
         draw_small_text_left(buffer, x, y, text_color, max_width);
         
         // Age
-        snprintf(buffer, sizeof(buffer), "Age: %d", api_response.age);
+        snprintf(buffer, sizeof(buffer), "Age: %d", current_user_data.age);
         draw_small_text_left(buffer, x, y + line_height, text_color, max_width);
         
         // Nationality
-        snprintf(buffer, sizeof(buffer), "Nationality: %s", api_response.nationality);
+        snprintf(buffer, sizeof(buffer), "Nationality: %s", current_user_data.nationality);
         draw_small_text_left(buffer, x, y + line_height * 2, text_color, max_width);
         
         // Location
-        snprintf(buffer, sizeof(buffer), "Location: %s", api_response.location);
+        snprintf(buffer, sizeof(buffer), "Location: %s", current_user_data.location);
         draw_small_text_left(buffer, x, y + line_height * 3, text_color, max_width);
         
         // Email 
-        snprintf(buffer, sizeof(buffer), "Email: %s", api_response.email);
+        snprintf(buffer, sizeof(buffer), "Email: %s", current_user_data.email);
         draw_small_text_left(buffer, x, y + line_height * 4, text_color, max_width);
         
         // Phone
-        snprintf(buffer, sizeof(buffer), "Phone: %s", api_response.phone);
+        snprintf(buffer, sizeof(buffer), "Phone: %s", current_user_data.phone);
         draw_small_text_left(buffer, x, y + line_height * 5, text_color, max_width);
         
         // Picture URL info (just show that it's available)
-        draw_small_text_left("Image URL available", x, y + line_height * 6, text_color, max_width);
+        if (strlen(current_user_data.picture_url) > 0) {
+            draw_small_text_left("Image URL available", x, y + line_height * 6, text_color, max_width);
+        }
+    }
+    else if (state == API_STATE_ERROR) {
+        const char* error_msg = api_manager_get_error_message(api_manager);
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), "Error: %s", error_msg);
+        draw_small_text_left(buffer, x, y, text_color, max_width);
     }
     else {
         draw_small_text_left("No user data loaded", x, y, text_color, max_width);
     }
-    
-    pthread_mutex_unlock(&api_response.mutex);
 }
 
-void init_api() {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    pthread_mutex_init(&api_response.mutex, NULL);
+// API callback functions
+void on_api_data_received(const UserData* data, void* context) {
+    (void)context; // Unused
+    
+    if (data) {
+        current_user_data = *data;
+        log_info("API data received: %s", current_user_data.name);
+    }
 }
 
-void cleanup_api() {
-    pthread_mutex_lock(&api_response.mutex);
-    if (api_response.data) {
-        free(api_response.data);
-        api_response.data = NULL;
-    }
-    pthread_mutex_unlock(&api_response.mutex);
+void on_api_error(ApiError error, const char* message, void* context) {
+    (void)context; // Unused
     
-    pthread_mutex_destroy(&api_response.mutex);
-    curl_global_cleanup();
+    log_error("API error: %s - %s", api_error_string(error), message ? message : "Unknown error");
 }
 
-// Simple JSON parser for the API response
-void parse_api_response() {
-    if (!api_response.data || api_response.size == 0) {
-        return;
-    }
+void on_api_state_changed(ApiState state, void* context) {
+    (void)context; // Unused
     
-    // Very simple parsing - in production you'd use a proper JSON library
-    char* data = api_response.data;
-    
-    // Extract name
-    char* name_start = strstr(data, "\"first\":\"");
-    if (name_start) {
-        name_start += 9;
-        char* name_end = strchr(name_start, '"');
-        if (name_end) {
-            int len = name_end - name_start;
-            if (len > 0 && len < 64) {
-                strncpy(api_response.name, name_start, len);
-                api_response.name[len] = '\0';
-                
-                // Add last name
-                char* last_start = strstr(data, "\"last\":\"");
-                if (last_start) {
-                    last_start += 8;
-                    char* last_end = strchr(last_start, '"');
-                    if (last_end) {
-                        strcat(api_response.name, " ");
-                        len = last_end - last_start;
-                        if (len > 0 && len < 63 - strlen(api_response.name)) {
-                            strncat(api_response.name, last_start, len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Extract email
-    char* email_start = strstr(data, "\"email\":\"");
-    if (email_start) {
-        email_start += 9;
-        char* email_end = strchr(email_start, '"');
-        if (email_end) {
-            int len = email_end - email_start;
-            if (len > 0 && len < 128) {
-                strncpy(api_response.email, email_start, len);
-                api_response.email[len] = '\0';
-            }
-        }
-    }
-    
-    // Extract location (city, country)
-    char* city_start = strstr(data, "\"city\":\"");
-    if (city_start) {
-        city_start += 8;
-        char* city_end = strchr(city_start, '"');
-        if (city_end) {
-            int len = city_end - city_start;
-            if (len > 0 && len < 64) {
-                strncpy(api_response.location, city_start, len);
-                api_response.location[len] = '\0';
-                
-                // Add country
-                char* country_start = strstr(data, "\"country\":\"");
-                if (country_start) {
-                    country_start += 11;
-                    char* country_end = strchr(country_start, '"');
-                    if (country_end) {
-                        strcat(api_response.location, ", ");
-                        len = country_end - country_start;
-                        if (len > 0 && len < 127 - strlen(api_response.location)) {
-                            strncat(api_response.location, country_start, len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Extract age
-    char* age_start = strstr(data, "\"age\":");
-    if (age_start) {
-        age_start += 6;
-        api_response.age = atoi(age_start);
-    }
+    log_debug("API state changed: %s", api_state_string(state));
 }
+
