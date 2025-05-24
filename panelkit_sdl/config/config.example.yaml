@@ -1,0 +1,73 @@
+# PanelKit Example Configuration File
+# Copy this file to one of:
+#   /etc/panelkit/config.yaml        (system-wide)
+#   ~/.config/panelkit/config.yaml   (user-specific)
+#   ./config.yaml                    (local override)
+
+# Display configuration
+display:
+  width: 480
+  height: 640
+  fullscreen: false
+  vsync: true
+  backend: "auto"  # Options: auto, sdl, sdl_drm
+
+# Input configuration
+input:
+  source: "auto"  # Options: auto, sdl_native, evdev
+  device_path: "auto"  # Device path or "auto" for auto-detection
+  mouse_emulation: false
+  auto_detect_devices: true
+
+# API configuration
+api:
+  base_url: "https://randomuser.me/api/"
+  timeout: 10  # seconds
+  auto_refresh: false
+  refresh_interval: 30  # seconds
+
+# User Interface configuration
+ui:
+  colors:
+    background: "#212121"
+    primary: "#ffffff"
+    secondary: "#cccccc"
+    accent: "#00ff00"
+    error: "#ff0000"
+    warning: "#ff9800"
+    success: "#4caf50"
+  
+  fonts:
+    regular_size: 18
+    large_size: 32
+    small_size: 14
+    family: "default"  # "default" uses embedded font
+  
+  animations:
+    enabled: true
+    page_transition_ms: 300
+    scroll_friction: 0.95
+    button_press_scale: 0.95
+  
+  layout:
+    button_padding: 20
+    header_height: 60
+    margin: 10
+    scroll_threshold: 10
+    swipe_threshold: 50
+
+# Logging configuration
+logging:
+  level: "info"  # Options: debug, info, warn, error
+  file: "/var/log/panelkit/panelkit.log"
+  max_size: 10485760  # 10MB in bytes
+  max_files: 5
+  console: true
+
+# System configuration
+system:
+  startup_page: 0
+  debug_overlay: false
+  allow_exit: true
+  idle_timeout: 0  # seconds, 0 = disabled
+  config_check_interval: 0  # seconds, 0 = disabled

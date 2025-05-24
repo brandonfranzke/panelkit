@@ -1,0 +1,125 @@
+#include "config_defaults.h"
+#include <string.h>
+
+void config_init_display_defaults(DisplayConfig* display) {
+    display->width = DEFAULT_DISPLAY_WIDTH;
+    display->height = DEFAULT_DISPLAY_HEIGHT;
+    display->fullscreen = DEFAULT_DISPLAY_FULLSCREEN;
+    display->vsync = DEFAULT_DISPLAY_VSYNC;
+    strncpy(display->backend, DEFAULT_DISPLAY_BACKEND, CONFIG_MAX_STRING - 1);
+    display->backend[CONFIG_MAX_STRING - 1] = '\0';
+}
+
+void config_init_input_defaults(InputConfig* input) {
+    strncpy(input->source, DEFAULT_INPUT_SOURCE, CONFIG_MAX_STRING - 1);
+    input->source[CONFIG_MAX_STRING - 1] = '\0';
+    
+    strncpy(input->device_path, DEFAULT_INPUT_DEVICE_PATH, CONFIG_MAX_PATH - 1);
+    input->device_path[CONFIG_MAX_PATH - 1] = '\0';
+    
+    input->mouse_emulation = DEFAULT_INPUT_MOUSE_EMULATION;
+    input->auto_detect_devices = DEFAULT_INPUT_AUTO_DETECT;
+}
+
+void config_init_api_defaults(ApiConfig* api) {
+    strncpy(api->base_url, DEFAULT_API_BASE_URL, CONFIG_MAX_URL - 1);
+    api->base_url[CONFIG_MAX_URL - 1] = '\0';
+    
+    api->timeout = DEFAULT_API_TIMEOUT;
+    api->auto_refresh = DEFAULT_API_AUTO_REFRESH;
+    api->refresh_interval = DEFAULT_API_REFRESH_INTERVAL;
+    
+    api->custom_endpoints = NULL;
+    api->num_custom_endpoints = 0;
+}
+
+static void config_init_colors_defaults(ColorScheme* colors) {
+    strncpy(colors->background, DEFAULT_COLOR_BACKGROUND, CONFIG_MAX_COLOR - 1);
+    colors->background[CONFIG_MAX_COLOR - 1] = '\0';
+    
+    strncpy(colors->primary, DEFAULT_COLOR_PRIMARY, CONFIG_MAX_COLOR - 1);
+    colors->primary[CONFIG_MAX_COLOR - 1] = '\0';
+    
+    strncpy(colors->secondary, DEFAULT_COLOR_SECONDARY, CONFIG_MAX_COLOR - 1);
+    colors->secondary[CONFIG_MAX_COLOR - 1] = '\0';
+    
+    strncpy(colors->accent, DEFAULT_COLOR_ACCENT, CONFIG_MAX_COLOR - 1);
+    colors->accent[CONFIG_MAX_COLOR - 1] = '\0';
+    
+    strncpy(colors->error, DEFAULT_COLOR_ERROR, CONFIG_MAX_COLOR - 1);
+    colors->error[CONFIG_MAX_COLOR - 1] = '\0';
+    
+    strncpy(colors->warning, DEFAULT_COLOR_WARNING, CONFIG_MAX_COLOR - 1);
+    colors->warning[CONFIG_MAX_COLOR - 1] = '\0';
+    
+    strncpy(colors->success, DEFAULT_COLOR_SUCCESS, CONFIG_MAX_COLOR - 1);
+    colors->success[CONFIG_MAX_COLOR - 1] = '\0';
+}
+
+static void config_init_fonts_defaults(FontConfig* fonts) {
+    fonts->regular_size = DEFAULT_FONT_REGULAR_SIZE;
+    fonts->large_size = DEFAULT_FONT_LARGE_SIZE;
+    fonts->small_size = DEFAULT_FONT_SMALL_SIZE;
+    
+    strncpy(fonts->family, DEFAULT_FONT_FAMILY, CONFIG_MAX_STRING - 1);
+    fonts->family[CONFIG_MAX_STRING - 1] = '\0';
+}
+
+static void config_init_animations_defaults(AnimationConfig* animations) {
+    animations->enabled = DEFAULT_ANIMATION_ENABLED;
+    animations->page_transition_ms = DEFAULT_ANIMATION_PAGE_TRANSITION_MS;
+    animations->scroll_friction = DEFAULT_ANIMATION_SCROLL_FRICTION;
+    animations->button_press_scale = DEFAULT_ANIMATION_BUTTON_PRESS_SCALE;
+}
+
+static void config_init_layout_defaults(LayoutConfig* layout) {
+    layout->button_padding = DEFAULT_LAYOUT_BUTTON_PADDING;
+    layout->header_height = DEFAULT_LAYOUT_HEADER_HEIGHT;
+    layout->margin = DEFAULT_LAYOUT_MARGIN;
+    layout->scroll_threshold = DEFAULT_LAYOUT_SCROLL_THRESHOLD;
+    layout->swipe_threshold = DEFAULT_LAYOUT_SWIPE_THRESHOLD;
+}
+
+void config_init_ui_defaults(UIConfig* ui) {
+    config_init_colors_defaults(&ui->colors);
+    config_init_fonts_defaults(&ui->fonts);
+    config_init_animations_defaults(&ui->animations);
+    config_init_layout_defaults(&ui->layout);
+}
+
+void config_init_logging_defaults(LogConfig* logging) {
+    strncpy(logging->level, DEFAULT_LOG_LEVEL, CONFIG_MAX_STRING - 1);
+    logging->level[CONFIG_MAX_STRING - 1] = '\0';
+    
+    strncpy(logging->file, DEFAULT_LOG_FILE, CONFIG_MAX_PATH - 1);
+    logging->file[CONFIG_MAX_PATH - 1] = '\0';
+    
+    logging->max_size = DEFAULT_LOG_MAX_SIZE;
+    logging->max_files = DEFAULT_LOG_MAX_FILES;
+    logging->console = DEFAULT_LOG_CONSOLE;
+}
+
+void config_init_system_defaults(SystemConfig* system) {
+    system->startup_page = DEFAULT_SYSTEM_STARTUP_PAGE;
+    system->debug_overlay = DEFAULT_SYSTEM_DEBUG_OVERLAY;
+    system->allow_exit = DEFAULT_SYSTEM_ALLOW_EXIT;
+    system->idle_timeout = DEFAULT_SYSTEM_IDLE_TIMEOUT;
+    system->config_check_interval = DEFAULT_SYSTEM_CONFIG_CHECK_INTERVAL;
+}
+
+void config_init_defaults(Config* config) {
+    // Clear the structure
+    memset(config, 0, sizeof(Config));
+    
+    // Set version
+    strncpy(config->version, "1.0", CONFIG_MAX_STRING - 1);
+    config->version[CONFIG_MAX_STRING - 1] = '\0';
+    
+    // Initialize all sections with defaults
+    config_init_display_defaults(&config->display);
+    config_init_input_defaults(&config->input);
+    config_init_api_defaults(&config->api);
+    config_init_ui_defaults(&config->ui);
+    config_init_logging_defaults(&config->logging);
+    config_init_system_defaults(&config->system);
+}
