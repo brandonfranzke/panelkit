@@ -20,10 +20,11 @@
 #define DEFAULT_INPUT_AUTO_DETECT true
 
 // API defaults
-#define DEFAULT_API_BASE_URL "https://randomuser.me/api/"
-#define DEFAULT_API_TIMEOUT 10
-#define DEFAULT_API_AUTO_REFRESH false
-#define DEFAULT_API_REFRESH_INTERVAL 30
+#define DEFAULT_API_TIMEOUT_MS 10000
+#define DEFAULT_API_RETRY_COUNT 3
+#define DEFAULT_API_RETRY_DELAY_MS 1000
+#define DEFAULT_API_VERIFY_SSL true
+#define DEFAULT_API_USER_AGENT "PanelKit/1.0"
 
 // UI Color defaults (Material Design inspired)
 #define DEFAULT_COLOR_BACKGROUND "#212121"
@@ -71,11 +72,11 @@
 void config_init_defaults(Config* config);
 
 // Initialize individual sections with defaults
-void config_init_display_defaults(DisplayConfig* display);
-void config_init_input_defaults(InputConfig* input);
-void config_init_api_defaults(ApiConfig* api);
-void config_init_ui_defaults(UIConfig* ui);
-void config_init_logging_defaults(LogConfig* logging);
-void config_init_system_defaults(SystemConfig* system);
+void config_init_display_defaults(ConfigDisplay* display);
+void config_init_input_defaults(ConfigInput* input);
+void config_init_api_defaults(ConfigApi* api);
+void config_init_ui_defaults(ConfigUI* ui);
+void config_init_logging_defaults(ConfigLogging* logging);
+void config_init_system_defaults(ConfigSystem* system);
 
 #endif // CONFIG_DEFAULTS_H

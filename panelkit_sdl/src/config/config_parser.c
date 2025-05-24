@@ -152,18 +152,24 @@ static void process_key_value(ParseContext* ctx, const char* key, const char* va
     else if (strncmp(path, "api.", 4) == 0) {
         const char* subkey = path + 4;
         
-        if (strcmp(subkey, "base_url") == 0) {
-            strncpy(ctx->config->api.base_url, value, CONFIG_MAX_URL - 1);
-            ctx->parser->required_fields.api_base_url = true;
+        if (strcmp(subkey, "default_timeout_ms") == 0) {
+            ctx->config->api.default_timeout_ms = atoi(value);
         }
-        else if (strcmp(subkey, "timeout") == 0) {
-            ctx->config->api.timeout = atoi(value);
+        else if (strcmp(subkey, "default_retry_count") == 0) {
+            ctx->config->api.default_retry_count = atoi(value);
         }
-        else if (strcmp(subkey, "auto_refresh") == 0) {
-            parse_bool(value, &ctx->config->api.auto_refresh);
+        else if (strcmp(subkey, "default_retry_delay_ms") == 0) {
+            ctx->config->api.default_retry_delay_ms = atoi(value);
         }
-        else if (strcmp(subkey, "refresh_interval") == 0) {
-            ctx->config->api.refresh_interval = atoi(value);
+        else if (strcmp(subkey, "default_verify_ssl") == 0) {
+            parse_bool(value, &ctx->config->api.default_verify_ssl);
+        }
+        else if (strcmp(subkey, "default_user_agent") == 0) {
+            strncpy(ctx->config->api.default_user_agent, value, CONFIG_MAX_STRING - 1);
+        }
+        else if (strncmp(subkey, "services", 8) == 0) {
+            // TODO: Parse nested services structure including headers and meta
+            emit_warning(ctx, "Nested API services parsing not yet implemented (includes headers/meta): %s", subkey);
         }
         else {
             emit_warning(ctx, "Unknown API configuration key: %s", subkey);
@@ -434,18 +440,8 @@ bool config_parser_parse(ConfigParser* parser, const char* yaml_content, size_t 
     
     // Validate required fields
     if (success) {
-        if (!parser->required_fields.display_width || !parser->required_fields.display_height) {
-            set_parse_error(parser, "Required display dimensions (width/height) not specified");
-            success = false;
-        }
-        else if (!parser->required_fields.api_base_url) {
-            set_parse_error(parser, "Required API base URL not specified");
-            success = false;
-        }
-        else if (!parser->required_fields.logging_file) {
-            set_parse_error(parser, "Required logging file path not specified");
-            success = false;
-        }
+        // All fields are optional - defaults will be used if not specified
+        // This allows for minimal configuration files
     }
     
     return success;

@@ -24,6 +24,9 @@
 // API modules
 #include "api/api_manager.h"
 
+// Configuration system
+#include "config/config_manager.h"
+
 // Embedded font data
 #include "embedded_font.h"
 
@@ -45,13 +48,14 @@ SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 DisplayBackend* display_backend = NULL;  // Display abstraction
 InputHandler* input_handler = NULL;     // Input abstraction
+ConfigManager* config_manager = NULL;   // Configuration system
 TTF_Font* font = NULL;
 TTF_Font* large_font = NULL;
 TTF_Font* small_font = NULL; // Smaller font for API data
 bool quit = false;
 
-// Background color
-SDL_Color bg_color = {33, 33, 33, 255}; // Dark gray
+// Background color (will be set from config)
+SDL_Color bg_color = {33, 33, 33, 255}; // Default dark gray
 
 // Time display
 bool show_time = true; // Whether to show time on the third button
@@ -127,6 +131,31 @@ void on_page_render(int page_index, float offset_x) {
     render_page(page_index, offset_x);
 }
 
+// Configuration helper functions
+static DisplayBackendType backend_type_from_string(const char* str) {
+    if (strcmp(str, "sdl") == 0) return DISPLAY_BACKEND_SDL;
+    if (strcmp(str, "sdl_drm") == 0) return DISPLAY_BACKEND_SDL_DRM;
+    return DISPLAY_BACKEND_AUTO;
+}
+
+static InputSourceType input_source_from_string(const char* str) {
+    if (strcmp(str, "sdl_native") == 0) return INPUT_SOURCE_SDL_NATIVE;
+    if (strcmp(str, "evdev") == 0) return INPUT_SOURCE_LINUX_EVDEV;
+    return INPUT_SOURCE_SDL_NATIVE;  // Default
+}
+
+static SDL_Color parse_color(const char* hex) {
+    SDL_Color color = {0, 0, 0, 255};
+    if (hex && hex[0] == '#' && strlen(hex) == 7) {
+        unsigned int rgb;
+        sscanf(hex + 1, "%06x", &rgb);
+        color.r = (rgb >> 16) & 0xFF;
+        color.g = (rgb >> 8) & 0xFF;
+        color.b = rgb & 0xFF;
+    }
+    return color;
+}
+
 int main(int argc, char* argv[]) {
     // Initialize logging first
     const char* config_paths[] = {
@@ -160,42 +189,98 @@ int main(int argc, char* argv[]) {
         log_debug("  argv[%d] = %s", i, argv[i]);
     }
     
-    // Parse command line for display options
-    DisplayBackendType backend_type = DISPLAY_BACKEND_AUTO;
-    int display_width = SCREEN_WIDTH;
-    int display_height = SCREEN_HEIGHT;
+    // Initialize configuration system
+    ConfigManagerOptions config_options = {0};
+    config_manager = config_manager_create(&config_options);
+    if (!config_manager) {
+        log_error("Failed to create configuration manager");
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Load configuration from all sources
+    if (!config_manager_load(config_manager)) {
+        log_error("Failed to load configuration");
+        config_manager_destroy(config_manager);
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Get configuration
+    const Config* config = config_manager_get_config(config_manager);
+    config_log_summary(config_manager);
+    
+    // Parse command line for overrides and special options
+    DisplayBackendType backend_type = backend_type_from_string(config->display.backend);
+    int display_width = config->display.width;
+    int display_height = config->display.height;
     bool portrait_mode = false;
     
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--display-backend") == 0 && i + 1 < argc) {
-            const char* backend = argv[i + 1];
-            if (strcmp(backend, "sdl") == 0) {
-                backend_type = DISPLAY_BACKEND_SDL;
-            } else if (strcmp(backend, "sdl_drm") == 0) {
-                backend_type = DISPLAY_BACKEND_SDL_DRM;
+        if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
+            config_manager_load_file(config_manager, argv[i + 1], CONFIG_SOURCE_CLI);
+            log_info("Loaded configuration from: %s", argv[i + 1]);
+            i++;
+        } else if (strcmp(argv[i], "--config-override") == 0 && i + 1 < argc) {
+            char* arg_copy = strdup(argv[i + 1]);
+            char* key = strtok(arg_copy, "=");
+            char* value = strtok(NULL, "=");
+            if (key && value) {
+                config_manager_apply_override(config_manager, key, value);
+                log_info("Configuration override: %s = %s", key, value);
             }
-            log_info("Display backend requested: %s", backend);
-            i++; // Skip the argument value
+            free(arg_copy);
+            i++;
+        } else if (strcmp(argv[i], "--validate-config") == 0 && i + 1 < argc) {
+            ValidationResult result = config_validate_file(argv[i + 1]);
+            if (result.valid) {
+                printf("Configuration file is valid: %s\n", argv[i + 1]);
+            } else {
+                printf("Configuration error at line %d: %s\n", 
+                       result.error_line, result.error_message);
+            }
+            config_manager_destroy(config_manager);
+            logger_shutdown();
+            return result.valid ? 0 : 1;
+        } else if (strcmp(argv[i], "--generate-config") == 0 && i + 1 < argc) {
+            if (config_generate_default(argv[i + 1], true)) {
+                printf("Generated configuration file: %s\n", argv[i + 1]);
+            } else {
+                printf("Failed to generate configuration file\n");
+            }
+            config_manager_destroy(config_manager);
+            logger_shutdown();
+            return config_generate_default(argv[i + 1], true) ? 0 : 1;
+        } else if (strcmp(argv[i], "--display-backend") == 0 && i + 1 < argc) {
+            const char* backend = argv[i + 1];
+            backend_type = backend_type_from_string(backend);
+            log_info("Display backend override: %s", backend);
+            i++;
         } else if (strcmp(argv[i], "--portrait") == 0) {
             portrait_mode = true;
             log_info("Portrait mode requested");
         } else if (strcmp(argv[i], "--width") == 0 && i + 1 < argc) {
             display_width = atoi(argv[i + 1]);
-            log_info("Custom width requested: %d", display_width);
-            i++; // Skip the argument value
+            log_info("Display width override: %d", display_width);
+            i++;
         } else if (strcmp(argv[i], "--height") == 0 && i + 1 < argc) {
             display_height = atoi(argv[i + 1]);
-            log_info("Custom height requested: %d", display_height);
-            i++; // Skip the argument value
+            log_info("Display height override: %d", display_height);
+            i++;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("PanelKit - Touch UI Application\n");
             printf("Usage: %s [options]\n", argv[0]);
             printf("Options:\n");
+            printf("  --config <file>                  Load configuration from file\n");
+            printf("  --config-override <key=value>    Override configuration value\n");
+            printf("  --validate-config <file>         Validate configuration file\n");
+            printf("  --generate-config <file>         Generate default configuration\n");
             printf("  --display-backend <sdl|sdl_drm>  Select display backend\n");
             printf("  --portrait                       Use portrait mode (swap width/height)\n");
             printf("  --width <pixels>                 Set display width\n");
             printf("  --height <pixels>                Set display height\n");
             printf("  --help, -h                       Show this help\n");
+            config_manager_destroy(config_manager);
             logger_shutdown();
             return 0;
         }
@@ -216,8 +301,8 @@ int main(int argc, char* argv[]) {
         .height = display_height,
         .title = "PanelKit",
         .backend_type = backend_type,
-        .fullscreen = false,
-        .vsync = true
+        .fullscreen = config->display.fullscreen,
+        .vsync = config->display.vsync
     };
     
     display_backend = display_backend_create(&display_config);
@@ -263,7 +348,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Load font at different sizes - don't close RWops, TTF_OpenFontRW handles it
-    font = TTF_OpenFontRW(font_rw, 1, 18);  // The '1' means SDL will free the RWops
+    font = TTF_OpenFontRW(font_rw, 1, config->ui.fonts.regular_size);  // The '1' means SDL will free the RWops
     if (!font) {
         log_error("Failed to load font from embedded data: %s", TTF_GetError());
         TTF_Quit();
@@ -274,7 +359,7 @@ int main(int argc, char* argv[]) {
     
     // Load same font at larger size
     SDL_RWops* large_font_rw = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
-    large_font = TTF_OpenFontRW(large_font_rw, 1, 36);
+    large_font = TTF_OpenFontRW(large_font_rw, 1, config->ui.fonts.large_size);
     if (!large_font) {
         log_error("Failed to load large font: %s", TTF_GetError());
         TTF_CloseFont(font);
@@ -286,7 +371,7 @@ int main(int argc, char* argv[]) {
     
     // Load same font at smaller size
     SDL_RWops* small_font_rw = SDL_RWFromConstMem(embedded_font_data, embedded_font_size);
-    small_font = TTF_OpenFontRW(small_font_rw, 1, 14);
+    small_font = TTF_OpenFontRW(small_font_rw, 1, config->ui.fonts.small_size);
     if (!small_font) {
         log_error("Failed to load small font: %s", TTF_GetError());
         TTF_CloseFont(font);
@@ -302,10 +387,10 @@ int main(int argc, char* argv[]) {
     // Initialize input handler
     log_state_change("Input", "NONE", "INITIALIZING");
     InputConfig input_config = {
-        .source_type = INPUT_SOURCE_SDL_NATIVE,  // Default to SDL native
-        .device_path = NULL,                      // Auto-detect
-        .auto_detect_devices = true,
-        .enable_mouse_emulation = false
+        .source_type = input_source_from_string(config->input.source),
+        .device_path = strcmp(config->input.device_path, "auto") == 0 ? NULL : config->input.device_path,
+        .auto_detect_devices = config->input.auto_detect_devices,
+        .enable_mouse_emulation = config->input.mouse_emulation
     };
     
     // If using SDL+DRM backend, switch to evdev input source
@@ -356,12 +441,19 @@ int main(int argc, char* argv[]) {
     rendering_init(renderer, font, large_font, small_font);
     rendering_set_dimensions(actual_width, actual_height);
     
+    // Apply UI configuration
+    bg_color = parse_color(config->ui.colors.background);
+    
     // Initialize pages
     initialize_pages();
     
     // Initialize API manager
+    // TODO: Update to use new multi-service API structure
     ApiManagerConfig api_config = api_manager_default_config();
-    api_config.auto_refresh = false; // We'll control refreshes manually
+    api_config.timeout_seconds = config->api.default_timeout_ms / 1000;  // Convert ms to seconds
+    api_config.retry_count = config->api.default_retry_count;
+    api_config.retry_delay_ms = config->api.default_retry_delay_ms;
+    // For now, keep using the default base_url until API manager is updated
     
     api_manager = api_manager_create(&api_config);
     if (!api_manager) {
@@ -518,6 +610,9 @@ int main(int argc, char* argv[]) {
     }
     if (input_handler) {
         input_handler_destroy(input_handler);
+    }
+    if (config_manager) {
+        config_manager_destroy(config_manager);
     }
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);

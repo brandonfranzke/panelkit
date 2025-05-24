@@ -279,10 +279,10 @@ void config_log_summary(const ConfigManager* manager) {
              cfg->input.device_path,
              cfg->input.mouse_emulation ? "yes" : "no");
     
-    log_info("API: base_url=%s, timeout=%ds, auto_refresh=%s",
-             cfg->api.base_url,
-             cfg->api.timeout,
-             cfg->api.auto_refresh ? "yes" : "no");
+    log_info("API: default_timeout=%dms, verify_ssl=%s, num_services=%zu",
+             cfg->api.default_timeout_ms,
+             cfg->api.default_verify_ssl ? "yes" : "no",
+             cfg->api.num_services);
     
     log_info("UI: fonts=%d/%d/%d, animations=%s, colors: bg=%s primary=%s",
              cfg->ui.fonts.regular_size,
@@ -420,12 +420,68 @@ bool config_generate_default(const char* path, bool include_comments) {
     // API section
     if (include_comments) {
         fprintf(file, "# API configuration\n");
+        fprintf(file, "# Multiple API services can be defined, each with multiple endpoints\n");
     }
     fprintf(file, "api:\n");
-    fprintf(file, "  base_url: \"%s\"\n", DEFAULT_API_BASE_URL);
-    fprintf(file, "  timeout: %d  # seconds\n", DEFAULT_API_TIMEOUT);
-    fprintf(file, "  auto_refresh: %s\n", DEFAULT_API_AUTO_REFRESH ? "true" : "false");
-    fprintf(file, "  refresh_interval: %d  # seconds\n\n", DEFAULT_API_REFRESH_INTERVAL);
+    
+    // Default settings
+    fprintf(file, "  default_timeout_ms: %d\n", DEFAULT_API_TIMEOUT_MS);
+    fprintf(file, "  default_retry_count: %d\n", DEFAULT_API_RETRY_COUNT);
+    fprintf(file, "  default_retry_delay_ms: %d\n", DEFAULT_API_RETRY_DELAY_MS);
+    fprintf(file, "  default_verify_ssl: %s\n", DEFAULT_API_VERIFY_SSL ? "true" : "false");
+    fprintf(file, "  default_user_agent: \"%s\"\n\n", DEFAULT_API_USER_AGENT);
+    
+    // Services
+    fprintf(file, "  services:\n");
+    
+    // RandomUser API service
+    fprintf(file, "    - id: \"randomuser\"\n");
+    fprintf(file, "      name: \"Random User Generator\"\n");
+    fprintf(file, "      host: \"randomuser.me\"\n");
+    fprintf(file, "      protocol: \"https\"\n");
+    fprintf(file, "      base_path: \"/api\"\n");
+    fprintf(file, "      verify_ssl: true\n");
+    if (include_comments) {
+        fprintf(file, "      # headers: '{\"X-Custom-Header\": \"value\", \"Accept-Language\": \"en-US\"}'\n");
+        fprintf(file, "      # meta: '{\"rate_limit_per_hour\": 1000, \"quota_info\": \"free-tier\"}'\n");
+    }
+    fprintf(file, "      endpoints:\n");
+    fprintf(file, "        - id: \"get_user\"\n");
+    fprintf(file, "          name: \"Get Random User\"\n");
+    fprintf(file, "          path: \"/\"\n");
+    fprintf(file, "          method: \"GET\"\n");
+    fprintf(file, "          auto_refresh: true\n");
+    fprintf(file, "          refresh_interval_ms: 30000\n");
+    fprintf(file, "          optional_params: '{\"results\": \"1\", \"gender\": \"female\"}'\n\n");
+    
+    // Weather API service (example for N+1 testing)
+    fprintf(file, "    - id: \"weather\"\n");
+    fprintf(file, "      name: \"OpenWeatherMap API\"\n");
+    fprintf(file, "      host: \"api.openweathermap.org\"\n");
+    fprintf(file, "      protocol: \"https\"\n");
+    fprintf(file, "      base_path: \"/data/2.5\"\n");
+    fprintf(file, "      api_key: \"your-api-key-here\"  # Replace with actual API key\n");
+    if (include_comments) {
+        fprintf(file, "      # Custom headers for this API\n");
+    }
+    fprintf(file, "      headers: '{\"Accept\": \"application/json\", \"X-Requested-With\": \"PanelKit\"}'\n");
+    if (include_comments) {
+        fprintf(file, "      # Meta section for service-specific configuration\n");
+    }
+    fprintf(file, "      meta: '{\"subscription_type\": \"free\", \"calls_per_minute\": 60, \"city_default\": \"San Francisco,US\"}'\n");
+    fprintf(file, "      endpoints:\n");
+    fprintf(file, "        - id: \"current_weather\"\n");
+    fprintf(file, "          name: \"Current Weather\"\n");
+    fprintf(file, "          path: \"/weather\"\n");
+    fprintf(file, "          method: \"GET\"\n");
+    fprintf(file, "          auto_refresh: true\n");
+    fprintf(file, "          refresh_interval_ms: 300000  # 5 minutes\n");
+    fprintf(file, "          required_params: '{\"q\": \"San Francisco,US\", \"units\": \"metric\"}'\n");
+    fprintf(file, "        - id: \"forecast\"\n");
+    fprintf(file, "          name: \"5-Day Forecast\"\n");
+    fprintf(file, "          path: \"/forecast\"\n");
+    fprintf(file, "          method: \"GET\"\n");
+    fprintf(file, "          required_params: '{\"q\": \"San Francisco,US\", \"units\": \"metric\"}'\n\n");
     
     // UI section
     if (include_comments) {

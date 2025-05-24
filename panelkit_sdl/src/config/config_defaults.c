@@ -1,7 +1,7 @@
 #include "config_defaults.h"
 #include <string.h>
 
-void config_init_display_defaults(DisplayConfig* display) {
+void config_init_display_defaults(ConfigDisplay* display) {
     display->width = DEFAULT_DISPLAY_WIDTH;
     display->height = DEFAULT_DISPLAY_HEIGHT;
     display->fullscreen = DEFAULT_DISPLAY_FULLSCREEN;
@@ -10,7 +10,7 @@ void config_init_display_defaults(DisplayConfig* display) {
     display->backend[CONFIG_MAX_STRING - 1] = '\0';
 }
 
-void config_init_input_defaults(InputConfig* input) {
+void config_init_input_defaults(ConfigInput* input) {
     strncpy(input->source, DEFAULT_INPUT_SOURCE, CONFIG_MAX_STRING - 1);
     input->source[CONFIG_MAX_STRING - 1] = '\0';
     
@@ -21,16 +21,19 @@ void config_init_input_defaults(InputConfig* input) {
     input->auto_detect_devices = DEFAULT_INPUT_AUTO_DETECT;
 }
 
-void config_init_api_defaults(ApiConfig* api) {
-    strncpy(api->base_url, DEFAULT_API_BASE_URL, CONFIG_MAX_URL - 1);
-    api->base_url[CONFIG_MAX_URL - 1] = '\0';
+void config_init_api_defaults(ConfigApi* api) {
+    // Set defaults
+    api->default_timeout_ms = DEFAULT_API_TIMEOUT_MS;
+    api->default_retry_count = DEFAULT_API_RETRY_COUNT;
+    api->default_retry_delay_ms = DEFAULT_API_RETRY_DELAY_MS;
+    api->default_verify_ssl = DEFAULT_API_VERIFY_SSL;
+    strncpy(api->default_user_agent, DEFAULT_API_USER_AGENT, CONFIG_MAX_STRING - 1);
+    api->default_user_agent[CONFIG_MAX_STRING - 1] = '\0';
     
-    api->timeout = DEFAULT_API_TIMEOUT;
-    api->auto_refresh = DEFAULT_API_AUTO_REFRESH;
-    api->refresh_interval = DEFAULT_API_REFRESH_INTERVAL;
-    
-    api->custom_endpoints = NULL;
-    api->num_custom_endpoints = 0;
+    // Initialize with no services (will be allocated and populated from config)
+    api->services = NULL;
+    api->num_services = 0;
+    api->max_services = 0;
 }
 
 static void config_init_colors_defaults(ColorScheme* colors) {
@@ -80,14 +83,14 @@ static void config_init_layout_defaults(LayoutConfig* layout) {
     layout->swipe_threshold = DEFAULT_LAYOUT_SWIPE_THRESHOLD;
 }
 
-void config_init_ui_defaults(UIConfig* ui) {
+void config_init_ui_defaults(ConfigUI* ui) {
     config_init_colors_defaults(&ui->colors);
     config_init_fonts_defaults(&ui->fonts);
     config_init_animations_defaults(&ui->animations);
     config_init_layout_defaults(&ui->layout);
 }
 
-void config_init_logging_defaults(LogConfig* logging) {
+void config_init_logging_defaults(ConfigLogging* logging) {
     strncpy(logging->level, DEFAULT_LOG_LEVEL, CONFIG_MAX_STRING - 1);
     logging->level[CONFIG_MAX_STRING - 1] = '\0';
     
@@ -99,7 +102,7 @@ void config_init_logging_defaults(LogConfig* logging) {
     logging->console = DEFAULT_LOG_CONSOLE;
 }
 
-void config_init_system_defaults(SystemConfig* system) {
+void config_init_system_defaults(ConfigSystem* system) {
     system->startup_page = DEFAULT_SYSTEM_STARTUP_PAGE;
     system->debug_overlay = DEFAULT_SYSTEM_DEBUG_OVERLAY;
     system->allow_exit = DEFAULT_SYSTEM_ALLOW_EXIT;

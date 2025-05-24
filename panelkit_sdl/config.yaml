@@ -1,0 +1,115 @@
+# PanelKit Configuration File
+# Generated on: May 24 2025
+# Version: 1.0
+
+# Display configuration
+display:
+  width: 640
+  height: 480
+  fullscreen: false
+  vsync: true
+  backend: "auto"  # Options: auto, sdl, sdl_drm
+
+# Input configuration
+input:
+  source: "auto"  # Options: auto, sdl_native, evdev
+  device_path: "auto"  # Device path or "auto"
+  mouse_emulation: false
+  auto_detect_devices: true
+
+# API configuration
+# Multiple API services can be defined, each with multiple endpoints
+api:
+  default_timeout_ms: 10000
+  default_retry_count: 3
+  default_retry_delay_ms: 1000
+  default_verify_ssl: true
+  default_user_agent: "PanelKit/1.0"
+
+  services:
+    - id: "randomuser"
+      name: "Random User Generator"
+      host: "randomuser.me"
+      protocol: "https"
+      base_path: "/api"
+      verify_ssl: true
+      # headers: '{"X-Custom-Header": "value", "Accept-Language": "en-US"}'
+      # meta: '{"rate_limit_per_hour": 1000, "quota_info": "free-tier"}'
+      endpoints:
+        - id: "get_user"
+          name: "Get Random User"
+          path: "/"
+          method: "GET"
+          auto_refresh: true
+          refresh_interval_ms: 30000
+          optional_params: '{"results": "1", "gender": "female"}'
+
+    - id: "weather"
+      name: "OpenWeatherMap API"
+      host: "api.openweathermap.org"
+      protocol: "https"
+      base_path: "/data/2.5"
+      api_key: "your-api-key-here"  # Replace with actual API key
+      # Custom headers for this API
+      headers: '{"Accept": "application/json", "X-Requested-With": "PanelKit"}'
+      # Meta section for service-specific configuration
+      meta: '{"subscription_type": "free", "calls_per_minute": 60, "city_default": "San Francisco,US"}'
+      endpoints:
+        - id: "current_weather"
+          name: "Current Weather"
+          path: "/weather"
+          method: "GET"
+          auto_refresh: true
+          refresh_interval_ms: 300000  # 5 minutes
+          required_params: '{"q": "San Francisco,US", "units": "metric"}'
+        - id: "forecast"
+          name: "5-Day Forecast"
+          path: "/forecast"
+          method: "GET"
+          required_params: '{"q": "San Francisco,US", "units": "metric"}'
+
+# User Interface configuration
+ui:
+  colors:
+    background: "#212121"
+    primary: "#ffffff"
+    secondary: "#cccccc"
+    accent: "#00ff00"
+    error: "#ff0000"
+    warning: "#ff9800"
+    success: "#4caf50"
+  
+  fonts:
+    regular_size: 18
+    large_size: 32
+    small_size: 14
+    family: "default"  # "default" uses embedded font
+  
+  animations:
+    enabled: true
+    page_transition_ms: 300
+    scroll_friction: 0.95
+    button_press_scale: 0.95
+  
+  layout:
+    button_padding: 20
+    header_height: 60
+    margin: 10
+    scroll_threshold: 10
+    swipe_threshold: 50
+
+# Logging configuration
+logging:
+  level: "info"  # Options: debug, info, warn, error
+  file: "/var/log/panelkit/panelkit.log"
+  max_size: 10485760  # bytes
+  max_files: 5
+  console: true
+
+# System configuration
+system:
+  startup_page: 0
+  debug_overlay: false
+  allow_exit: true
+  idle_timeout: 0  # seconds, 0 = disabled
+  config_check_interval: 0  # seconds, 0 = disabled

@@ -21,7 +21,7 @@ typedef struct {
     bool fullscreen;
     bool vsync;
     char backend[CONFIG_MAX_STRING];  // "auto", "sdl", "sdl_drm"
-} DisplayConfig;
+} ConfigDisplay;
 
 // Input configuration
 typedef struct {
@@ -29,26 +29,71 @@ typedef struct {
     char device_path[CONFIG_MAX_PATH]; // Device path or "auto"
     bool mouse_emulation;
     bool auto_detect_devices;
-} InputConfig;
+} ConfigInput;
 
-// API endpoint configuration
+// Individual endpoint within an API
 typedef struct {
-    char name[CONFIG_MAX_STRING];
-    char url[CONFIG_MAX_URL];
-    int refresh_interval;  // seconds
-} ApiEndpoint;
+    char id[CONFIG_MAX_STRING];             // Unique identifier for this endpoint
+    char name[CONFIG_MAX_STRING];           // Human-readable name
+    char path[CONFIG_MAX_PATH];             // Endpoint path (appended to API base_path)
+    char method[16];                        // HTTP method: "GET", "POST", "PUT", "DELETE"
+    char required_params[CONFIG_MAX_STRING]; // JSON object string of required params
+    char optional_params[CONFIG_MAX_STRING]; // JSON object string of optional params
+    bool auto_refresh;                      // Enable auto-refresh for this endpoint
+    int refresh_interval_ms;                // Auto-refresh interval (overrides API default)
+    
+    // Parser function for this endpoint's responses
+    // Note: Parser implementations are registered separately in code
+    // This field is populated at runtime, not from config
+    void* parser_func;  // Will be cast to appropriate parser function type
+} ApiEndpointConfig;
+
+// API service configuration
+typedef struct {
+    char id[CONFIG_MAX_STRING];             // Unique identifier for this API service
+    char name[CONFIG_MAX_STRING];           // Human-readable name
+    char host[CONFIG_MAX_STRING];           // Hostname or IP
+    int port;                               // Port number (0 = use default for protocol)
+    char protocol[16];                      // "http", "https", "ws", "wss"
+    char base_path[CONFIG_MAX_PATH];        // Base path for all endpoints
+    char bearer_token[CONFIG_MAX_STRING];   // Bearer token for auth
+    char api_key[CONFIG_MAX_STRING];        // API key for auth
+    char username[CONFIG_MAX_STRING];       // Basic auth username
+    char password[CONFIG_MAX_STRING];       // Basic auth password
+    int timeout_ms;                         // Request timeout in milliseconds
+    int retry_count;                        // Number of retries on failure
+    int retry_delay_ms;                     // Delay between retries
+    bool verify_ssl;                        // Verify SSL certificates
+    char user_agent[CONFIG_MAX_STRING];     // Custom User-Agent header
+    
+    // Custom headers for non-standard API requirements
+    char headers[CONFIG_MAX_STRING * 4];    // JSON object string of custom headers
+    
+    // Meta/data section for service-specific configuration
+    // This can contain API-specific keys, tokens, or other data
+    // that the service handler can interpret as needed
+    char meta[CONFIG_MAX_STRING * 4];       // JSON object string of metadata
+    
+    // Endpoints for this API service
+    ApiEndpointConfig* endpoints;
+    size_t num_endpoints;
+    size_t max_endpoints;
+} ApiServiceConfig;
 
 // API configuration
 typedef struct {
-    char base_url[CONFIG_MAX_URL];
-    int timeout;  // seconds
-    bool auto_refresh;
-    int refresh_interval;  // seconds
+    // Default settings for all APIs
+    int default_timeout_ms;
+    int default_retry_count;
+    int default_retry_delay_ms;
+    bool default_verify_ssl;
+    char default_user_agent[CONFIG_MAX_STRING];
     
-    // Custom endpoints (future expansion)
-    ApiEndpoint* custom_endpoints;
-    size_t num_custom_endpoints;
-} ApiConfig;
+    // Defined API services
+    ApiServiceConfig* services;
+    size_t num_services;
+    size_t max_services;
+} ConfigApi;
 
 // Color scheme
 typedef struct {
@@ -92,7 +137,7 @@ typedef struct {
     FontConfig fonts;
     AnimationConfig animations;
     LayoutConfig layout;
-} UIConfig;
+} ConfigUI;
 
 // Logging configuration
 typedef struct {
@@ -101,7 +146,7 @@ typedef struct {
     uint64_t max_size;                 // bytes
     int max_files;
     bool console;
-} LogConfig;
+} ConfigLogging;
 
 // System configuration
 typedef struct {
@@ -110,7 +155,7 @@ typedef struct {
     bool allow_exit;
     int idle_timeout;  // seconds, 0 = disabled
     char config_check_interval;  // seconds, 0 = disabled
-} SystemConfig;
+} ConfigSystem;
 
 // Main configuration structure
 struct Config {
@@ -119,12 +164,12 @@ struct Config {
     char loaded_from[CONFIG_MAX_PATH];
     
     // Configuration sections
-    DisplayConfig display;
-    InputConfig input;
-    ApiConfig api;
-    UIConfig ui;
-    LogConfig logging;
-    SystemConfig system;
+    ConfigDisplay display;
+    ConfigInput input;
+    ConfigApi api;
+    ConfigUI ui;
+    ConfigLogging logging;
+    ConfigSystem system;
 };
 
 // Required field indicators (for validation)

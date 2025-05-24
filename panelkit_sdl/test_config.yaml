@@ -1,0 +1,9 @@
+display:
+  width: 800
+  height: 600
+
+api:
+  base_url: "http://localhost:8080"
+
+logging:
+  file: "/tmp/panelkit.log"

@@ -1,0 +1,44 @@
+api:
+  default_timeout_ms: 15000
+  default_user_agent: "PanelKit/1.0 (Custom Build)"
+  
+  services:
+    - id: "custom_api"
+      name: "Custom Corporate API"
+      host: "internal.company.com"
+      port: 8443
+      protocol: "https"
+      base_path: "/api/v2"
+      bearer_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      headers: |
+        {
+          "X-API-Version": "2.0",
+          "X-Client-ID": "panelkit-device-001",
+          "Accept-Language": "en-US,en;q=0.9",
+          "X-Request-Source": "embedded-panel"
+        }
+      meta: |
+        {
+          "environment": "production",
+          "region": "us-west-2",
+          "device_capabilities": ["touch", "display", "audio"],
+          "max_concurrent_requests": 5,
+          "cache_ttl_seconds": 300,
+          "fallback_endpoints": ["backup.company.com", "dr.company.com"]
+        }
+      endpoints:
+        - id: "device_status"
+          name: "Device Status Check"
+          path: "/device/status"
+          method: "POST"
+          auto_refresh: true
+          refresh_interval_ms: 60000
+          required_params: '{"device_id": "panel-001", "location": "lobby"}'
+          
+        - id: "notifications"
+          name: "Get Notifications"
+          path: "/notifications/active"
+          method: "GET"
+          auto_refresh: true
+          refresh_interval_ms: 30000
+          optional_params: '{"priority": "high", "max_count": 10}'

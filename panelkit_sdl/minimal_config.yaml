@@ -1,0 +1,14 @@
+display:
+  width: 800
+  height: 600
+
+api:
+  default_timeout_ms: 5000
+  services:
+    - id: "randomuser"
+      host: "randomuser.me"
+      protocol: "https"
+      endpoints:
+        - id: "get_user"
+          path: "/api/"
+          method: "GET"
