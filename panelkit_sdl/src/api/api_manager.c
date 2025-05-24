@@ -406,8 +406,18 @@ static bool parse_user_data(const char* json_data, UserData* user_data) {
         char first_name[64] = {0};
         char last_name[64] = {0};
         
-        if (first) json_value_get_string(first, first_name, sizeof(first_name));
-        if (last) json_value_get_string(last, last_name, sizeof(last_name));
+        if (first) {
+            JsonError err = json_value_get_string(first, first_name, sizeof(first_name));
+            if (err != JSON_SUCCESS) {
+                log_error("Failed to parse first name: %s", json_error_string(err));
+            }
+        }
+        if (last) {
+            JsonError err = json_value_get_string(last, last_name, sizeof(last_name));
+            if (err != JSON_SUCCESS) {
+                log_error("Failed to parse last name: %s", json_error_string(err));
+            }
+        }
         
         snprintf(user_data->name, sizeof(user_data->name), "%s %s", first_name, last_name);
     }
@@ -415,7 +425,10 @@ static bool parse_user_data(const char* json_data, UserData* user_data) {
     // Parse email
     JsonValue* email = json_object_get(user, "email");
     if (email) {
-        json_value_get_string(email, user_data->email, sizeof(user_data->email));
+        JsonError err = json_value_get_string(email, user_data->email, sizeof(user_data->email));
+        if (err != JSON_SUCCESS) {
+            log_error("Failed to parse email: %s", json_error_string(err));
+        }
     }
     
     // Parse location
@@ -427,8 +440,18 @@ static bool parse_user_data(const char* json_data, UserData* user_data) {
         char city_name[64] = {0};
         char country_name[64] = {0};
         
-        if (city) json_value_get_string(city, city_name, sizeof(city_name));
-        if (country) json_value_get_string(country, country_name, sizeof(country_name));
+        if (city) {
+            JsonError err = json_value_get_string(city, city_name, sizeof(city_name));
+            if (err != JSON_SUCCESS) {
+                log_error("Failed to parse city: %s", json_error_string(err));
+            }
+        }
+        if (country) {
+            JsonError err = json_value_get_string(country, country_name, sizeof(country_name));
+            if (err != JSON_SUCCESS) {
+                log_error("Failed to parse country: %s", json_error_string(err));
+            }
+        }
         
         snprintf(user_data->location, sizeof(user_data->location), "%s, %s", city_name, country_name);
     }
@@ -436,13 +459,19 @@ static bool parse_user_data(const char* json_data, UserData* user_data) {
     // Parse phone
     JsonValue* phone = json_object_get(user, "phone");
     if (phone) {
-        json_value_get_string(phone, user_data->phone, sizeof(user_data->phone));
+        JsonError err = json_value_get_string(phone, user_data->phone, sizeof(user_data->phone));
+        if (err != JSON_SUCCESS) {
+            log_error("Failed to parse phone: %s", json_error_string(err));
+        }
     }
     
     // Parse nationality
     JsonValue* nat = json_object_get(user, "nat");
     if (nat) {
-        json_value_get_string(nat, user_data->nationality, sizeof(user_data->nationality));
+        JsonError err = json_value_get_string(nat, user_data->nationality, sizeof(user_data->nationality));
+        if (err != JSON_SUCCESS) {
+            log_error("Failed to parse nationality: %s", json_error_string(err));
+        }
     }
     
     // Parse age
@@ -450,7 +479,10 @@ static bool parse_user_data(const char* json_data, UserData* user_data) {
     if (dob_obj) {
         JsonValue* age = json_object_get(dob_obj, "age");
         if (age) {
-            json_value_get_int(age, &user_data->age);
+            JsonError err = json_value_get_int(age, &user_data->age);
+            if (err != JSON_SUCCESS) {
+                log_error("Failed to parse age: %s", json_error_string(err));
+            }
         }
     }
     
@@ -459,7 +491,10 @@ static bool parse_user_data(const char* json_data, UserData* user_data) {
     if (picture_obj) {
         JsonValue* large = json_object_get(picture_obj, "large");
         if (large) {
-            json_value_get_string(large, user_data->picture_url, sizeof(user_data->picture_url));
+            JsonError err = json_value_get_string(large, user_data->picture_url, sizeof(user_data->picture_url));
+            if (err != JSON_SUCCESS) {
+                log_error("Failed to parse picture URL: %s", json_error_string(err));
+            }
         }
     }
     

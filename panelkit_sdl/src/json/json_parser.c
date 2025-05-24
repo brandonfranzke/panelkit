@@ -6,6 +6,7 @@
 #include <string.h>
 
 #define MAX_TOKENS 128
+#define MAX_JSON_VALUES 32
 
 struct JsonValue {
     jsmntok_t* token;
@@ -18,6 +19,10 @@ struct JsonParser {
     int token_count;
     char* json_string;
     JsonValue root_value;
+    
+    // Value pool to avoid static variables
+    JsonValue value_pool[MAX_JSON_VALUES];
+    int value_pool_index;
 };
 
 JsonParser* json_parser_create(void) {
@@ -91,6 +96,20 @@ static int json_token_equal(const char* json, jsmntok_t* token, const char* str)
     return 0;
 }
 
+static int skip_tokens(jsmntok_t* token) {
+    int count = 1;
+    if (token->type == JSMN_OBJECT || token->type == JSMN_ARRAY) {
+        int size = token->size;
+        for (int i = 0; i < size; i++) {
+            count += skip_tokens(token + count);
+            if (token->type == JSMN_OBJECT) {
+                count += skip_tokens(token + count);  // Skip value too
+            }
+        }
+    }
+    return count;
+}
+
 JsonValue* json_object_get(JsonValue* object, const char* key) {
     if (!object || !key || object->token->type != JSMN_OBJECT) {
         return NULL;
@@ -99,8 +118,10 @@ JsonValue* json_object_get(JsonValue* object, const char* key) {
     jsmntok_t* tokens = object->token;
     const char* json = object->json_string;
     
-    // Find the key in the object
-    for (int i = 1; i < object->token->size * 2; i += 2) {
+    // Iterate through object key-value pairs
+    int i = 1;  // Start after the object token itself
+    for (int j = 0; j < object->token->size; j++) {
+        // Check if this key matches
         if (json_token_equal(json, &tokens[i], key)) {
             // Found the key, return the value
             static JsonValue value;
@@ -108,6 +129,10 @@ JsonValue* json_object_get(JsonValue* object, const char* key) {
             value.json_string = json;
             return &value;
         }
+        
+        // Skip to next key-value pair
+        i += 1;  // Skip key
+        i += skip_tokens(&tokens[i]);  // Skip value
     }
     
     return NULL;
@@ -118,8 +143,16 @@ JsonValue* json_array_get(JsonValue* array, int index) {
         return NULL;
     }
     
+    // Navigate to the correct array element
+    jsmntok_t* tokens = array->token;
+    int i = 1;  // Start after array token
+    
+    for (int j = 0; j < index; j++) {
+        i += skip_tokens(&tokens[i]);
+    }
+    
     static JsonValue value;
-    value.token = &array->token[index + 1];
+    value.token = &tokens[i];
     value.json_string = array->json_string;
     return &value;
 }

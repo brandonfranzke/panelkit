@@ -13,7 +13,8 @@
 #include "core/logger.h"
 #include "core/build_info.h"
 #include "display/display_backend.h"
-// Input handling is done directly through SDL events
+#include "input/input_handler.h"
+#include "input/input_debug.h"
 
 // UI modules
 #include "ui/gestures.h"
@@ -43,7 +44,7 @@ static int actual_height = SCREEN_HEIGHT;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 DisplayBackend* display_backend = NULL;  // Display abstraction
-// No input handler - we use SDL events directly
+InputHandler* input_handler = NULL;     // Input abstraction
 TTF_Font* font = NULL;
 TTF_Font* large_font = NULL;
 TTF_Font* small_font = NULL; // Smaller font for API data
@@ -298,8 +299,55 @@ int main(int argc, char* argv[]) {
     
     log_info("Fonts loaded successfully from embedded data");
     
-    // Note: We don't use the input handler abstraction anymore
-    // We process SDL events directly for unified touch/mouse handling
+    // Initialize input handler
+    log_state_change("Input", "NONE", "INITIALIZING");
+    InputConfig input_config = {
+        .source_type = INPUT_SOURCE_SDL_NATIVE,  // Default to SDL native
+        .device_path = NULL,                      // Auto-detect
+        .auto_detect_devices = true,
+        .enable_mouse_emulation = false
+    };
+    
+    // If using SDL+DRM backend, switch to evdev input source
+    if (display_backend->type == DISPLAY_BACKEND_SDL_DRM) {
+        log_info("SDL+DRM backend detected, switching to evdev input source");
+        input_config.source_type = INPUT_SOURCE_LINUX_EVDEV;
+    }
+    
+    input_handler = input_handler_create(&input_config);
+    if (!input_handler) {
+        log_error("Failed to create input handler");
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    if (!input_handler_start(input_handler)) {
+        log_error("Failed to start input handler");
+        input_handler_destroy(input_handler);
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    log_state_change("Input", "INITIALIZING", "READY");
+    
+    // Log input debug info
+    input_debug_log_state(input_handler);
+    
+    // If we're using evdev, log device capabilities
+    if (input_handler->config.source_type == INPUT_SOURCE_LINUX_EVDEV &&
+        input_handler->config.device_path) {
+        input_debug_log_device_caps(input_handler->config.device_path);
+    }
     
     // Initialize modules
     gestures_init(on_gesture_click, on_gesture_drag, on_gesture_swipe, button_hit_test);
@@ -344,7 +392,9 @@ int main(int argc, char* argv[]) {
         
         // Process SDL events for unified input handling
         SDL_Event e;
+        int event_count = 0;
         while (SDL_PollEvent(&e)) {
+            event_count++;
             if (e.type == SDL_QUIT) {
                 quit = true;
             }
@@ -466,7 +516,9 @@ int main(int argc, char* argv[]) {
     if (api_manager) {
         api_manager_destroy(api_manager);
     }
-    // No input handler to destroy
+    if (input_handler) {
+        input_handler_destroy(input_handler);
+    }
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
     TTF_CloseFont(small_font);
