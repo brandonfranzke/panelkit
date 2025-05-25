@@ -1,136 +1,259 @@
-# PanelKit SDL Display Issue - Progress Report
+# State Management and Event System Implementation Progress
 
-## Context & Goal
-We have a C/SDL touch panel application for Raspberry Pi CM5 that successfully compiles, deploys, and runs as a systemd service. The application logic works correctly (API calls, logging, rendering to software renderer), but **no graphics appear on the physical display**. The goal is to get actual visual output on the Raspberry Pi's connected display.
+## Overview
+This document captures the architectural decisions, implementation progress, and future roadmap for the state management and event system refactoring of PanelKit. It serves as a formal prompt to allow seamless continuation by another assistant.
 
 ## Current Status
-- ✅ **Application runs successfully** - no crashes, proper service startup
-- ✅ **SDL initializes** - creates windows, renderers, processes input
-- ✅ **Software rendering works** - application draws to memory buffers
-- ❌ **No display output** - screen remains blank despite successful rendering
+- **Phase 1: State Store Foundation** - ✅ COMPLETE
+- **Phase 2: Event System Core** - 🚧 NEXT
+- **Phase 3: Widget Interface Pattern** - 📅 PLANNED
+- **Phase 4: Integration & Migration** - 📅 PLANNED
 
-## Architecture Overview
-- **Target**: Raspberry Pi CM5 (ARM64) running Raspberry Pi OS
-- **Build**: Cross-compiled in Docker (Debian Bookworm with ARM64 toolchain)
-- **SDL**: Custom-built SDL 2.30.x with static linking for embedded deployment
-- **Display**: Connected via standard display interface (exact specs TBD)
+## Architecture Context
 
-## Core Problem: Missing Video Drivers
+### Problem Statement
+The original PanelKit implementation had tight coupling between:
+- API calls and UI updates
+- Button actions and data fetching
+- State management scattered across components
 
-### Observed Issue
-```bash
-# Current SDL driver enumeration:
-Available drivers: 3
-  0: offscreen  # Memory-only rendering
-  1: dummy      # No-op driver  
-  2: evdev      # Input driver, not video
+This made it difficult to:
+- Add new API services
+- Update UI elements independently
+- Handle asynchronous data flow cleanly
+- Test components in isolation
 
-# Expected but missing:
-- KMSDRM (modern Linux framebuffer via DRM/KMS)
-- fbdev (legacy framebuffer)
+### Solution Architecture
+Implement a decoupled event-driven architecture with centralized state management:
+
+```
+[UI Components] <--subscribe--> [Event System] <--listen--> [State Store]
+                                      ^
+                                      |
+                                 [API Parsers]
 ```
 
-### Root Cause Analysis
-Through systematic testing, we identified that **SDL framebuffer drivers are not being compiled** into our custom SDL build, despite configuration appearing correct:
+## Key Design Decisions
 
-1. **SDL Configuration appears correct**:
-   ```
-   SDL_KMSDRM:BOOL=ON
-   PKG_KMSDRM_FOUND:INTERNAL=1
-   All DRM/GBM/EGL libraries detected
-   ```
+### 1. State Store Design (Phase 1 - COMPLETE)
 
-2. **But compilation fails silently**:
-   - Verbose build shows no KMSDRM source files compiled
-   - `strings libSDL2.a | grep kmsdrm` returns nothing
-   - Driver enumeration only shows offscreen/dummy/evdev
+**Compound Key Approach**
+- Decision: Use "type_name:id" compound keys instead of nested structures
+- Rationale: Simpler implementation, familiar from database/JS world, enables wildcards
+- Example: `"weather_current:91007"`, `"battery_state:low"`
 
-3. **Current hypothesis**: Cross-compilation EGL header issue
-   - SDL's KMSDRM requires: `PKG_KMSDRM_FOUND AND HAVE_OPENGL_EGL`
-   - EGL detection likely failing in cross-compilation environment
-   - Headers exist in `/usr/include/EGL/` but not in ARM64 cross-compilation paths
+**Memory Management**
+- Decision: Deep copy with thread safety (pthread_rwlock)
+- Rationale: Devices have ample memory (several GB), safety over optimization
+- Trade-off: More memory usage but simpler ownership model
 
-## Testing Methodology
+**Type Registration**
+- Decision: Runtime registration via string names (not fixed enum)
+- Rationale: Flexibility for new APIs without recompilation
+- Implementation: Dynamic type configuration with per-type settings
 
-### Minimal Test App Approach
-Created isolated test applications in `test_minimal/` directory to avoid disrupting main application:
+**Data Storage**
+- Decision: Generic void* storage with type envelope
+- Rationale: Most flexible for different data types
+- Alternative considered: JSON strings (rejected for performance)
 
-**test_display.c**: Basic SDL window with colored rectangle
-**test_forced_driver.c**: Systematically tries forcing different video drivers via environment variables
+### 2. Event System Design (Phase 2 - NEXT)
 
-**Benefits**:
-- Fast iteration (minimal build time)
-- Clear debug output
-- Isolated from main application complexity
-- Easy to create variants testing different approaches
+**Event Naming**
+- Decision: Hierarchical semantic names without tight coupling to source
+- Examples: `"weather.temperature"`, `"device.battery"` (NOT `"api_weather_temperature"`)
+- Rationale: Avoid coupling events to their source
 
-### Key Test Results
-```bash
-# Forcing different drivers via SDL_VIDEODRIVER:
-fbdev: "fbdev not available"
-KMSDRM: "KMSDRM not available" 
-offscreen: ✅ Works (but no display output)
+**Subscription Model**
+- Decision: Function pointer callbacks with context
+- Pattern: `event_subscribe("weather.temperature", handler_func, context)`
+- No wildcards initially (explicit subscriptions only)
+
+**Publishing**
+- Decision: Explicit publishing (not automatic on state change)
+- Rationale: More control over event flow
+- State store subscribes to all events for caching
+
+### 3. Widget Interface Pattern (Phase 3 - PLANNED)
+
+**Component Structure**
+- Each UI element can subscribe to events
+- Standard interface for event handling
+- Components manage their own subscriptions
+
+**Migration Strategy**
+- Start with one dummy button as proof of concept
+- Gradually migrate existing components
+- Keep existing functionality working throughout
+
+## Implementation Progress
+
+### Phase 1: State Store Foundation ✅
+
+**Completed Files:**
+- `src/state/state_store.h` - Public API
+- `src/state/state_store.c` - Implementation
+
+**Key Features Implemented:**
+```c
+// Core operations with compound keys
+state_store_set(store, "weather_current", "91007", data, size);
+state_store_get(store, "weather_current", "91007", &size, &timestamp);
+
+// Type configuration
+DataTypeConfig config = {
+    .type_name = "weather_current",
+    .max_items_per_key = 1,      // Keep only latest
+    .retention_seconds = 1800,   // 30 min expiration
+    .cache_enabled = true
+};
+
+// Thread-safe with rwlocks
+// Deep copy memory management
+// Expiration handling
+// Wildcard-ready structure
 ```
 
-This confirms drivers are completely missing from SDL build, not just enumeration issues.
+### Phase 2: Event System Core 🚧
 
-## Current Investigation Plan
+**Planned Files:**
+- `src/events/event_system.h` - Public API
+- `src/events/event_system.c` - Implementation
 
-### Immediate Next Steps
-1. **Fix EGL cross-compilation**: Add EGL headers to ARM64 cross-compilation paths
-2. **Verify HAVE_OPENGL_EGL**: Ensure EGL detection passes during SDL build
-3. **Confirm KMSDRM compilation**: Check that KMSDRM sources actually get compiled
-4. **Test framebuffer output**: Verify working drivers produce display output
+**Planned API:**
+```c
+// Event system lifecycle
+EventSystem* event_system_create(void);
+void event_system_destroy(EventSystem* system);
 
-### Docker Build Changes Made
-- Added comprehensive DRM/GBM/EGL dependencies
-- Added cross-compilation EGL header copying
-- Enhanced build debugging and verification
-- Explicit library path configuration for cross-compilation
+// Publishing
+bool event_publish(EventSystem* system, const char* event_name, 
+                   void* data, size_t data_size);
 
-### Fallback Approaches
-If KMSDRM continues to fail:
-1. **Legacy fbdev**: Focus on getting basic framebuffer driver working
-2. **Raspberry Pi specific driver**: Try SDL_RPI driver with VideoCore libraries
-3. **System configuration**: Investigate Pi boot config for KMS/DRM mode
-4. **Alternative SDL build**: Try different SDL version or build approach
+// Subscription
+typedef void (*event_handler_func)(const char* event_name, 
+                                  const void* data, size_t data_size,
+                                  void* context);
 
-## Technical Details
-
-### Build Environment
-- **Container**: Debian Bookworm with crossbuild-essential-arm64
-- **Toolchain**: aarch64-linux-gnu-gcc
-- **SDL Build**: From source with custom configuration for embedded use
-- **Dependencies**: DRM, GBM, EGL, udev libraries for framebuffer support
-
-### SDL Configuration
-```cmake
--DSDL_KMSDRM=ON
--DSDL_FBDEV=ON  
--DSDL_OPENGL=ON
--DSDL_OPENGLES=ON
--DSDL_RENDER_SOFTWARE=ON
-# Disabled: X11, Wayland, audio, joystick, etc.
+bool event_subscribe(EventSystem* system, const char* event_name,
+                    event_handler_func handler, void* context);
+bool event_unsubscribe(EventSystem* system, const char* event_name,
+                      event_handler_func handler);
 ```
 
-### Key Files
-- **Main app**: `src/app.c` - Full application with logging, API calls, UI
-- **Test apps**: `test_minimal/test_display.c`, `test_minimal/test_forced_driver.c`
-- **Build**: `Dockerfile.target` - Cross-compilation environment and SDL build
-- **Deploy**: `deploy/panelkit.service` - Systemd service configuration
+**Integration with State Store:**
+- State store will subscribe to all events
+- Events carry full data payload
+- Handlers can query state store for historical data
 
-## Questions for Next Session
-1. Should we continue with EGL header fix approach or try different strategy?
-2. Are there Raspberry Pi specific display configuration requirements we're missing?
-3. Should we try a completely different SDL build approach (package manager vs source)?
-4. Is there value in testing with simpler graphics output (direct framebuffer writes)?
+### Phase 3: Widget Interface Pattern 📅
 
-## Success Criteria
-- SDL enumerates KMSDRM or fbdev drivers
-- `test_forced_driver` successfully initializes framebuffer driver
-- Colored rectangle appears on physical display
-- Main application displays UI on screen
+**Planned Approach:**
+```c
+// Widget event interface
+typedef struct {
+    void (*on_event)(void* widget, const char* event_name, 
+                     const void* data, size_t data_size);
+    bool (*subscribe_events)(void* widget, EventSystem* system);
+    void (*unsubscribe_events)(void* widget, EventSystem* system);
+} WidgetEventInterface;
 
----
+// Example button implementation
+typedef struct {
+    Button base;
+    WidgetEventInterface events;
+    char* subscribed_event;
+} EventButton;
+```
 
-**Current Status**: Ready to test EGL header fix and verify KMSDRM compilation. If this doesn't work, we have clear fallback strategies and a solid testing framework for rapid iteration.
+### Phase 4: Integration & Migration 📅
+
+**API Integration Points:**
+- API parsers publish events after successful parse
+- Event names based on service/endpoint: `"weather.current_weather"`
+- Parsers use meta/headers from config for custom behavior
+
+**Example Flow:**
+1. Button triggers API call: `api_request("weather", "current_weather", "91007")`
+2. API response parsed by registered parser
+3. Parser publishes: `event_publish("weather.temperature", &temp_data, sizeof(temp_data))`
+4. State store caches: `state_store_set("weather_temperature", "91007", &temp_data, sizeof(temp_data))`
+5. UI widgets update via their event handlers
+
+## Configuration Integration
+
+The new API configuration structure (already implemented) supports:
+- Multiple services with multiple endpoints
+- Custom headers and meta sections per service
+- Parser registration per service/endpoint
+
+Example:
+```yaml
+api:
+  services:
+    - id: "weather"
+      host: "api.openweathermap.org"
+      headers: '{"Accept": "application/json"}'
+      meta: '{"rate_limit": 60, "default_city": "San Francisco,US"}'
+      endpoints:
+        - id: "current_weather"
+          path: "/weather"
+          method: "GET"
+```
+
+## Next Steps for Continuation
+
+1. **Implement Phase 2: Event System Core**
+   - Create event_system.h/c files
+   - Implement publish/subscribe with function pointers
+   - Add thread safety
+   - Create unit tests
+
+2. **Connect State Store to Event System**
+   - State store subscribes to all events
+   - Implement filtering for cache_enabled types
+   - Add event history queries
+
+3. **Create Proof of Concept**
+   - One dummy button that subscribes to weather events
+   - Test full flow: button → API → parser → event → state → UI update
+
+4. **Plan Migration Strategy**
+   - Identify order of component migration
+   - Create compatibility layer for gradual transition
+   - Document new patterns for team
+
+## Technical Constraints & Decisions
+
+**Language:** C (not C++)
+- Use function pointers for polymorphism
+- Explicit memory management
+- Thread safety with pthreads
+
+**Memory:** Ample available (several GB)
+- Prefer safety over optimization
+- Deep copies acceptable
+- Can cache reasonable history
+
+**Platform:** Embedded Linux (Yocto-based)
+- SDL for display
+- Touch input via evdev/SDL
+- Network via curl
+
+## Questions Resolved
+
+1. **Compound keys vs nested structure** → Compound keys chosen
+2. **Thread safety timing** → Implement now (not premature)
+3. **Fixed types vs runtime registration** → Runtime registration
+4. **Event wildcards** → Explicit subscriptions only (no wildcards initially)
+5. **State ownership** → Deep copy (store owns its data)
+
+## Architecture Benefits
+
+1. **Decoupling:** UI doesn't know about APIs, APIs don't know about UI
+2. **Testability:** Each component can be tested with mock events
+3. **Extensibility:** New APIs/widgets added without touching existing code
+4. **Performance:** Async updates, caching, selective refreshing
+5. **Maintainability:** Clear separation of concerns
+
+This architecture sets up PanelKit for long-term maintainability and feature additions while keeping the codebase manageable and testable.

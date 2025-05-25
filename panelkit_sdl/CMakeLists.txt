@@ -95,6 +95,7 @@ set(SOURCES
     src/config/config_parser.c
     src/config/config_defaults.c
     src/config/config_utils.c
+    src/state/state_store.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c
@@ -134,9 +135,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/ui)
 # Include src/api and src/json directories for API modules  
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/api)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/json)
-# Include src/config and src/yaml directories for configuration system
+# Include src/config, src/yaml, and src/state directories 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/config)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/yaml)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/state)
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
