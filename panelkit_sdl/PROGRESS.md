@@ -5,8 +5,8 @@ This document captures the architectural decisions, implementation progress, and
 
 ## Current Status
 - **Phase 1: State Store Foundation** - ✅ COMPLETE
-- **Phase 2: Event System Core** - 🚧 NEXT
-- **Phase 3: Widget Interface Pattern** - 📅 PLANNED
+- **Phase 2: Event System Core** - ✅ COMPLETE
+- **Phase 3: Widget Interface Pattern** - 🚧 NEXT
 - **Phase 4: Integration & Migration** - 📅 PLANNED
 
 ## Architecture Context
@@ -114,13 +114,15 @@ DataTypeConfig config = {
 // Wildcard-ready structure
 ```
 
-### Phase 2: Event System Core 🚧
+### Phase 2: Event System Core ✅
 
-**Planned Files:**
+**Completed Files:**
 - `src/events/event_system.h` - Public API
 - `src/events/event_system.c` - Implementation
+- `src/state/state_event_bridge.h` - Bridge between state and events
+- `src/state/state_event_bridge.c` - Bridge implementation
 
-**Planned API:**
+**Implemented API:**
 ```c
 // Event system lifecycle
 EventSystem* event_system_create(void);
@@ -141,10 +143,18 @@ bool event_unsubscribe(EventSystem* system, const char* event_name,
                       event_handler_func handler);
 ```
 
+**Key Features Implemented:**
+- Thread-safe publish/subscribe with function pointer callbacks
+- Multiple handlers per event, multiple contexts
+- Deep copy event data for safety
+- Statistics and debugging functions
+- State-event bridge for automatic caching
+
 **Integration with State Store:**
-- State store will subscribe to all events
-- Events carry full data payload
-- Handlers can query state store for historical data
+- Bridge allows state store to subscribe to events
+- Automatic event-to-state mapping (event name → type_name:id)
+- Configurable caching behavior
+- Wildcard iteration support: `state_store_iterate_wildcard(store, "weather_*:*", ...)`
 
 ### Phase 3: Widget Interface Pattern 📅
 

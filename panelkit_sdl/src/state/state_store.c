@@ -382,34 +382,231 @@ bool state_store_has(StateStore* store, const char* type_name, const char* id) {
     return false;
 }
 
-bool state_store_remove(StateStore* store, const char* type_name, const char* id) {
-    if (!store || !type_name || !id) {
+// Iteration functions
+bool state_store_iterate_all(StateStore* store, state_store_iterator callback, void* user_context) {
+    if (!store || !callback) {
         return false;
     }
     
-    char compound_key[MAX_COMPOUND_KEY_LENGTH];
-    make_compound_key(compound_key, sizeof(compound_key), type_name, id);
-    
-    pthread_rwlock_wrlock(&store->lock);
+    pthread_rwlock_rdlock(&store->lock);
     
     for (size_t i = 0; i < store->num_items; i++) {
-        if (strcmp(store->items[i].compound_key, compound_key) == 0) {
-            // Free data
-            free(store->items[i].data);
-            
-            // Move last item to this position to fill gap
-            if (i < store->num_items - 1) {
-                store->items[i] = store->items[store->num_items - 1];
-            }
-            
-            store->num_items--;
-            
+        StoredItem* item = &store->items[i];
+        
+        // Skip expired items
+        time_t now = time(NULL);
+        if (item->expires_at > 0 && now > item->expires_at) {
+            continue;
+        }
+        
+        // Split compound key
+        char type_name[64];
+        char id[128];
+        if (!split_compound_key(item->compound_key, type_name, sizeof(type_name), 
+                               id, sizeof(id))) {
+            continue;
+        }
+        
+        // Call iterator
+        bool continue_iter = callback(type_name, id, item->data, item->data_size,
+                                     item->timestamp, user_context);
+        if (!continue_iter) {
             pthread_rwlock_unlock(&store->lock);
-            log_debug("Removed item: %s", compound_key);
             return true;
         }
     }
     
     pthread_rwlock_unlock(&store->lock);
-    return false;
+    return true;
 }
+
+bool state_store_iterate_by_type(StateStore* store, const char* type_name,
+                                 state_store_iterator callback, void* user_context) {
+    if (!store || !type_name || !callback) {
+        return false;
+    }
+    
+    pthread_rwlock_rdlock(&store->lock);
+    
+    for (size_t i = 0; i < store->num_items; i++) {
+        StoredItem* item = &store->items[i];
+        
+        // Skip expired items
+        time_t now = time(NULL);
+        if (item->expires_at > 0 && now > item->expires_at) {
+            continue;
+        }
+        
+        // Check if type matches
+        char item_type[64];
+        char item_id[128];
+        if (!split_compound_key(item->compound_key, item_type, sizeof(item_type), 
+                               item_id, sizeof(item_id))) {
+            continue;
+        }
+        
+        if (strcmp(item_type, type_name) != 0) {
+            continue;
+        }
+        
+        // Call iterator
+        bool continue_iter = callback(item_type, item_id, item->data, item->data_size,
+                                     item->timestamp, user_context);
+        if (!continue_iter) {
+            pthread_rwlock_unlock(&store->lock);
+            return true;
+        }
+    }
+    
+    pthread_rwlock_unlock(&store->lock);
+    return true;
+}
+
+bool state_store_iterate_wildcard(StateStore* store, const char* pattern,
+                                  state_store_iterator callback, void* user_context) {
+    if (!store || !pattern || !callback) {
+        return false;
+    }
+    
+    // Parse pattern into type and id parts
+    char pattern_type[64] = "";
+    char pattern_id[128] = "";
+    const char* colon = strchr(pattern, ':');
+    
+    if (!colon) {
+        // No colon, invalid pattern
+        log_error("Invalid wildcard pattern: %s (must contain ':')", pattern);
+        return false;
+    }
+    
+    // Extract type and id patterns
+    size_t type_len = colon - pattern;
+    if (type_len >= sizeof(pattern_type)) {
+        log_error("Pattern type too long: %s", pattern);
+        return false;
+    }
+    
+    strncpy(pattern_type, pattern, type_len);
+    pattern_type[type_len] = '\0';
+    strncpy(pattern_id, colon + 1, sizeof(pattern_id) - 1);
+    pattern_id[sizeof(pattern_id) - 1] = '\0';
+    
+    bool type_wildcard = (strcmp(pattern_type, "*") == 0);
+    bool id_wildcard = (strcmp(pattern_id, "*") == 0);
+    
+    pthread_rwlock_rdlock(&store->lock);
+    
+    for (size_t i = 0; i < store->num_items; i++) {
+        StoredItem* item = &store->items[i];
+        
+        // Skip expired items
+        time_t now = time(NULL);
+        if (item->expires_at > 0 && now > item->expires_at) {
+            continue;
+        }
+        
+        // Split compound key
+        char item_type[64];
+        char item_id[128];
+        if (!split_compound_key(item->compound_key, item_type, sizeof(item_type), 
+                               item_id, sizeof(item_id))) {
+            continue;
+        }
+        
+        // Check pattern match
+        bool type_match = type_wildcard || (strcmp(item_type, pattern_type) == 0);
+        bool id_match = id_wildcard || (strcmp(item_id, pattern_id) == 0);
+        
+        if (!type_match || !id_match) {
+            continue;
+        }
+        
+        // Call iterator
+        bool continue_iter = callback(item_type, item_id, item->data, item->data_size,
+                                     item->timestamp, user_context);
+        if (!continue_iter) {
+            pthread_rwlock_unlock(&store->lock);
+            return true;
+        }
+    }
+    
+    pthread_rwlock_unlock(&store->lock);
+    return true;
+}
+
+// Maintenance functions
+size_t state_store_cleanup_expired(StateStore* store) {
+    if (!store) {
+        return 0;
+    }
+    
+    pthread_rwlock_wrlock(&store->lock);
+    
+    time_t now = time(NULL);
+    size_t removed = 0;
+    size_t write_idx = 0;
+    
+    // Compact array, removing expired items
+    for (size_t read_idx = 0; read_idx < store->num_items; read_idx++) {
+        StoredItem* item = &store->items[read_idx];
+        
+        if (item->expires_at > 0 && now > item->expires_at) {
+            // Expired - free data and skip
+            free(item->data);
+            removed++;
+        } else {
+            // Keep this item
+            if (write_idx != read_idx) {
+                store->items[write_idx] = store->items[read_idx];
+            }
+            write_idx++;
+        }
+    }
+    
+    store->num_items = write_idx;
+    
+    pthread_rwlock_unlock(&store->lock);
+    
+    if (removed > 0) {
+        log_info("Cleaned up %zu expired items from state store", removed);
+    }
+    
+    return removed;
+}
+
+size_t state_store_get_total_items(StateStore* store) {
+    if (!store) {
+        return 0;
+    }
+    
+    pthread_rwlock_rdlock(&store->lock);
+    size_t count = store->num_items;
+    pthread_rwlock_unlock(&store->lock);
+    
+    return count;
+}
+
+size_t state_store_get_items_by_type(StateStore* store, const char* type_name) {
+    if (!store || !type_name) {
+        return 0;
+    }
+    
+    pthread_rwlock_rdlock(&store->lock);
+    
+    size_t count = 0;
+    for (size_t i = 0; i < store->num_items; i++) {
+        char item_type[64];
+        char item_id[128];
+        if (split_compound_key(store->items[i].compound_key, 
+                              item_type, sizeof(item_type), 
+                              item_id, sizeof(item_id))) {
+            if (strcmp(item_type, type_name) == 0) {
+                count++;
+            }
+        }
+    }
+    
+    pthread_rwlock_unlock(&store->lock);
+    return count;
+}
+
