@@ -633,6 +633,11 @@ int main(int argc, char* argv[]) {
             fps = frame_count;
             frame_count = 0;
             fps_timer = current_time;
+            
+            // Update FPS in widget integration
+            if (widget_integration) {
+                widget_integration_update_fps(widget_integration, fps);
+            }
         }
         
         // Update screen

@@ -3,6 +3,7 @@
 
 #include "../state/state_store.h"
 #include "../events/event_system.h"
+#include <stdint.h>
 
 // Forward declarations
 typedef struct SDL_Renderer SDL_Renderer;
@@ -84,5 +85,10 @@ void widget_integration_sync_page_state(WidgetIntegration* integration,
 // Get shadow widgets for inspection/testing
 Widget* widget_integration_get_page_widget(WidgetIntegration* integration, int page);
 Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int page, int button);
+
+// State management helpers
+void widget_integration_init_app_state(WidgetIntegration* integration);
+int widget_integration_get_current_page(WidgetIntegration* integration);
+void widget_integration_update_fps(WidgetIntegration* integration, uint32_t fps);
 
 #endif // WIDGET_INTEGRATION_H

@@ -64,12 +64,52 @@ Existing PanelKit UI (Visible)          Widget System (Shadow/Invisible)
 - ✅ API data mirrored to widget state store
 - ✅ Clean initialization and shutdown
 
-## Next Steps (Not Yet Implemented)
+## Recent Progress: State Migration Started
 
-1. **State Migration**: Start querying state from widget system instead of globals
-2. **Logic Migration**: Move button click handlers to widget callbacks
-3. **Gradual Rendering**: Begin rendering some elements through widgets
-4. **Full Migration**: Eventually switch all rendering to widget system
+### State Store Integration
+- Added `widget_integration_init_app_state()` to initialize application state in state store
+- Key application state now mirrored in state store:
+  - `app:current_page` - Current page index
+  - `app:show_time` - Time display toggle
+  - `app:show_debug` - Debug overlay toggle
+  - `app:bg_color` - Background color
+  - `app:page1_text` - Page 1 welcome text
+  - `app:page1_text_color` - Text color index
+  - `app:fps` - Current FPS value
+
+### State Helper Functions
+- `widget_integration_get_current_page()` - Query current page from state store
+- `widget_integration_update_fps()` - Update FPS in state store
+- Page changes now update state store immediately
+
+### Integration Example
+```c
+// FPS updates now mirror to state store
+if (current_time - fps_timer >= 1000) {
+    fps = frame_count;
+    // Update in widget integration
+    widget_integration_update_fps(widget_integration, fps);
+}
+
+// Future: Replace global queries with state store
+// int current_page = widget_integration_get_current_page(widget_integration);
+```
+
+## Next Steps
+
+1. **Continue State Migration**: 
+   - Replace global variable reads with state store queries
+   - Add state change event listeners in widgets
+   
+2. **Logic Migration**: 
+   - Move button click handlers to widget callbacks
+   - Migrate page transition logic
+   
+3. **Gradual Rendering**: 
+   - Begin rendering some elements through widgets
+   
+4. **Full Migration**: 
+   - Eventually switch all rendering to widget system
 
 ## How to Continue
 

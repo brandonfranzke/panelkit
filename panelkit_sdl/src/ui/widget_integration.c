@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <SDL2/SDL.h>
 
 // Simple logging macros for integration layer
 #ifndef log_info
@@ -77,6 +78,9 @@ WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     // Initialize widget arrays
     memset(integration->page_widgets, 0, sizeof(integration->page_widgets));
     memset(integration->button_widgets, 0, sizeof(integration->button_widgets));
+    
+    // Initialize application state in state store
+    widget_integration_init_app_state(integration);
     
     log_info("Widget integration layer created (running in background)");
     return integration;
@@ -183,6 +187,9 @@ void widget_integration_mirror_page_change(WidgetIntegration* integration,
     if (!integration || !integration->events_enabled) {
         return;
     }
+    
+    // Update current page in state store
+    state_store_set(integration->state_store, "app", "current_page", &to_page, sizeof(int));
     
     // Mirror page change to widget event system
     struct {
@@ -418,4 +425,63 @@ Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int
         return NULL;
     }
     return integration->button_widgets[page][button];
+}
+
+// Initialize application state in the state store
+void widget_integration_init_app_state(WidgetIntegration* integration) {
+    if (!integration || !integration->state_store) return;
+    
+    log_debug("Initializing application state in state store");
+    
+    // Current page (initially 0)
+    int current_page = 0;
+    state_store_set(integration->state_store, "app", "current_page", &current_page, sizeof(int));
+    
+    // Show time flag
+    bool show_time = true;
+    state_store_set(integration->state_store, "app", "show_time", &show_time, sizeof(bool));
+    
+    // Show debug flag  
+    bool show_debug = true;
+    state_store_set(integration->state_store, "app", "show_debug", &show_debug, sizeof(bool));
+    
+    // Background color
+    SDL_Color bg_color = {33, 33, 33, 255};
+    state_store_set(integration->state_store, "app", "bg_color", &bg_color, sizeof(SDL_Color));
+    
+    // Page 1 text
+    const char* page1_text = "Welcome to Page 1! Swipe right to see buttons.";
+    state_store_set(integration->state_store, "app", "page1_text", page1_text, strlen(page1_text) + 1);
+    
+    // Page 1 text color index
+    int page1_text_color = 0;
+    state_store_set(integration->state_store, "app", "page1_text_color", &page1_text_color, sizeof(int));
+    
+    // FPS data
+    Uint32 fps = 0;
+    state_store_set(integration->state_store, "app", "fps", &fps, sizeof(Uint32));
+    
+    log_debug("Application state initialized in state store");
+}
+
+// Get current page from state store
+int widget_integration_get_current_page(WidgetIntegration* integration) {
+    if (!integration || !integration->state_store) return 0;
+    
+    size_t size;
+    time_t timestamp;
+    int* page = (int*)state_store_get(integration->state_store, "app", "current_page", &size, &timestamp);
+    if (page && size == sizeof(int)) {
+        int result = *page;
+        free(page);
+        return result;
+    }
+    return 0;
+}
+
+// Update FPS in state store
+void widget_integration_update_fps(WidgetIntegration* integration, Uint32 fps) {
+    if (!integration || !integration->state_store) return;
+    
+    state_store_set(integration->state_store, "app", "fps", &fps, sizeof(Uint32));
 }
