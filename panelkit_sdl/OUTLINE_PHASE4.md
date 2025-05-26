@@ -64,9 +64,9 @@ Existing PanelKit UI (Visible)          Widget System (Shadow/Invisible)
 - ✅ API data mirrored to widget state store
 - ✅ Clean initialization and shutdown
 
-## Recent Progress: State Migration Started
+## Recent Progress: Complete State & Logic Migration Demonstrated
 
-### State Store Integration
+### State Store Integration ✅
 - Added `widget_integration_init_app_state()` to initialize application state in state store
 - Key application state now mirrored in state store:
   - `app:current_page` - Current page index
@@ -77,22 +77,40 @@ Existing PanelKit UI (Visible)          Widget System (Shadow/Invisible)
   - `app:page1_text_color` - Text color index
   - `app:fps` - Current FPS value
 
-### State Helper Functions
+### State Query Functions ✅
 - `widget_integration_get_current_page()` - Query current page from state store
+- `widget_integration_get_show_debug()` - Query debug flag from state store
 - `widget_integration_update_fps()` - Update FPS in state store
 - Page changes now update state store immediately
 
-### Integration Example
+### Widget-Based Button Handling ✅
+- Implemented `widget_button_click_handler()` - handles button clicks via event system
+- Handles Blue button (sets background color via state store)
+- Handles Time toggle button (toggles show_time via state store)
+- Subscribes to `ui.button_pressed` events
+- Demonstrates event-driven architecture
+
+### Bidirectional State Sync ✅
+- `widget_integration_sync_state_to_globals()` - syncs widget state back to globals
+- Called every frame to keep existing UI synchronized
+- Allows widget system to control state while existing rendering continues unchanged
+
+### Complete Migration Pattern Example
 ```c
-// FPS updates now mirror to state store
-if (current_time - fps_timer >= 1000) {
-    fps = frame_count;
-    // Update in widget integration
-    widget_integration_update_fps(widget_integration, fps);
+// Debug display shows both old and new state
+int widget_current_page = widget_integration_get_current_page(widget_integration);
+snprintf(debug_line1, sizeof(debug_line1), "Page: %d/%d | FPS: %d", 
+         current_page + 1, widget_current_page + 1, fps);
+
+// Widget handler updates state store
+case 0: { // Blue button
+    SDL_Color blue_color = {41, 128, 185, 255};
+    state_store_set(integration->state_store, "app", "bg_color", &blue_color, sizeof(SDL_Color));
+    break;
 }
 
-// Future: Replace global queries with state store
-// int current_page = widget_integration_get_current_page(widget_integration);
+// State sync keeps globals updated
+widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time);
 ```
 
 ## Next Steps

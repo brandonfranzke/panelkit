@@ -491,6 +491,9 @@ int main(int argc, char* argv[]) {
         // Enable event mirroring to capture interactions
         widget_integration_enable_events(widget_integration);
         
+        // Enable widget-based button handling (parallel to existing system)
+        widget_integration_enable_button_handling(widget_integration);
+        
         // Start with state tracking and event mirroring
         log_info("Widget integration layer initialized (background mode with event mirroring)");
     }
@@ -599,6 +602,7 @@ int main(int argc, char* argv[]) {
         }
         
         // Draw debug overlay if enabled (at bottom of screen - two lines)
+        // MIGRATION DEMO: Could replace with: widget_integration_get_show_debug(widget_integration)
         if (show_debug) {
             const char* gesture_name = 
                 gestures_get_state() == GESTURE_NONE ? "NONE" :
@@ -611,10 +615,14 @@ int main(int argc, char* argv[]) {
                 pages_get_transition_state() == TRANSITION_NONE ? "NONE" :
                 pages_get_transition_state() == TRANSITION_DRAGGING ? "DRAGGING" : "ANIMATING";
             
-            // First line: Page | FPS | Gesture
+            // Demonstrate state migration: Get page from widget integration
+            int widget_current_page = widget_integration ? 
+                widget_integration_get_current_page(widget_integration) : current_page;
+            
+            // First line: Page | FPS | Gesture (showing both old and new state)
             char debug_line1[256];
-            snprintf(debug_line1, sizeof(debug_line1), "Page: %d | FPS: %d | Gesture: %s", 
-                    current_page + 1, fps, gesture_name);
+            snprintf(debug_line1, sizeof(debug_line1), "Page: %d/%d | FPS: %d | Gesture: %s", 
+                    current_page + 1, widget_current_page + 1, fps, gesture_name);
             draw_text_left(debug_line1, 10, actual_height - 55, (SDL_Color){255, 255, 255, 128});
             
             // Second line: Button | Transition | Scroll
@@ -637,6 +645,9 @@ int main(int argc, char* argv[]) {
             // Update FPS in widget integration
             if (widget_integration) {
                 widget_integration_update_fps(widget_integration, fps);
+                
+                // Sync state changes from widget store back to globals (gradual migration)
+                widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time);
             }
         }
         

@@ -485,3 +485,101 @@ void widget_integration_update_fps(WidgetIntegration* integration, Uint32 fps) {
     
     state_store_set(integration->state_store, "app", "fps", &fps, sizeof(Uint32));
 }
+
+// Get show_debug flag from state store
+bool widget_integration_get_show_debug(WidgetIntegration* integration) {
+    if (!integration || !integration->state_store) return true; // Default
+    
+    size_t size;
+    time_t timestamp;
+    bool* show_debug = (bool*)state_store_get(integration->state_store, "app", "show_debug", &size, &timestamp);
+    if (show_debug && size == sizeof(bool)) {
+        bool result = *show_debug;
+        free(show_debug);
+        return result;
+    }
+    return true; // Default
+}
+
+// Widget-based button click handler
+static void widget_button_click_handler(const char* event_name, const void* data, size_t data_size, void* context) {
+    WidgetIntegration* integration = (WidgetIntegration*)context;
+    if (!integration || !data || data_size < sizeof(struct { int button_index; int page; })) {
+        return;
+    }
+    
+    struct {
+        int button_index;
+        int page;
+        uint32_t timestamp;
+        char button_text[32];
+    } *button_data = (void*)data;
+    
+    log_debug("Widget button click handler: page=%d button=%d text='%s'",
+             button_data->page, button_data->button_index, button_data->button_text);
+    
+    // Handle actions based on page and button
+    if (button_data->page == 1) { // Page 2 (zero-indexed)
+        switch (button_data->button_index) {
+            case 0: { // Blue button
+                SDL_Color blue_color = {41, 128, 185, 255};
+                state_store_set(integration->state_store, "app", "bg_color", &blue_color, sizeof(SDL_Color));
+                log_debug("Widget handler: Background color set to blue via state store");
+                break;
+            }
+            case 2: { // Time toggle button  
+                // Get current show_time state
+                size_t size;
+                time_t timestamp;
+                bool* show_time = (bool*)state_store_get(integration->state_store, "app", "show_time", &size, &timestamp);
+                bool new_show_time = show_time ? !(*show_time) : true;
+                if (show_time) free(show_time);
+                
+                state_store_set(integration->state_store, "app", "show_time", &new_show_time, sizeof(bool));
+                log_debug("Widget handler: Time display toggled to %s via state store", 
+                         new_show_time ? "enabled" : "disabled");
+                break;
+            }
+        }
+    }
+}
+
+// Enable widget-based button handling
+void widget_integration_enable_button_handling(WidgetIntegration* integration) {
+    if (!integration || !integration->event_system) return;
+    
+    // Subscribe to button press events
+    event_subscribe(integration->event_system, "ui.button_pressed", 
+                   widget_button_click_handler, integration);
+    
+    log_debug("Enabled widget-based button handling");
+}
+
+// Sync state from widget store back to global variables (for gradual migration)
+void widget_integration_sync_state_to_globals(WidgetIntegration* integration, 
+                                             SDL_Color* bg_color, bool* show_time) {
+    if (!integration || !integration->state_store) return;
+    
+    size_t size;
+    time_t timestamp;
+    
+    // Sync background color
+    if (bg_color) {
+        SDL_Color* stored_color = (SDL_Color*)state_store_get(integration->state_store, 
+                                                             "app", "bg_color", &size, &timestamp);
+        if (stored_color && size == sizeof(SDL_Color)) {
+            *bg_color = *stored_color;
+            free(stored_color);
+        }
+    }
+    
+    // Sync show_time flag
+    if (show_time) {
+        bool* stored_show_time = (bool*)state_store_get(integration->state_store, 
+                                                       "app", "show_time", &size, &timestamp);
+        if (stored_show_time && size == sizeof(bool)) {
+            *show_time = *stored_show_time;
+            free(stored_show_time);
+        }
+    }
+}
