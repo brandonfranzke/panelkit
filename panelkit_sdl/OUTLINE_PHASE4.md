@@ -158,3 +158,43 @@ make -j4
 ```
 
 The application should run exactly as before, with shadow widgets operating in the background.
+
+## CRITICAL LESSONS LEARNED - DO NOT REPEAT THESE MISTAKES
+
+### What Went Wrong in Phase 6
+1. **Premature Removal of Old System**: Tried to remove gestures.c, pages.c, rendering.c from CMakeLists.txt before the widget system was fully functional
+2. **Missing Font Rendering**: Widgets were drawing placeholder rectangles instead of text because fonts weren't properly passed to the widget system
+3. **Broken Page Rendering**: Used WIDGET_TYPE_CONTAINER for pages which doesn't render children by default
+4. **No Proper Migration Path**: Jumped straight to elimination instead of gradual replacement
+
+### Correct Approach for Phase 6
+1. **KEEP ALL OLD FILES**: Do not remove any files from CMakeLists.txt until the new system is 100% working
+2. **Fix Rendering First**: 
+   - Ensure widgets have access to fonts (pass fonts through widget_integration)
+   - Use PageWidget instead of generic containers for pages
+   - Verify each widget type renders correctly before proceeding
+3. **Test at Each Step**: Run the app after every change to ensure nothing breaks
+4. **Gradual Replacement**:
+   - First: Get widget rendering working alongside old rendering
+   - Second: Add a toggle to switch between old and new rendering
+   - Third: Fix any issues in new rendering
+   - Fourth: Only then remove old files
+
+### Key Technical Issues to Address
+1. **Font Access**: Widgets need access to TTF_Font pointers to render text
+2. **Page Widget**: Must use PageWidget (not WIDGET_TYPE_CONTAINER) for proper child rendering
+3. **Widget Bounds**: Ensure all widgets have proper bounds set
+4. **Event Handling**: Keep old gesture system until new event handling is verified working
+
+### DO NOT:
+- Remove any source files from CMakeLists.txt until fully tested
+- Try to simplify by creating a new app_simple.c
+- Delete functions before their replacements are working
+- Rush to eliminate compatibility mode
+
+### DO:
+- Keep parallel systems running
+- Test every change thoroughly
+- Ensure widget rendering matches original UI exactly
+- Use environment variables or runtime flags to toggle between systems
+- Document every working state before proceeding

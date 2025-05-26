@@ -179,12 +179,23 @@ void widget_integration_mirror_button_press(WidgetIntegration* integration,
         return;
     }
     
+    // Get current page from state store
+    int current_page = 0;
+    size_t size;
+    time_t timestamp;
+    int* stored_page = (int*)state_store_get(integration->state_store, "app", "current_page", &size, &timestamp);
+    if (stored_page) {
+        current_page = *stored_page;
+        free(stored_page);
+    }
+    
     // Mirror button press to widget event system
     struct {
         int button_index;
-        char button_text[64];
+        int page;
         uint32_t timestamp;
-    } button_data = {button_index, {0}, SDL_GetTicks()};
+        char button_text[32];
+    } button_data = {button_index, current_page, SDL_GetTicks(), {0}};
     
     if (button_text) {
         strncpy(button_data.button_text, button_text, sizeof(button_data.button_text) - 1);
@@ -192,7 +203,7 @@ void widget_integration_mirror_button_press(WidgetIntegration* integration,
     
     event_publish(integration->event_system, "ui.button_pressed", &button_data, sizeof(button_data));
     
-    log_debug("Mirrored button press: index=%d text='%s'", button_index, button_text ? button_text : "");
+    log_debug("Mirrored button press: page=%d index=%d text='%s'", current_page, button_index, button_text ? button_text : "");
 }
 
 void widget_integration_mirror_page_change(WidgetIntegration* integration,
@@ -698,21 +709,31 @@ static void widget_page_transition_handler(const char* event_name, const void* d
     int target_page = *(int*)data;
     log_debug("Widget page transition handler: transitioning to page %d", target_page);
     
+    // Update state store with new page
+    state_store_set(integration->state_store, "app", "current_page", &target_page, sizeof(int));
+    
     // Use page manager widget
     if (integration->page_manager) {
         page_manager_transition_to(integration->page_manager, target_page);
     }
+    
+    // Also trigger the old page system (temporary until full migration)
+    pages_transition_to(target_page);
 }
 
 // Handle API refresh requests from widget system  
 static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context) {
-    (void)data; (void)data_size; // Timestamp not needed
-    (void)context; // Widget integration not needed for this
+    (void)event_name; (void)data; (void)data_size; (void)context;
     
-    log_debug("Widget API refresh handler: requesting API refresh (event system integration needed)");
+    log_debug("Widget API refresh handler: requesting API refresh");
     
-    // TODO: Integrate with API manager through proper event system
-    // For now, this event serves as a placeholder for API integration
+    // Trigger API refresh through the existing API manager
+    // This is temporary until API manager is integrated with event system
+    extern ApiManager* api_manager;  // From app.c
+    if (api_manager) {
+        api_manager_fetch_user_async(api_manager);
+        log_debug("API refresh triggered via api_manager");
+    }
 }
 
 // Sync state from widget store back to global variables (for gradual migration)

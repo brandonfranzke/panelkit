@@ -665,6 +665,11 @@ int main(int argc, char* argv[]) {
             draw_text_left(debug_line2, 10, actual_height - 30, (SDL_Color){200, 200, 200, 128});
         }
         
+        // Sync state changes from widget store back to globals (gradual migration)
+        if (widget_integration) {
+            widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time, &quit, &page1_text_color);
+        }
+        
         // Calculate FPS
         frame_count++;
         if (current_time - fps_timer >= 1000) {
@@ -675,9 +680,6 @@ int main(int argc, char* argv[]) {
             // Update FPS in widget integration
             if (widget_integration) {
                 widget_integration_update_fps(widget_integration, fps);
-                
-                // Sync state changes from widget store back to globals (gradual migration)
-                widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time, &quit, &page1_text_color);
             }
         }
         
