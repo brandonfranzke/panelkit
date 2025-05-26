@@ -72,6 +72,9 @@ void widget_integration_mirror_api_state(WidgetIntegration* integration,
 // Update - call from main loop
 void widget_integration_update(WidgetIntegration* integration);
 
+// Update widget rendering based on state
+void widget_integration_update_rendering(WidgetIntegration* integration);
+
 // Query functions - for gradual replacement of existing state
 bool widget_integration_has_user_data(WidgetIntegration* integration);
 void* widget_integration_get_user_data(WidgetIntegration* integration, size_t* size);

@@ -108,6 +108,9 @@ set(SOURCES
     src/ui/widgets/button_widget.c
     src/ui/widgets/weather_widget.c
     src/ui/widgets/page_manager_widget.c
+    src/ui/widgets/text_widget.c
+    src/ui/widgets/time_widget.c
+    src/ui/widgets/data_display_widget.c
     src/ui/page_widget.c
     # YAML library (vendored)
     src/yaml/api.c

@@ -29,6 +29,7 @@
 
 // Widget integration layer (runs parallel to existing UI)
 #include "ui/widget_integration.h"
+#include "ui/widget.h"
 
 // Embedded font data
 #include "embedded_font.h"
@@ -580,10 +581,33 @@ int main(int argc, char* argv[]) {
         SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
         SDL_RenderClear(renderer);
         
-        // Render current page(s)
+        // Get page state for debug info
         int current_page = pages_get_current();
         int target_page = pages_get_target_page();
         float transition_offset = pages_get_transition_offset();
+        
+        // WIDGET RENDERING: Check if we should use widget-based rendering
+        bool use_widget_rendering = widget_integration && widget_integration->page_manager && 
+                                   getenv("WIDGET_RENDER") != NULL;
+        
+        if (use_widget_rendering) {
+            // Update widget rendering based on current state
+            widget_integration_update_rendering(widget_integration);
+            
+            // Update page manager
+            if (widget_integration->page_manager->update) {
+                widget_integration->page_manager->update(widget_integration->page_manager, 
+                                                       (double)(current_time - last_time) / 1000.0);
+            }
+            
+            // Use widget-based rendering
+            if (widget_integration->page_manager->render) {
+                widget_integration->page_manager->render(widget_integration->page_manager, renderer);
+            }
+        } else {
+            // Use old rendering system
+            
+        // Render current page(s)
         
         if (target_page != -1) {
             // Render both pages during transition
@@ -604,6 +628,8 @@ int main(int argc, char* argv[]) {
             render_page_indicators(current_page, pages_get_total(), transition_offset);
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
+        
+        } // End of old rendering system
         
         // Draw debug overlay if enabled (at bottom of screen - two lines)
         // MIGRATION DEMO: Could replace with: widget_integration_get_show_debug(widget_integration)

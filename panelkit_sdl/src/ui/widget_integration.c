@@ -6,6 +6,9 @@
 #include "widget.h"
 #include "widgets/button_widget.h"
 #include "widgets/page_manager_widget.h"
+#include "widgets/text_widget.h"
+#include "widgets/time_widget.h"
+#include "widgets/data_display_widget.h"
 #include "page_widget.h"
 #include "../core/sdl_includes.h"
 #include "pages.h"
@@ -27,6 +30,7 @@ static void widget_button_click_handler(const char* event_name, const void* data
 static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context);
 static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context);
 static void widget_integration_page_changed_callback(int from_page, int to_page, void* user_data);
+static void widget_integration_populate_page_widgets(WidgetIntegration* integration);
 
 WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     WidgetIntegration* integration = calloc(1, sizeof(WidgetIntegration));
@@ -388,6 +392,9 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     if (integration->widget_manager && integration->page_widgets[0]) {
         widget_manager_set_active_root(integration->widget_manager, "page_0");
     }
+    
+    // Add UI widgets to pages
+    widget_integration_populate_page_widgets(integration);
     
     integration->shadow_widgets_created = true;
     log_info("Shadow widget tree created successfully");
@@ -753,6 +760,133 @@ void widget_integration_sync_state_to_globals(WidgetIntegration* integration,
         if (stored_color && size == sizeof(int)) {
             *page1_text_color = *stored_color;
             free(stored_color);
+        }
+    }
+}
+
+// Populate pages with actual UI widgets
+static void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
+    if (!integration || !integration->renderer) return;
+    
+    // Get fonts from the app (temporarily using extern)
+    extern TTF_Font* font;
+    extern TTF_Font* large_font;
+    extern TTF_Font* small_font;
+    
+    // Populate Page 0 (Welcome page)
+    if (integration->page_widgets[0]) {
+        Widget* page = integration->page_widgets[0];
+        
+        // Title text
+        Widget* title = (Widget*)text_widget_create("page0_title", "Welcome to PanelKit!", large_font);
+        if (title) {
+            widget_set_bounds(title, 0, 60, integration->screen_width, 40);
+            text_widget_set_alignment(title, TEXT_ALIGN_CENTER);
+            widget_add_child(page, title);
+        }
+        
+        // Welcome message (will be updated from state)
+        Widget* welcome_text = (Widget*)text_widget_create("page0_welcome", 
+            "Welcome to Page 1!", font);
+        if (welcome_text) {
+            widget_set_bounds(welcome_text, 0, 280, integration->screen_width, 30);
+            text_widget_set_alignment(welcome_text, TEXT_ALIGN_CENTER);
+            widget_add_child(page, welcome_text);
+        }
+        
+        Widget* instruction_text = (Widget*)text_widget_create("page0_instruction", 
+            "Swipe right to see buttons.", font);
+        if (instruction_text) {
+            widget_set_bounds(instruction_text, 0, 310, integration->screen_width, 30);
+            text_widget_set_alignment(instruction_text, TEXT_ALIGN_CENTER);
+            widget_add_child(page, instruction_text);
+        }
+    }
+    
+    // Populate Page 1 (Buttons and data page)
+    if (integration->page_widgets[1]) {
+        Widget* page = integration->page_widgets[1];
+        
+        // Time widget (will be toggled based on show_time)
+        Widget* time_widget = (Widget*)time_widget_create("page1_time", "%H:%M:%S", large_font);
+        if (time_widget) {
+            // Position it where the Time button would show it
+            widget_set_bounds(time_widget, 
+                integration->screen_width - 150, 10, 140, 40);
+            widget_add_child(page, time_widget);
+        }
+        
+        // API data display
+        Widget* data_display = (Widget*)data_display_widget_create("page1_data", 
+            small_font, font);
+        if (data_display) {
+            // Position on the right side
+            widget_set_bounds(data_display, 
+                integration->screen_width / 2, 100, 
+                integration->screen_width / 2 - 20, 200);
+            widget_add_child(page, data_display);
+        }
+    }
+    
+    log_debug("Populated page widgets with UI elements");
+}
+
+// Update widget rendering based on state
+void widget_integration_update_rendering(WidgetIntegration* integration) {
+    if (!integration || !integration->state_store) return;
+    
+    size_t size;
+    time_t timestamp;
+    
+    // Update page 0 text color
+    Widget* welcome_text = widget_manager_find_widget(integration->widget_manager, "page0_welcome");
+    if (welcome_text) {
+        int* text_color_idx = (int*)state_store_get(integration->state_store, 
+                                                   "app", "page1_text_color", &size, &timestamp);
+        if (text_color_idx && size == sizeof(int)) {
+            // Define text colors
+            SDL_Color text_colors[] = {
+                {255, 255, 255, 255}, // White
+                {255, 100, 100, 255}, // Red
+                {100, 255, 100, 255}, // Green
+                {100, 100, 255, 255}, // Blue
+                {255, 255, 100, 255}, // Yellow
+                {255, 100, 255, 255}, // Purple
+                {100, 255, 255, 255}, // Cyan
+            };
+            int idx = *text_color_idx % 7;
+            text_widget_set_color(welcome_text, text_colors[idx]);
+            free(text_color_idx);
+        }
+    }
+    
+    // Update time widget visibility
+    Widget* time_widget = widget_manager_find_widget(integration->widget_manager, "page1_time");
+    if (time_widget) {
+        bool* show_time = (bool*)state_store_get(integration->state_store, 
+                                                "app", "show_time", &size, &timestamp);
+        if (show_time && size == sizeof(bool)) {
+            if (*show_time) {
+                time_widget->state_flags &= ~WIDGET_STATE_HIDDEN;
+            } else {
+                time_widget->state_flags |= WIDGET_STATE_HIDDEN;
+            }
+            free(show_time);
+        }
+    }
+    
+    // Update API data display
+    Widget* data_display = widget_manager_find_widget(integration->widget_manager, "page1_data");
+    if (data_display && integration->state_tracking_enabled) {
+        void* user_data = state_store_get(integration->state_store, "api_data", "user", &size, &timestamp);
+        if (user_data && size > 0) {
+            // Parse user data (simplified for now)
+            // In real implementation, properly deserialize UserData struct
+            data_display_widget_set_user_data(data_display, "John Doe", 
+                "john@example.com", "555-1234", "New York", "USA");
+            free(user_data);
+        } else {
+            data_display_widget_clear(data_display);
         }
     }
 }
