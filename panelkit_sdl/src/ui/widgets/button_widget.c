@@ -185,6 +185,11 @@ static void button_widget_render(Widget* widget, SDL_Renderer* renderer) {
         return;
     }
     
+    log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d color (%d,%d,%d)", 
+              button->base.id, widget->bounds.x, widget->bounds.y, 
+              widget->bounds.w, widget->bounds.h,
+              widget->background_color.r, widget->background_color.g, widget->background_color.b);
+    
     // Update background color based on state
     if (widget_has_state(widget, WIDGET_STATE_DISABLED)) {
         widget->background_color = button->disabled_color;

@@ -50,9 +50,9 @@ PageWidget* page_widget_create(const char* id, const char* title) {
         return NULL;
     }
     
-    // Set default colors
-    page->background_color = (SDL_Color){240, 240, 240, 255};
-    page->title_color = (SDL_Color){0, 0, 0, 255};
+    // Set default colors (dark theme to match app)
+    page->background_color = (SDL_Color){33, 33, 33, 255};
+    page->title_color = (SDL_Color){255, 255, 255, 255};
     
     base->background_color = page->background_color;
     base->border_width = 0;
@@ -247,6 +247,12 @@ static void page_widget_render(Widget* widget, SDL_Renderer* renderer) {
     if (!page || !renderer) {
         return;
     }
+    
+    log_debug("PAGE RENDER: %s at (%d,%d) size %dx%d bg(%d,%d,%d) children=%zu", 
+              widget->id, widget->bounds.x, widget->bounds.y,
+              widget->bounds.w, widget->bounds.h,
+              page->background_color.r, page->background_color.g, page->background_color.b,
+              widget->child_count);
     
     // Draw background
     SDL_SetRenderDrawColor(renderer,

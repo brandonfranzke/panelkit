@@ -8,6 +8,13 @@
 #include <math.h>
 #include <SDL2/SDL.h>
 
+// Simple logging macros
+#ifndef log_info
+#define log_info(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
+#define log_error(fmt, ...) fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+#define log_debug(fmt, ...) printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#endif
+
 // Animation constants
 #define TRANSITION_SPEED 0.12f
 #define SWIPE_THRESHOLD 0.3f  // 30% of screen width
@@ -278,20 +285,37 @@ static void page_manager_update(Widget* widget, double delta_time) {
 static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
     PageManagerWidget* manager = (PageManagerWidget*)widget;
     
+    log_debug("PAGE MANAGER RENDER: %d pages, current=%d, bounds=(%d,%d,%dx%d)", 
+              manager->page_count, manager->current_page,
+              widget->bounds.x, widget->bounds.y, widget->bounds.w, widget->bounds.h);
+    
     // Set clipping rectangle
     SDL_RenderSetClipRect(renderer, &widget->bounds);
     
     // Render visible pages
     for (int i = 0; i < manager->page_count; i++) {
-        if (manager->pages[i] && !(manager->pages[i]->state_flags & WIDGET_STATE_HIDDEN)) {
-            // Check if page is visible
-            int page_x = manager->pages[i]->bounds.x;
-            if (page_x + widget->bounds.w >= widget->bounds.x && 
-                page_x <= widget->bounds.x + widget->bounds.w) {
-                if (manager->pages[i]->render) {
-                    manager->pages[i]->render(manager->pages[i], renderer);
+        if (manager->pages[i]) {
+            log_debug("  Page %d: id=%s, hidden=%d, x=%d, render=%p", 
+                      i, manager->pages[i]->id,
+                      (manager->pages[i]->state_flags & WIDGET_STATE_HIDDEN) ? 1 : 0,
+                      manager->pages[i]->bounds.x,
+                      manager->pages[i]->render);
+            
+            if (!(manager->pages[i]->state_flags & WIDGET_STATE_HIDDEN)) {
+                // Check if page is visible
+                int page_x = manager->pages[i]->bounds.x;
+                if (page_x + widget->bounds.w >= widget->bounds.x && 
+                    page_x <= widget->bounds.x + widget->bounds.w) {
+                    log_debug("    Page %d is visible, calling render", i);
+                    if (manager->pages[i]->render) {
+                        manager->pages[i]->render(manager->pages[i], renderer);
+                    }
+                } else {
+                    log_debug("    Page %d NOT visible: page_x=%d, check failed", i, page_x);
                 }
             }
+        } else {
+            log_debug("  Page %d: NULL", i);
         }
     }
     

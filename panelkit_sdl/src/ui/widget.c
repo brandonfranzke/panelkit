@@ -57,9 +57,9 @@ Widget* widget_create(const char* id, WidgetType type) {
     }
     
     // Default colors
-    widget->background_color = (SDL_Color){240, 240, 240, 255};
-    widget->foreground_color = (SDL_Color){0, 0, 0, 255};
-    widget->border_color = (SDL_Color){200, 200, 200, 255};
+    widget->background_color = (SDL_Color){33, 33, 33, 255};  // Dark like app
+    widget->foreground_color = (SDL_Color){255, 255, 255, 255};  // White text
+    widget->border_color = (SDL_Color){100, 100, 100, 255};  // Gray border
     widget->border_width = 1;
     widget->padding = 5;
     
@@ -526,6 +526,11 @@ void widget_default_render(Widget* widget, SDL_Renderer* renderer) {
         return;
     }
     
+    log_debug("DEFAULT RENDER: %s at (%d,%d,%dx%d) bg(%d,%d,%d)", 
+              widget->id, widget->bounds.x, widget->bounds.y,
+              widget->bounds.w, widget->bounds.h,
+              widget->background_color.r, widget->background_color.g, widget->background_color.b);
+    
     // Draw background
     SDL_SetRenderDrawColor(renderer, 
                           widget->background_color.r,
@@ -550,6 +555,14 @@ void widget_default_render(Widget* widget, SDL_Renderer* renderer) {
                 widget->bounds.h - i * 2
             };
             SDL_RenderDrawRect(renderer, &border_rect);
+        }
+    }
+    
+    // Render children
+    for (size_t i = 0; i < widget->child_count; i++) {
+        Widget* child = widget->children[i];
+        if (child && child->render && !(child->state_flags & WIDGET_STATE_HIDDEN)) {
+            child->render(child, renderer);
         }
     }
 }
