@@ -486,7 +486,114 @@ if (api_request_failed) {
 - No shell command execution
 - Controlled file system access
 
+## Event-Driven Architecture
+
+### State Management System
+
+The state store provides thread-safe, type-aware storage with compound keys:
+
+```c
+// Store data with compound keys: "type_name:id"
+state_store_set(store, "weather_temperature", "New York", 
+               &weather_data, sizeof(weather_data));
+
+// Retrieve with type safety
+WeatherData* data = state_store_get(store, "weather_temperature", 
+                                  "New York", &size, &timestamp);
+
+// Wildcard iteration
+state_store_iterate_wildcard(store, "weather_*:*", callback, context);
+```
+
+### Event System
+
+Decoupled publish/subscribe system for loose coupling between components:
+
+```c
+// Subscribe to events
+event_subscribe(event_system, "weather.temperature", 
+               handle_weather_update, context);
+
+// Publish events
+WeatherData weather = {.temperature = 72.5f, .location = "NYC"};
+event_publish(event_system, "weather.temperature", 
+             &weather, sizeof(weather));
+```
+
+### Event-Aware UI Components
+
+UI elements can subscribe to events and update automatically:
+
+```c
+// Proof of concept event button
+EventButtonPOC* button = event_button_poc_create(x, y, w, h, 
+                                               "Weather", 
+                                               "weather.temperature");
+event_button_poc_subscribe(button, event_system, state_store);
+
+// Button automatically updates when weather events are published
+```
+
+## Configuration System
+
+### YAML-Based Configuration
+
+Hierarchical configuration with multiple sources:
+
+```yaml
+# System configuration (read-only)
+display:
+  brightness: 80
+  timeout: 300
+
+# User configuration
+api:
+  services:
+    - id: weather
+      host: api.weather.com
+      endpoints:
+        - name: current
+          path: /current/{location}
+          method: GET
+```
+
+### Configuration Loading Order
+
+1. **System Config**: `/etc/panelkit/config.yaml` (defaults)
+2. **User Config**: `~/.config/panelkit/config.yaml` (overrides)
+3. **Local Config**: `./config.yaml` (development)
+4. **CLI Arguments**: `--config key=value` (highest priority)
+
 ## Future Architecture Extensions
+
+### Widget Interface Pattern (Phase 3)
+
+```c
+// Base widget interface with event integration
+typedef struct Widget {
+    char id[64];
+    WidgetType type;
+    SDL_Rect bounds;
+    
+    // Event integration
+    char** subscribed_events;
+    size_t num_subscriptions;
+    
+    // Operations
+    void (*render)(Widget* self, SDL_Renderer* renderer);
+    void (*handle_event)(Widget* self, const SDL_Event* event);
+    void (*handle_data_event)(Widget* self, const char* event_name,
+                             const void* data, size_t size);
+    void (*destroy)(Widget* self);
+} Widget;
+
+// Concrete widget example
+typedef struct {
+    Widget base;
+    float current_temperature;
+    char location[64];
+} WeatherWidget;
+```
 
 ### Plugin System
 ```c
@@ -499,30 +606,6 @@ typedef struct {
 
 register_input_plugin(&evdev_plugin);
 register_input_plugin(&custom_plugin);
-```
-
-### Configuration System
-```c
-// Runtime configuration without rebuilds
-typedef struct {
-    GestureConfig gestures;
-    DisplayConfig display;
-    InputConfig input;
-    ApiConfig api;
-} PanelKitConfig;
-
-bool config_load_from_file(PanelKitConfig* config, const char* path);
-```
-
-### Advanced UI Components
-```c
-// Component-based UI system
-typedef struct {
-    ComponentType type;
-    void (*render)(Component* self, SDL_Renderer* renderer);
-    bool (*handle_event)(Component* self, const SDL_Event* event);
-    void (*destroy)(Component* self);
-} Component;
 ```
 
 ## Development Workflow

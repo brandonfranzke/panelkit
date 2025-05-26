@@ -98,6 +98,7 @@ set(SOURCES
     src/state/state_store.c
     src/state/state_event_bridge.c
     src/events/event_system.c
+    src/ui/event_button_poc.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c
@@ -146,6 +147,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/events)
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+# Create test executable for event button POC
+add_executable(test_event_button 
+    src/test_event_button.c
+    src/ui/event_button_poc.c
+    src/state/state_store.c
+    src/events/event_system.c
+)
+
 # Link libraries
 if(EMBEDDED_BUILD)
     # Embedded build - minimal dependencies for SDL2 framebuffer-only + curl
@@ -185,4 +194,25 @@ else()
         pthread
     )
     message(STATUS "Linked development dependencies")
+endif()
+
+# Link test executable
+if(EMBEDDED_BUILD)
+    target_link_libraries(test_event_button
+        ${SDL2_STATIC_LIBRARIES}
+        ${SDL2_TTF_STATIC_LIBRARIES}
+        freetype
+        z
+        m
+        pthread
+        dl
+        rt
+    )
+else()
+    target_link_libraries(test_event_button
+        ${SDL2_LIBRARIES}
+        ${SDL2_TTF_LIBRARIES}
+        m
+        pthread
+    )
 endif()

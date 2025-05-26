@@ -1,8 +1,15 @@
 #include "event_system.h"
-#include "../core/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdio.h>
+
+// Simple logging macros for standalone compilation
+#ifndef log_info
+#define log_info(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
+#define log_error(fmt, ...) fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+#define log_debug(fmt, ...) printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#endif
 
 #define MAX_EVENT_NAME_LENGTH 128
 #define INITIAL_SUBSCRIPTIONS_CAPACITY 32
