@@ -1,6 +1,11 @@
 #include "widget_integration.h"
 #include "../state/state_store.h"
 #include "../events/event_system.h"
+#include "widget_manager.h"
+#include "widget_factory.h"
+#include "widget.h"
+#include "widgets/button_widget.h"
+#include "page_widget.h"
 #include "../core/sdl_includes.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,10 +44,39 @@ WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
         return NULL;
     }
     
+    // Create widget manager (but don't create widgets yet)
+    integration->widget_manager = widget_manager_create(renderer, 
+                                                      integration->event_system,
+                                                      integration->state_store);
+    if (!integration->widget_manager) {
+        log_error("Failed to create widget manager for integration");
+        event_system_destroy(integration->event_system);
+        state_store_destroy(integration->state_store);
+        free(integration);
+        return NULL;
+    }
+    
+    // Create widget factory
+    integration->widget_factory = widget_factory_create_default();
+    if (!integration->widget_factory) {
+        log_error("Failed to create widget factory for integration");
+        widget_manager_destroy(integration->widget_manager);
+        event_system_destroy(integration->event_system);
+        state_store_destroy(integration->state_store);
+        free(integration);
+        return NULL;
+    }
+    
     // Start with minimal integration - events disabled to avoid interference
     integration->widget_system_enabled = false;
     integration->events_enabled = false;
     integration->state_tracking_enabled = true;  // Safe to start state tracking immediately
+    integration->shadow_widgets_created = false;
+    integration->num_pages = 2;  // PanelKit has 2 pages
+    
+    // Initialize widget arrays
+    memset(integration->page_widgets, 0, sizeof(integration->page_widgets));
+    memset(integration->button_widgets, 0, sizeof(integration->button_widgets));
     
     log_info("Widget integration layer created (running in background)");
     return integration;
@@ -53,6 +87,11 @@ void widget_integration_destroy(WidgetIntegration* integration) {
         return;
     }
     
+    // Destroy shadow widgets (widget manager handles this)
+    // Note: We don't individually destroy widgets as widget_manager owns them
+    
+    widget_factory_destroy(integration->widget_factory);
+    widget_manager_destroy(integration->widget_manager);
     event_system_destroy(integration->event_system);
     state_store_destroy(integration->state_store);
     free(integration);
@@ -236,4 +275,147 @@ void* widget_integration_get_user_data(WidgetIntegration* integration, size_t* s
     void* data = state_store_get(integration->state_store, "api_data", "user", size, &timestamp);
     
     return data;  // Caller must free this
+}
+
+void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
+    if (!integration || !integration->widget_manager || integration->shadow_widgets_created) {
+        return;
+    }
+    
+    log_info("Creating shadow widgets to mirror existing UI structure");
+    
+    // Create page widgets for each page
+    for (int i = 0; i < integration->num_pages; i++) {
+        char page_id[32];
+        char page_title[64];
+        snprintf(page_id, sizeof(page_id), "page_%d", i);
+        snprintf(page_title, sizeof(page_title), "Page %d", i + 1);
+        
+        // Create a page widget (using base widget for now)
+        Widget* page = widget_create(page_id, WIDGET_TYPE_CONTAINER);
+        if (page) {
+            widget_set_bounds(page, 0, 0, integration->screen_width, integration->screen_height);
+            integration->page_widgets[i] = page;
+            
+            // Add to widget manager as a root widget
+            widget_manager_add_root(integration->widget_manager, page, page_id);
+            
+            log_debug("Created shadow page widget: %s", page_id);
+        }
+    }
+    
+    // Create button widgets for existing buttons
+    // Page 0 (Page 1 in UI) has 1 button
+    // Page 1 (Page 2 in UI) has up to 9 buttons
+    
+    // Page 0 button
+    if (integration->page_widgets[0]) {
+        ButtonParams params = {"Change Color"};
+        Widget* button = widget_factory_create_widget(integration->widget_factory,
+                                                    "button", "page0_button0", &params);
+        if (button) {
+            widget_set_relative_bounds(button, 20, 100, 200, 50);
+            widget_add_child(integration->page_widgets[0], button);
+            integration->button_widgets[0][0] = button;
+            log_debug("Created shadow button widget: page0_button0");
+        }
+    }
+    
+    // Page 1 buttons (color buttons)
+    if (integration->page_widgets[1]) {
+        const char* button_labels[] = {
+            "Blue", "Green", "Gray", "Time", "Yellow", 
+            "Fetch User", "", "", ""
+        };
+        
+        for (int i = 0; i < 9; i++) {
+            if (strlen(button_labels[i]) > 0) {
+                char button_id[32];
+                snprintf(button_id, sizeof(button_id), "page1_button%d", i);
+                
+                ButtonParams params = {button_labels[i]};
+                Widget* button = widget_factory_create_widget(integration->widget_factory,
+                                                            "button", button_id, &params);
+                if (button) {
+                    // Calculate position based on 3x3 grid
+                    int row = i / 3;
+                    int col = i % 3;
+                    int button_width = integration->screen_width / 3 - 20;
+                    int button_height = integration->screen_height / 3 - 20;
+                    int x = col * (button_width + 10) + 10;
+                    int y = row * (button_height + 10) + 10;
+                    
+                    widget_set_relative_bounds(button, x, y, button_width, button_height);
+                    widget_add_child(integration->page_widgets[1], button);
+                    integration->button_widgets[1][i] = button;
+                    log_debug("Created shadow button widget: %s", button_id);
+                }
+            }
+        }
+    }
+    
+    // Set page 1 as initially active
+    if (integration->widget_manager && integration->page_widgets[0]) {
+        widget_manager_set_active_root(integration->widget_manager, "page_0");
+    }
+    
+    integration->shadow_widgets_created = true;
+    log_info("Shadow widget tree created successfully");
+}
+
+void widget_integration_sync_button_state(WidgetIntegration* integration, 
+                                        int page, int button_index, 
+                                        const char* text, bool enabled) {
+    if (!integration || !integration->shadow_widgets_created || 
+        page < 0 || page >= integration->num_pages ||
+        button_index < 0 || button_index >= 9) {
+        return;
+    }
+    
+    Widget* button = integration->button_widgets[page][button_index];
+    if (button && button->type == WIDGET_TYPE_BUTTON) {
+        ButtonWidget* btn = (ButtonWidget*)button;
+        
+        // Update button text if provided
+        if (text) {
+            button_widget_set_label(btn, text);
+        }
+        
+        // Update enabled state
+        widget_set_enabled(button, enabled);
+        
+        log_debug("Synced button state: page=%d button=%d text='%s' enabled=%d",
+                 page, button_index, text ? text : "", enabled);
+    }
+}
+
+void widget_integration_sync_page_state(WidgetIntegration* integration,
+                                       int page_index, bool is_active) {
+    if (!integration || !integration->shadow_widgets_created || 
+        !integration->widget_manager ||
+        page_index < 0 || page_index >= integration->num_pages) {
+        return;
+    }
+    
+    if (is_active) {
+        char page_id[32];
+        snprintf(page_id, sizeof(page_id), "page_%d", page_index);
+        widget_manager_set_active_root(integration->widget_manager, page_id);
+        log_debug("Activated shadow page: %s", page_id);
+    }
+}
+
+Widget* widget_integration_get_page_widget(WidgetIntegration* integration, int page) {
+    if (!integration || page < 0 || page >= integration->num_pages) {
+        return NULL;
+    }
+    return integration->page_widgets[page];
+}
+
+Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int page, int button) {
+    if (!integration || page < 0 || page >= integration->num_pages ||
+        button < 0 || button >= 9) {
+        return NULL;
+    }
+    return integration->button_widgets[page][button];
 }

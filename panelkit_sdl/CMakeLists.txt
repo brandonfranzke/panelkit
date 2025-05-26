@@ -101,6 +101,13 @@ set(SOURCES
     src/ui/event_button_poc.c
     # Widget integration layer (parallel to existing UI)
     src/ui/widget_integration.c
+    # Widget system (shadow UI tree)
+    src/ui/widget.c
+    src/ui/widget_manager.c
+    src/ui/widget_factory.c
+    src/ui/widgets/button_widget.c
+    src/ui/widgets/weather_widget.c
+    src/ui/page_widget.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c

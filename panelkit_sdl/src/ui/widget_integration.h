@@ -6,6 +6,9 @@
 
 // Forward declarations
 typedef struct SDL_Renderer SDL_Renderer;
+typedef struct WidgetManager WidgetManager;
+typedef struct WidgetFactory WidgetFactory;
+typedef struct Widget Widget;
 
 // Widget integration layer - runs parallel to existing system
 // This layer gradually replaces internal state without changing visuals
@@ -14,6 +17,15 @@ typedef struct WidgetIntegration {
     StateStore* state_store;
     EventSystem* event_system;
     
+    // Widget components (shadow UI tree)
+    WidgetManager* widget_manager;
+    WidgetFactory* widget_factory;
+    
+    // Shadow widgets that mirror existing UI
+    Widget* page_widgets[2];  // Mirror the 2 pages
+    Widget* button_widgets[2][9];  // Mirror buttons on each page (max 9 per page)
+    int num_pages;
+    
     // Renderer reference (for future widget rendering)
     SDL_Renderer* renderer;
     
@@ -21,6 +33,7 @@ typedef struct WidgetIntegration {
     bool widget_system_enabled;
     bool events_enabled;
     bool state_tracking_enabled;
+    bool shadow_widgets_created;
     
     // Screen dimensions
     int screen_width;
@@ -59,5 +72,17 @@ void widget_integration_update(WidgetIntegration* integration);
 // Query functions - for gradual replacement of existing state
 bool widget_integration_has_user_data(WidgetIntegration* integration);
 void* widget_integration_get_user_data(WidgetIntegration* integration, size_t* size);
+
+// Shadow widget creation - mirrors existing UI structure
+void widget_integration_create_shadow_widgets(WidgetIntegration* integration);
+void widget_integration_sync_button_state(WidgetIntegration* integration, 
+                                        int page, int button_index, 
+                                        const char* text, bool enabled);
+void widget_integration_sync_page_state(WidgetIntegration* integration,
+                                       int page_index, bool is_active);
+
+// Get shadow widgets for inspection/testing
+Widget* widget_integration_get_page_widget(WidgetIntegration* integration, int page);
+Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int page, int button);
 
 #endif // WIDGET_INTEGRATION_H

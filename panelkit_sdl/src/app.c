@@ -484,8 +484,15 @@ int main(int argc, char* argv[]) {
         log_warn("Widget integration layer failed to initialize - continuing without it");
     } else {
         widget_integration_set_dimensions(widget_integration, actual_width, actual_height);
-        // Start with minimal integration - just state tracking for now
-        log_info("Widget integration layer initialized (background mode)");
+        
+        // Create shadow widgets that mirror existing UI structure
+        widget_integration_create_shadow_widgets(widget_integration);
+        
+        // Enable event mirroring to capture interactions
+        widget_integration_enable_events(widget_integration);
+        
+        // Start with state tracking and event mirroring
+        log_info("Widget integration layer initialized (background mode with event mirroring)");
     }
     
     // Force initial API fetch immediately
@@ -545,6 +552,19 @@ int main(int argc, char* argv[]) {
         // Update page transitions
         pages_update_transition();
         gestures_set_current_page(pages_get_current());
+        
+        // Sync page state with widget integration
+        if (widget_integration) {
+            static int last_page = -1;
+            int current_page_idx = pages_get_current();
+            if (current_page_idx != last_page) {
+                if (last_page >= 0) {
+                    widget_integration_mirror_page_change(widget_integration, last_page, current_page_idx);
+                }
+                widget_integration_sync_page_state(widget_integration, current_page_idx, true);
+                last_page = current_page_idx;
+            }
+        }
         
         // Update API manager
         api_manager_update(api_manager, current_time);
