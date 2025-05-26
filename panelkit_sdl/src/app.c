@@ -514,11 +514,11 @@ int main(int argc, char* argv[]) {
         while (SDL_PollEvent(&e)) {
             event_count++;
             if (e.type == SDL_QUIT) {
-                quit = true;
-                // Also set in widget state store
+                // Set quit through widget state store
                 if (widget_integration) {
                     widget_integration_set_quit(widget_integration, true);
                 }
+                quit = true; // Will be synced from widget state
             }
             // Handle SDL touch events
             else if (e.type == SDL_FINGERDOWN) {
@@ -902,12 +902,13 @@ int get_button_at_position(int x, int y, int scroll_offset) {
     return -1;
 }
 
-// Handle a button click - exact same implementation as original
+// Handle a button click - now just mirrors to widget system
 void handle_click(int button_index) {
     int gesture_page = gestures_get_page();
     log_event("BUTTON_CLICK", "button=%d page=%d", button_index, gesture_page);
     
     // Mirror button press to widget integration layer
+    // The widget system handles all button logic through event handlers
     if (widget_integration) {
         Page* page = pages_get(gesture_page);
         const char* button_text = (page && button_index < page->button_count) ? 
@@ -915,64 +916,10 @@ void handle_click(int button_index) {
         widget_integration_mirror_button_press(widget_integration, button_index, button_text);
     }
     
-    // Handle button actions based on page and button index
-    if (gesture_page == 0) {
-        // Page 1 buttons
-        switch (button_index) {
-            case 0: // Change text color
-                page1_text_color = (page1_text_color + 1) % 7;
-                log_info("Text color changed to index %d", page1_text_color);
-                break;
-        }
-    }
-    else if (gesture_page == 1) {
-        // Page 2 buttons
-        switch (button_index) {
-            case 0: // Blue
-                // Set background to blue
-                bg_color = (SDL_Color){41, 128, 185, 255}; // Blue
-                log_info("Background color set to blue");
-                break;
-                
-            case 1: // Random
-                // Set background to random color
-                bg_color.r = rand() % 256;
-                bg_color.g = rand() % 256;
-                bg_color.b = rand() % 256;
-                log_info("Background color set to RGB(%d,%d,%d)", 
-                       bg_color.r, bg_color.g, bg_color.b);
-                break;
-                
-            case 2: // Time
-                // Toggle time display
-                show_time = !show_time;
-                log_info("Time display: %s", show_time ? "enabled" : "disabled");
-                break;
-                
-            case 3: // Go to Page 1
-                // Go to Page 1
-                if (pages_get_current() != 0 && pages_get_target_page() == -1) {
-                    pages_transition_to(0);
-                }
-                break;
-                
-            case 4: // Refresh User
-                // Force refresh API data
-                log_info("Refreshing user data");
-                api_manager_fetch_user_async(api_manager);
-                break;
-                
-            case 5: // Exit
-                // Exit application
-                log_info("Exit button pressed");
-                quit = true;
-                // Also set in widget state store
-                if (widget_integration) {
-                    widget_integration_set_quit(widget_integration, true);
-                }
-                break;
-        }
-    }
+    // All button logic has been migrated to widget event handlers
+    // The actions are handled through:
+    // - widget_button_click_handler() in widget_integration.c
+    // - State changes sync back via widget_integration_sync_state_to_globals()
 }
 
 
