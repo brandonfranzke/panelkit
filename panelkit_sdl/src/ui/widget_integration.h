@@ -91,6 +91,9 @@ void widget_integration_sync_page_state(WidgetIntegration* integration,
 Widget* widget_integration_get_page_widget(WidgetIntegration* integration, int page);
 Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int page, int button);
 
+// Get event system for external subscriptions
+EventSystem* widget_integration_get_event_system(WidgetIntegration* integration);
+
 // State management helpers
 void widget_integration_init_app_state(WidgetIntegration* integration);
 int widget_integration_get_current_page(WidgetIntegration* integration);

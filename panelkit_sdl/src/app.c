@@ -91,6 +91,8 @@ Uint32 fps_timer = 0;
 Uint32 fps = 0;
 
 // Function prototypes
+static void on_system_page_transition(const char* event_name, const void* data, size_t data_size, void* context);
+static void on_system_api_refresh(const char* event_name, const void* data, size_t data_size, void* context);
 void initialize_pages();
 void render_page(int page_index, float offset_x);
 int get_button_at_position(int x, int y, int scroll_offset);
@@ -494,6 +496,14 @@ int main(int argc, char* argv[]) {
         
         // Enable widget-based button handling (parallel to existing system)
         widget_integration_enable_button_handling(widget_integration);
+        
+        // Subscribe to system events from widget integration
+        EventSystem* event_system = widget_integration_get_event_system(widget_integration);
+        if (event_system) {
+            event_subscribe(event_system, "system.page_transition", on_system_page_transition, NULL);
+            event_subscribe(event_system, "system.api_refresh", on_system_api_refresh, NULL);
+            log_info("Subscribed to system events: page_transition, api_refresh");
+        }
         
         // Start with state tracking and event mirroring
         log_info("Widget integration layer initialized (background mode with event mirroring)");
@@ -1037,5 +1047,39 @@ void on_api_state_changed(ApiState state, void* context) {
     (void)context; // Unused
     
     log_debug("API state changed: %s", api_state_string(state));
+}
+
+// Handle system page transition events from widget integration
+static void on_system_page_transition(const char* event_name, const void* data, size_t data_size, void* context) {
+    (void)event_name; (void)context;
+    
+    if (!data || data_size < sizeof(struct { int from_page; int to_page; })) {
+        return;
+    }
+    
+    struct {
+        int from_page;
+        int to_page;
+    } *page_event = (void*)data;
+    
+    log_debug("System page transition event: %d -> %d", page_event->from_page, page_event->to_page);
+    
+    // Trigger the old page system transition
+    // TODO(Phase7): Remove when old page system is fully retired
+    pages_transition_to(page_event->to_page);
+}
+
+// Event handler for API refresh requests
+static void on_system_api_refresh(const char* event_name, const void* data, size_t data_size, void* context) {
+    (void)event_name; (void)data; (void)data_size; (void)context;
+    
+    log_debug("System API refresh event received");
+    
+    // Trigger API refresh
+    // TODO(Phase7): Remove global api_manager when old system is fully retired
+    if (api_manager) {
+        api_manager_fetch_user_async(api_manager);
+        log_info("API refresh triggered via system event");
+    }
 }
 

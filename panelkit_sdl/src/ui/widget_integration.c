@@ -469,6 +469,10 @@ Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int
     return integration->button_widgets[page][button];
 }
 
+EventSystem* widget_integration_get_event_system(WidgetIntegration* integration) {
+    return integration ? integration->event_system : NULL;
+}
+
 // Initialize application state in the state store
 void widget_integration_init_app_state(WidgetIntegration* integration) {
     if (!integration || !integration->state_store) return;
@@ -717,23 +721,37 @@ static void widget_page_transition_handler(const char* event_name, const void* d
         page_manager_transition_to(integration->page_manager, target_page);
     }
     
-    // Also trigger the old page system (temporary until full migration)
-    pages_transition_to(target_page);
+    // Publish system-wide page change event for old system to handle
+    // TODO(Phase7): Remove when old page system is retired
+    struct {
+        int from_page;
+        int to_page;
+    } page_event = {
+        page_manager_get_current_page(integration->page_manager),
+        target_page
+    };
+    event_publish(integration->event_system, "system.page_transition", &page_event, sizeof(page_event));
+    log_debug("Published system.page_transition event: %d -> %d", page_event.from_page, page_event.to_page);
 }
 
 // Handle API refresh requests from widget system  
 static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context) {
-    (void)event_name; (void)data; (void)data_size; (void)context;
+    WidgetIntegration* integration = (WidgetIntegration*)context;
+    if (!integration || !integration->event_system) return;
     
-    log_debug("Widget API refresh handler: requesting API refresh");
+    log_debug("Widget API refresh handler: publishing system event");
     
-    // Trigger API refresh through the existing API manager
-    // This is temporary until API manager is integrated with event system
-    extern ApiManager* api_manager;  // From app.c
-    if (api_manager) {
-        api_manager_fetch_user_async(api_manager);
-        log_debug("API refresh triggered via api_manager");
-    }
+    // Publish system-wide event that app.c can subscribe to
+    struct {
+        uint32_t timestamp;
+        char source[32];
+    } api_event = {
+        SDL_GetTicks(),
+        "widget_system"
+    };
+    
+    event_publish(integration->event_system, "system.api_refresh", &api_event, sizeof(api_event));
+    log_debug("Published system.api_refresh event");
 }
 
 // Sync state from widget store back to global variables (for gradual migration)
