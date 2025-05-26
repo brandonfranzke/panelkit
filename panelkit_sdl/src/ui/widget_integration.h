@@ -92,12 +92,14 @@ void widget_integration_init_app_state(WidgetIntegration* integration);
 int widget_integration_get_current_page(WidgetIntegration* integration);
 void widget_integration_update_fps(WidgetIntegration* integration, uint32_t fps);
 bool widget_integration_get_show_debug(WidgetIntegration* integration);
+bool widget_integration_get_quit(WidgetIntegration* integration);
+void widget_integration_set_quit(WidgetIntegration* integration, bool quit);
 
 // Button handling migration
 void widget_integration_enable_button_handling(WidgetIntegration* integration);
 
 // State synchronization (for gradual migration)
 void widget_integration_sync_state_to_globals(WidgetIntegration* integration, 
-                                             SDL_Color* bg_color, bool* show_time);
+                                             SDL_Color* bg_color, bool* show_time, bool* quit, int* page1_text_color);
 
 #endif // WIDGET_INTEGRATION_H

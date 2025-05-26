@@ -515,6 +515,10 @@ int main(int argc, char* argv[]) {
             event_count++;
             if (e.type == SDL_QUIT) {
                 quit = true;
+                // Also set in widget state store
+                if (widget_integration) {
+                    widget_integration_set_quit(widget_integration, true);
+                }
             }
             // Handle SDL touch events
             else if (e.type == SDL_FINGERDOWN) {
@@ -647,7 +651,7 @@ int main(int argc, char* argv[]) {
                 widget_integration_update_fps(widget_integration, fps);
                 
                 // Sync state changes from widget store back to globals (gradual migration)
-                widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time);
+                widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time, &quit, &page1_text_color);
             }
         }
         
@@ -962,6 +966,10 @@ void handle_click(int button_index) {
                 // Exit application
                 log_info("Exit button pressed");
                 quit = true;
+                // Also set in widget state store
+                if (widget_integration) {
+                    widget_integration_set_quit(widget_integration, true);
+                }
                 break;
         }
     }

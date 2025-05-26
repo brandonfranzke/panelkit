@@ -7,6 +7,8 @@
 #include "widgets/button_widget.h"
 #include "page_widget.h"
 #include "../core/sdl_includes.h"
+#include "pages.h"
+#include "../api/api_manager.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +20,11 @@
 #define log_error(fmt, ...) fprintf(stderr, "[WIDGET_INTEGRATION_ERROR] " fmt "\n", ##__VA_ARGS__)
 #define log_debug(fmt, ...) printf("[WIDGET_INTEGRATION_DEBUG] " fmt "\n", ##__VA_ARGS__)
 #endif
+
+// Forward declarations for static event handlers
+static void widget_button_click_handler(const char* event_name, const void* data, size_t data_size, void* context);
+static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context);
+static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context);
 
 WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     WidgetIntegration* integration = calloc(1, sizeof(WidgetIntegration));
@@ -433,6 +440,10 @@ void widget_integration_init_app_state(WidgetIntegration* integration) {
     
     log_debug("Initializing application state in state store");
     
+    // Application running state
+    bool quit = false;
+    state_store_set(integration->state_store, "app", "quit", &quit, sizeof(bool));
+    
     // Current page (initially 0)
     int current_page = 0;
     state_store_set(integration->state_store, "app", "current_page", &current_page, sizeof(int));
@@ -453,13 +464,19 @@ void widget_integration_init_app_state(WidgetIntegration* integration) {
     const char* page1_text = "Welcome to Page 1! Swipe right to see buttons.";
     state_store_set(integration->state_store, "app", "page1_text", page1_text, strlen(page1_text) + 1);
     
-    // Page 1 text color index
+    // Page 1 text color index  
     int page1_text_color = 0;
     state_store_set(integration->state_store, "app", "page1_text_color", &page1_text_color, sizeof(int));
     
-    // FPS data
+    // FPS and debug data
     Uint32 fps = 0;
     state_store_set(integration->state_store, "app", "fps", &fps, sizeof(Uint32));
+    
+    Uint32 frame_count = 0;
+    state_store_set(integration->state_store, "app", "frame_count", &frame_count, sizeof(Uint32));
+    
+    Uint32 fps_timer = 0;
+    state_store_set(integration->state_store, "app", "fps_timer", &fps_timer, sizeof(Uint32));
     
     log_debug("Application state initialized in state store");
 }
@@ -519,12 +536,40 @@ static void widget_button_click_handler(const char* event_name, const void* data
              button_data->page, button_data->button_index, button_data->button_text);
     
     // Handle actions based on page and button
-    if (button_data->page == 1) { // Page 2 (zero-indexed)
+    if (button_data->page == 0) { // Page 1 (zero-indexed)
+        switch (button_data->button_index) {
+            case 0: { // Change text color button
+                // Get current text color index
+                size_t size;
+                time_t timestamp;
+                int* text_color = (int*)state_store_get(integration->state_store, "app", "page1_text_color", &size, &timestamp);
+                int new_color = text_color ? ((*text_color + 1) % 7) : 1;
+                if (text_color) free(text_color);
+                
+                state_store_set(integration->state_store, "app", "page1_text_color", &new_color, sizeof(int));
+                log_debug("Widget handler: Text color changed to index %d via state store", new_color);
+                break;
+            }
+        }
+    }
+    else if (button_data->page == 1) { // Page 2 (zero-indexed)
         switch (button_data->button_index) {
             case 0: { // Blue button
                 SDL_Color blue_color = {41, 128, 185, 255};
                 state_store_set(integration->state_store, "app", "bg_color", &blue_color, sizeof(SDL_Color));
                 log_debug("Widget handler: Background color set to blue via state store");
+                break;
+            }
+            case 1: { // Random color button
+                SDL_Color random_color = {
+                    .r = rand() % 256,
+                    .g = rand() % 256, 
+                    .b = rand() % 256,
+                    .a = 255
+                };
+                state_store_set(integration->state_store, "app", "bg_color", &random_color, sizeof(SDL_Color));
+                log_debug("Widget handler: Background color set to random RGB(%d,%d,%d) via state store",
+                         random_color.r, random_color.g, random_color.b);
                 break;
             }
             case 2: { // Time toggle button  
@@ -540,6 +585,25 @@ static void widget_button_click_handler(const char* event_name, const void* data
                          new_show_time ? "enabled" : "disabled");
                 break;
             }
+            case 3: { // Go to Page 1 button
+                int target_page = 0;
+                event_publish(integration->event_system, "app.page_transition", &target_page, sizeof(int));
+                log_debug("Widget handler: Page transition to %d requested via event system", target_page);
+                break;
+            }
+            case 4: { // Refresh API data button
+                // Trigger API refresh via event
+                uint32_t timestamp = SDL_GetTicks();
+                event_publish(integration->event_system, "api.refresh_requested", &timestamp, sizeof(uint32_t));
+                log_debug("Widget handler: API refresh requested via event system");
+                break;
+            }
+            case 5: { // Exit button
+                bool quit = true;
+                state_store_set(integration->state_store, "app", "quit", &quit, sizeof(bool));
+                log_debug("Widget handler: Application exit requested via state store");
+                break;
+            }
         }
     }
 }
@@ -552,12 +616,68 @@ void widget_integration_enable_button_handling(WidgetIntegration* integration) {
     event_subscribe(integration->event_system, "ui.button_pressed", 
                    widget_button_click_handler, integration);
     
-    log_debug("Enabled widget-based button handling");
+    // Subscribe to page transition events
+    event_subscribe(integration->event_system, "app.page_transition", 
+                   widget_page_transition_handler, integration);
+    
+    // Subscribe to API refresh events
+    event_subscribe(integration->event_system, "api.refresh_requested", 
+                   widget_api_refresh_handler, integration);
+    
+    log_debug("Enabled widget-based button handling with event subscriptions");
+}
+
+// Get quit flag from state store
+bool widget_integration_get_quit(WidgetIntegration* integration) {
+    if (!integration || !integration->state_store) return false;
+    
+    size_t size;
+    time_t timestamp;
+    bool* quit = (bool*)state_store_get(integration->state_store, "app", "quit", &size, &timestamp);
+    if (quit && size == sizeof(bool)) {
+        bool result = *quit;
+        free(quit);
+        return result;
+    }
+    return false;
+}
+
+// Set quit flag in state store
+void widget_integration_set_quit(WidgetIntegration* integration, bool quit) {
+    if (!integration || !integration->state_store) return;
+    
+    state_store_set(integration->state_store, "app", "quit", &quit, sizeof(bool));
+    log_debug("Widget state: quit flag set to %s", quit ? "true" : "false");
+}
+
+// Handle page transition requests from widget system
+static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context) {
+    (void)context; // Widget integration not needed for this
+    if (!data || data_size < sizeof(int)) return;
+    
+    int target_page = *(int*)data;
+    log_debug("Widget page transition handler: transitioning to page %d", target_page);
+    
+    // Use existing page system for transition (for now)
+    if (pages_get_current() != target_page && pages_get_target_page() == -1) {
+        pages_transition_to(target_page);
+    }
+}
+
+// Handle API refresh requests from widget system  
+static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context) {
+    (void)data; (void)data_size; // Timestamp not needed
+    (void)context; // Widget integration not needed for this
+    
+    log_debug("Widget API refresh handler: requesting API refresh (event system integration needed)");
+    
+    // TODO: Integrate with API manager through proper event system
+    // For now, this event serves as a placeholder for API integration
 }
 
 // Sync state from widget store back to global variables (for gradual migration)
 void widget_integration_sync_state_to_globals(WidgetIntegration* integration, 
-                                             SDL_Color* bg_color, bool* show_time) {
+                                             SDL_Color* bg_color, bool* show_time, bool* quit, int* page1_text_color) {
     if (!integration || !integration->state_store) return;
     
     size_t size;
@@ -580,6 +700,26 @@ void widget_integration_sync_state_to_globals(WidgetIntegration* integration,
         if (stored_show_time && size == sizeof(bool)) {
             *show_time = *stored_show_time;
             free(stored_show_time);
+        }
+    }
+    
+    // Sync quit flag
+    if (quit) {
+        bool* stored_quit = (bool*)state_store_get(integration->state_store, 
+                                                  "app", "quit", &size, &timestamp);
+        if (stored_quit && size == sizeof(bool)) {
+            *quit = *stored_quit;
+            free(stored_quit);
+        }
+    }
+    
+    // Sync page1_text_color
+    if (page1_text_color) {
+        int* stored_color = (int*)state_store_get(integration->state_store, 
+                                                 "app", "page1_text_color", &size, &timestamp);
+        if (stored_color && size == sizeof(int)) {
+            *page1_text_color = *stored_color;
+            free(stored_color);
         }
     }
 }
