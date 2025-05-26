@@ -351,7 +351,7 @@ void* state_store_get(StateStore* store, const char* type_name, const char* id,
             }
             
             pthread_rwlock_unlock(&store->lock);
-            log_debug("Retrieved item: %s (%zu bytes)", compound_key, item->data_size);
+            // log_debug("Retrieved item: %s (%zu bytes)", compound_key, item->data_size); // Too verbose
             return data_copy;
         }
     }
