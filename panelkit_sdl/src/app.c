@@ -27,6 +27,9 @@
 // Configuration system
 #include "config/config_manager.h"
 
+// Widget integration layer (runs parallel to existing UI)
+#include "ui/widget_integration.h"
+
 // Embedded font data
 #include "embedded_font.h"
 
@@ -76,6 +79,9 @@ SDL_Color text_colors[] = {
 // API manager
 ApiManager* api_manager = NULL;
 UserData current_user_data = {0};
+
+// Widget integration layer (runs parallel to existing system)
+WidgetIntegration* widget_integration = NULL;
 
 // Debug info
 bool show_debug = true;
@@ -472,6 +478,16 @@ int main(int argc, char* argv[]) {
     api_manager_set_error_callback(api_manager, on_api_error, NULL);
     api_manager_set_state_callback(api_manager, on_api_state_changed, NULL);
     
+    // Initialize widget integration layer (runs parallel to existing UI)
+    widget_integration = widget_integration_create(renderer);
+    if (!widget_integration) {
+        log_warn("Widget integration layer failed to initialize - continuing without it");
+    } else {
+        widget_integration_set_dimensions(widget_integration, actual_width, actual_height);
+        // Start with minimal integration - just state tracking for now
+        log_info("Widget integration layer initialized (background mode)");
+    }
+    
     // Force initial API fetch immediately
     api_manager_fetch_user_async(api_manager);
     
@@ -495,6 +511,10 @@ int main(int argc, char* argv[]) {
                 int touch_x = (int)(e.tfinger.x * actual_width);
                 int touch_y = (int)(e.tfinger.y * actual_height);
                 handle_touch_down(touch_x, touch_y, "touch");
+                // Mirror to widget integration layer
+                if (widget_integration) {
+                    widget_integration_mirror_touch_event(widget_integration, touch_x, touch_y, true);
+                }
             }
             else if (e.type == SDL_FINGERUP) {
                 int touch_x = (int)(e.tfinger.x * actual_width);
@@ -509,6 +529,10 @@ int main(int argc, char* argv[]) {
             // Handle mouse events as touch
             else if (e.type == SDL_MOUSEBUTTONDOWN) {
                 handle_touch_down(e.button.x, e.button.y, "mouse");
+                // Mirror to widget integration layer
+                if (widget_integration) {
+                    widget_integration_mirror_touch_event(widget_integration, e.button.x, e.button.y, true);
+                }
             }
             else if (e.type == SDL_MOUSEBUTTONUP) {
                 handle_touch_up(e.button.x, e.button.y, "mouse");
@@ -613,6 +637,9 @@ int main(int argc, char* argv[]) {
     }
     if (config_manager) {
         config_manager_destroy(config_manager);
+    }
+    if (widget_integration) {
+        widget_integration_destroy(widget_integration);
     }
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
@@ -840,6 +867,14 @@ void handle_click(int button_index) {
     int gesture_page = gestures_get_page();
     log_event("BUTTON_CLICK", "button=%d page=%d", button_index, gesture_page);
     
+    // Mirror button press to widget integration layer
+    if (widget_integration) {
+        Page* page = pages_get(gesture_page);
+        const char* button_text = (page && button_index < page->button_count) ? 
+                                page->button_texts[button_index] : NULL;
+        widget_integration_mirror_button_press(widget_integration, button_index, button_text);
+    }
+    
     // Handle button actions based on page and button index
     if (gesture_page == 0) {
         // Page 1 buttons
@@ -965,6 +1000,11 @@ void on_api_data_received(const UserData* data, void* context) {
     if (data) {
         current_user_data = *data;
         log_info("API data received: %s", current_user_data.name);
+        
+        // Mirror API data to widget integration layer
+        if (widget_integration) {
+            widget_integration_mirror_user_data(widget_integration, data, sizeof(*data));
+        }
     }
 }
 

@@ -99,6 +99,8 @@ set(SOURCES
     src/state/state_event_bridge.c
     src/events/event_system.c
     src/ui/event_button_poc.c
+    # Widget integration layer (parallel to existing UI)
+    src/ui/widget_integration.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c

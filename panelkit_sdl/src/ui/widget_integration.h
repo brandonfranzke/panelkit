@@ -1,0 +1,63 @@
+#ifndef WIDGET_INTEGRATION_H
+#define WIDGET_INTEGRATION_H
+
+#include "../state/state_store.h"
+#include "../events/event_system.h"
+
+// Forward declarations
+typedef struct SDL_Renderer SDL_Renderer;
+
+// Widget integration layer - runs parallel to existing system
+// This layer gradually replaces internal state without changing visuals
+typedef struct WidgetIntegration {
+    // Widget system components (running in background)
+    StateStore* state_store;
+    EventSystem* event_system;
+    
+    // Renderer reference (for future widget rendering)
+    SDL_Renderer* renderer;
+    
+    // Migration state tracking
+    bool widget_system_enabled;
+    bool events_enabled;
+    bool state_tracking_enabled;
+    
+    // Screen dimensions
+    int screen_width;
+    int screen_height;
+} WidgetIntegration;
+
+// Lifecycle
+WidgetIntegration* widget_integration_create(SDL_Renderer* renderer);
+void widget_integration_destroy(WidgetIntegration* integration);
+
+// Setup
+void widget_integration_set_dimensions(WidgetIntegration* integration, int width, int height);
+
+// Migration controls - enable components gradually
+void widget_integration_enable_events(WidgetIntegration* integration);
+void widget_integration_enable_state_tracking(WidgetIntegration* integration);
+void widget_integration_enable_widgets(WidgetIntegration* integration);
+
+// Event integration - mirror existing events into widget system
+void widget_integration_mirror_touch_event(WidgetIntegration* integration, 
+                                          int x, int y, bool is_down);
+void widget_integration_mirror_button_press(WidgetIntegration* integration,
+                                           int button_index, const char* button_text);
+void widget_integration_mirror_page_change(WidgetIntegration* integration,
+                                          int from_page, int to_page);
+
+// State integration - mirror existing state into widget system
+void widget_integration_mirror_user_data(WidgetIntegration* integration,
+                                        const void* user_data, size_t data_size);
+void widget_integration_mirror_api_state(WidgetIntegration* integration,
+                                        const char* state_name, const char* value);
+
+// Update - call from main loop
+void widget_integration_update(WidgetIntegration* integration);
+
+// Query functions - for gradual replacement of existing state
+bool widget_integration_has_user_data(WidgetIntegration* integration);
+void* widget_integration_get_user_data(WidgetIntegration* integration, size_t* size);
+
+#endif // WIDGET_INTEGRATION_H
