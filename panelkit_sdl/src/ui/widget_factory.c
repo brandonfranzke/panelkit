@@ -1,6 +1,7 @@
 #include "widget_factory.h"
 #include "widgets/button_widget.h"
 #include "widgets/weather_widget.h"
+#include "widgets/page_manager_widget.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -142,6 +143,11 @@ Widget* widget_factory_create_weather(const char* id, void* params) {
     
     WeatherWidget* weather = weather_widget_create(id, location);
     return weather ? &weather->base : NULL;
+}
+
+Widget* widget_factory_create_page_manager(const char* id, void* params) {
+    int page_count = params ? *(int*)params : 2;  // Default to 2 pages
+    return page_manager_widget_create(id, page_count);
 }
 
 Widget* widget_factory_create_label(const char* id, void* params) {

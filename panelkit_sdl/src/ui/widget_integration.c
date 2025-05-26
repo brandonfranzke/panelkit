@@ -5,6 +5,7 @@
 #include "widget_factory.h"
 #include "widget.h"
 #include "widgets/button_widget.h"
+#include "widgets/page_manager_widget.h"
 #include "page_widget.h"
 #include "../core/sdl_includes.h"
 #include "pages.h"
@@ -25,6 +26,7 @@
 static void widget_button_click_handler(const char* event_name, const void* data, size_t data_size, void* context);
 static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context);
 static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context);
+static void widget_integration_page_changed_callback(int from_page, int to_page, void* user_data);
 
 WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     WidgetIntegration* integration = calloc(1, sizeof(WidgetIntegration));
@@ -298,6 +300,20 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     
     log_info("Creating shadow widgets to mirror existing UI structure");
     
+    // Create page manager widget
+    integration->page_manager = page_manager_widget_create("page_manager", integration->num_pages);
+    if (!integration->page_manager) {
+        log_error("Failed to create page manager widget");
+        return;
+    }
+    
+    widget_set_bounds(integration->page_manager, 0, 0, integration->screen_width, integration->screen_height);
+    widget_manager_add_root(integration->widget_manager, integration->page_manager, "page_manager");
+    
+    // Set up page change callback to mirror to existing system
+    page_manager_set_page_changed_callback(integration->page_manager,
+        widget_integration_page_changed_callback, integration);
+    
     // Create page widgets for each page
     for (int i = 0; i < integration->num_pages; i++) {
         char page_id[32];
@@ -305,14 +321,14 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
         snprintf(page_id, sizeof(page_id), "page_%d", i);
         snprintf(page_title, sizeof(page_title), "Page %d", i + 1);
         
-        // Create a page widget (using base widget for now)
+        // Create a page widget
         Widget* page = widget_create(page_id, WIDGET_TYPE_CONTAINER);
         if (page) {
             widget_set_bounds(page, 0, 0, integration->screen_width, integration->screen_height);
             integration->page_widgets[i] = page;
             
-            // Add to widget manager as a root widget
-            widget_manager_add_root(integration->widget_manager, page, page_id);
+            // Add to page manager instead of directly to widget manager
+            page_manager_add_page(integration->page_manager, i, page);
             
             log_debug("Created shadow page widget: %s", page_id);
         }
@@ -406,16 +422,17 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
 void widget_integration_sync_page_state(WidgetIntegration* integration,
                                        int page_index, bool is_active) {
     if (!integration || !integration->shadow_widgets_created || 
-        !integration->widget_manager ||
+        !integration->page_manager ||
         page_index < 0 || page_index >= integration->num_pages) {
         return;
     }
     
-    if (is_active) {
-        char page_id[32];
-        snprintf(page_id, sizeof(page_id), "page_%d", page_index);
-        widget_manager_set_active_root(integration->widget_manager, page_id);
-        log_debug("Activated shadow page: %s", page_id);
+    if (is_active && integration->page_manager) {
+        // Sync page state to page manager widget
+        if (page_manager_get_current_page(integration->page_manager) != page_index) {
+            page_manager_set_current_page(integration->page_manager, page_index);
+        }
+        log_debug("Synced page state to page manager: page %d", page_index);
     }
 }
 
@@ -650,17 +667,33 @@ void widget_integration_set_quit(WidgetIntegration* integration, bool quit) {
     log_debug("Widget state: quit flag set to %s", quit ? "true" : "false");
 }
 
+// Callback when page changes in page manager widget
+static void widget_integration_page_changed_callback(int from_page, int to_page, void* user_data) {
+    WidgetIntegration* integration = (WidgetIntegration*)user_data;
+    if (!integration) return;
+    
+    log_debug("Page manager widget changed page: %d -> %d", from_page, to_page);
+    
+    // Mirror to existing page system
+    if (pages_get_current() != to_page) {
+        pages_transition_to(to_page);
+    }
+    
+    // Publish page change event
+    widget_integration_mirror_page_change(integration, from_page, to_page);
+}
+
 // Handle page transition requests from widget system
 static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context) {
-    (void)context; // Widget integration not needed for this
-    if (!data || data_size < sizeof(int)) return;
+    WidgetIntegration* integration = (WidgetIntegration*)context;
+    if (!data || data_size < sizeof(int) || !integration) return;
     
     int target_page = *(int*)data;
     log_debug("Widget page transition handler: transitioning to page %d", target_page);
     
-    // Use existing page system for transition (for now)
-    if (pages_get_current() != target_page && pages_get_target_page() == -1) {
-        pages_transition_to(target_page);
+    // Use page manager widget
+    if (integration->page_manager) {
+        page_manager_transition_to(integration->page_manager, target_page);
     }
 }
 

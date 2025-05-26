@@ -24,6 +24,7 @@ typedef struct WidgetIntegration {
     WidgetFactory* widget_factory;
     
     // Shadow widgets that mirror existing UI
+    Widget* page_manager;  // Page manager widget that handles all pages
     Widget* page_widgets[2];  // Mirror the 2 pages
     Widget* button_widgets[2][9];  // Mirror buttons on each page (max 9 per page)
     int num_pages;
