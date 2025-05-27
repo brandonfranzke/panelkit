@@ -30,6 +30,7 @@ typedef struct {
     bool skip_system_config;         /**< Skip loading system config */
     bool skip_user_config;           /**< Skip loading user config */
     bool skip_local_config;          /**< Skip loading local config */
+    bool use_fallback_on_error;      /**< Use defaults when config parse fails */
 } ConfigManagerOptions;
 
 /**

@@ -33,6 +33,12 @@ typedef struct {
     bool follow_redirects;      // Follow HTTP redirects
     int max_redirects;          // Maximum number of redirects
     const char* user_agent;     // User-Agent header
+    
+    // Retry configuration
+    int max_retries;            // Maximum retry attempts (0 = no retry)
+    int initial_backoff_ms;     // Initial backoff in milliseconds
+    int max_backoff_ms;         // Maximum backoff in milliseconds
+    float backoff_multiplier;   // Backoff multiplier (e.g., 2.0 for exponential)
 } ApiClientConfig;
 
 // Response structure

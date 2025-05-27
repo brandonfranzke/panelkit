@@ -136,6 +136,26 @@ bool config_manager_load_file(ConfigManager* manager, const char* path, ConfigSo
     if (!config_parser_parse_file(manager->parser, path, &manager->config)) {
         const ConfigParseError* error = config_parser_get_error(manager->parser);
         log_error("Failed to parse configuration file %s: %s", path, error->message);
+        
+        // Fallback strategy: Use partial config if available
+        if (manager->options.use_fallback_on_error) {
+            log_warn("Using partial configuration and defaults for missing values");
+            
+            // The parser may have loaded some values before failing
+            // Log what we're falling back on
+            log_info("Fallback: display.width = %d (default: %d)", 
+                     manager->config.display.width, 
+                     DEFAULT_DISPLAY_WIDTH);
+            log_info("Fallback: display.height = %d (default: %d)", 
+                     manager->config.display.height,
+                     DEFAULT_DISPLAY_HEIGHT);
+            log_info("Fallback: display.fullscreen = %s",
+                     manager->config.display.fullscreen ? "true" : "false");
+            
+            // Continue loading despite parse error
+            return true;
+        }
+        
         return false;
     }
     
@@ -155,6 +175,37 @@ bool config_manager_load_file(ConfigManager* manager, const char* path, ConfigSo
     }
     
     return true;
+}
+
+// Validate critical configuration values and apply corrections
+static void validate_and_correct_config(Config* config) {
+    bool corrected = false;
+    
+    // Validate display dimensions
+    if (config->display.width <= 0 || config->display.width > 8192) {
+        log_warn("Invalid display width %d, using default %d", 
+                 config->display.width, DEFAULT_DISPLAY_WIDTH);
+        config->display.width = DEFAULT_DISPLAY_WIDTH;
+        corrected = true;
+    }
+    
+    if (config->display.height <= 0 || config->display.height > 8192) {
+        log_warn("Invalid display height %d, using default %d",
+                 config->display.height, DEFAULT_DISPLAY_HEIGHT);
+        config->display.height = DEFAULT_DISPLAY_HEIGHT;
+        corrected = true;
+    }
+    
+    // Validate logging level
+    if (strlen(config->logging.level) == 0) {
+        log_warn("Empty logging level, using default 'info'");
+        strncpy(config->logging.level, "info", CONFIG_MAX_STRING - 1);
+        corrected = true;
+    }
+    
+    if (corrected) {
+        log_info("Configuration validation completed with corrections");
+    }
 }
 
 bool config_manager_load(ConfigManager* manager) {
@@ -191,6 +242,9 @@ bool config_manager_load(ConfigManager* manager) {
     if (!any_loaded) {
         log_warn("No configuration files found, using defaults only");
     }
+    
+    // Validate and correct configuration
+    validate_and_correct_config(&manager->config);
     
     return true;
 }

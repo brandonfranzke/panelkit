@@ -1,9 +1,11 @@
 #include "api_client.h"
 #include "../core/logger.h"
+#include "../core/sdl_includes.h"
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdio.h>
 
 struct ApiClient {
     CURL* curl;
@@ -142,37 +144,95 @@ ApiClientError api_client_request(ApiClient* client,
             break;
     }
     
-    // Perform request
-    CURLcode curl_result = curl_easy_perform(client->curl);
-    
-    // Get HTTP response code
-    curl_easy_getinfo(client->curl, CURLINFO_RESPONSE_CODE, &response->http_code);
-    
+    // Retry logic with exponential backoff
+    int max_attempts = client->config.max_retries + 1;  // Initial attempt + retries
+    int backoff_ms = client->config.initial_backoff_ms;
     ApiClientError result = API_CLIENT_SUCCESS;
+    CURLcode curl_result = CURLE_OK;
     
-    if (curl_result != CURLE_OK) {
-        const char* error_msg = curl_easy_strerror(curl_result);
-        response->error_message = malloc(strlen(error_msg) + 1);
-        if (response->error_message) {
-            strcpy(response->error_message, error_msg);
+    for (int attempt = 1; attempt <= max_attempts; attempt++) {
+        // Clear previous response data if retrying
+        if (attempt > 1) {
+            if (response->data) {
+                free(response->data);
+                response->data = NULL;
+                response->size = 0;
+            }
+            if (response->error_message) {
+                free(response->error_message);
+                response->error_message = NULL;
+            }
+            
+            // Wait with backoff
+            log_info("Retrying API request (attempt %d/%d) after %dms backoff...", 
+                     attempt, max_attempts, backoff_ms);
+            SDL_Delay(backoff_ms);
+            
+            // Calculate next backoff (exponential with max limit)
+            backoff_ms = (int)(backoff_ms * client->config.backoff_multiplier);
+            if (backoff_ms > client->config.max_backoff_ms) {
+                backoff_ms = client->config.max_backoff_ms;
+            }
         }
         
-        switch (curl_result) {
-            case CURLE_OPERATION_TIMEDOUT:
-                result = API_CLIENT_ERROR_TIMEOUT;
-                break;
-            case CURLE_OUT_OF_MEMORY:
-                result = API_CLIENT_ERROR_MEMORY;
-                break;
-            default:
+        // Perform request
+        curl_result = curl_easy_perform(client->curl);
+        
+        // Get HTTP response code
+        curl_easy_getinfo(client->curl, CURLINFO_RESPONSE_CODE, &response->http_code);
+        
+        if (curl_result == CURLE_OK) {
+            // Check if HTTP response indicates success or permanent failure
+            if (response->http_code >= 200 && response->http_code < 300) {
+                result = API_CLIENT_SUCCESS;
+                break;  // Success - no need to retry
+            } else if (response->http_code >= 400 && response->http_code < 500 &&
+                      response->http_code != 429) {  // 429 is "Too Many Requests" - retryable
+                // Client error (4xx except 429) - don't retry
                 result = API_CLIENT_ERROR_NETWORK;
+                log_error("API request failed with HTTP %ld - not retrying", response->http_code);
                 break;
+            }
+            // Server errors (5xx) and 429 - continue retry loop
+            result = API_CLIENT_ERROR_NETWORK;
+        } else {
+            // CURL error - check if retryable
+            switch (curl_result) {
+                case CURLE_OUT_OF_MEMORY:
+                    result = API_CLIENT_ERROR_MEMORY;
+                    break;  // Don't retry memory errors
+                case CURLE_OPERATION_TIMEDOUT:
+                    result = API_CLIENT_ERROR_TIMEOUT;
+                    // Continue retry loop for timeouts
+                    break;
+                default:
+                    result = API_CLIENT_ERROR_NETWORK;
+                    // Continue retry loop for network errors
+                    break;
+            }
+            
+            // Store error message
+            const char* error_msg = curl_easy_strerror(curl_result);
+            response->error_message = malloc(strlen(error_msg) + 32);
+            if (response->error_message) {
+                sprintf(response->error_message, "%s (attempt %d/%d)", 
+                        error_msg, attempt, max_attempts);
+            }
+            
+            // Don't retry memory errors
+            if (result == API_CLIENT_ERROR_MEMORY) {
+                break;
+            }
         }
-        
-        log_error("API request failed: %s (%d)", error_msg, curl_result);
-    } else {
+    }
+    
+    // Log final result
+    if (result == API_CLIENT_SUCCESS) {
         log_debug("API request successful: %s -> %ld (%zu bytes)", 
                  url, response->http_code, response->size);
+    } else {
+        log_error("API request failed after %d attempts: %s", 
+                 max_attempts, response->error_message ? response->error_message : "Unknown error");
     }
     
     pthread_mutex_unlock(&client->mutex);
@@ -310,7 +370,13 @@ ApiClientConfig api_client_default_config(void) {
         .connect_timeout_seconds = 5,
         .follow_redirects = true,
         .max_redirects = 3,
-        .user_agent = "PanelKit/1.0"
+        .user_agent = "PanelKit/1.0",
+        
+        // Retry configuration defaults
+        .max_retries = 3,
+        .initial_backoff_ms = 100,
+        .max_backoff_ms = 5000,
+        .backoff_multiplier = 2.0f
     };
     return config;
 }

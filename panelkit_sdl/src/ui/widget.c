@@ -29,8 +29,9 @@ Widget* widget_create(const char* id, WidgetType type) {
     
     Widget* widget = calloc(1, sizeof(Widget));
     if (!widget) {
-        log_error("Failed to allocate widget");
-        pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
+        log_error("Failed to allocate widget for '%s'", id);
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate Widget struct for '%s'", id);
         return NULL;
     }
     
@@ -38,21 +39,29 @@ Widget* widget_create(const char* id, WidgetType type) {
     strncpy(widget->id, id, sizeof(widget->id) - 1);
     widget->type = type;
     
-    // Initialize arrays
+    // Initialize arrays with proper cleanup on failure
     widget->child_capacity = INITIAL_CHILD_CAPACITY;
     widget->children = calloc(widget->child_capacity, sizeof(Widget*));
     if (!widget->children) {
+        log_error("Failed to allocate children array for widget '%s'", id);
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate %zu bytes for children array",
+                                       widget->child_capacity * sizeof(Widget*));
+        // Cleanup partially created widget
         free(widget);
-        pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     
     widget->event_capacity = INITIAL_EVENT_CAPACITY;
     widget->subscribed_events = calloc(widget->event_capacity, sizeof(char*));
     if (!widget->subscribed_events) {
+        log_error("Failed to allocate event array for widget '%s'", id);
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate %zu bytes for event array",
+                                       widget->event_capacity * sizeof(char*));
+        // Cleanup partially created widget
         free(widget->children);
         free(widget);
-        pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     
@@ -138,7 +147,19 @@ bool widget_add_child(Widget* parent, Widget* child) {
     
     // Inherit event system and state store
     if (parent->event_system || parent->state_store) {
-        widget_connect_systems(child, parent->event_system, parent->state_store);
+        PkError err = widget_connect_systems(child, parent->event_system, parent->state_store);
+        if (err != PK_OK) {
+            // Rollback: Remove child from parent on connection failure
+            parent->child_count--;
+            child->parent = NULL;
+            
+            log_error("Failed to connect child '%s' to systems: %s", 
+                     child->id, pk_error_string(err));
+            pk_set_last_error_with_context(err,
+                                          "Failed to connect child '%s' to parent '%s' systems",
+                                          child->id, parent->id);
+            return false;
+        }
     }
     
     widget_invalidate_layout(parent);
