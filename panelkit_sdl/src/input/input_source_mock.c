@@ -45,7 +45,7 @@ typedef struct {
 /* Pattern generation thread */
 static void* pattern_thread_func(void* arg) {
     InputSource* source = (InputSource*)arg;
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     Uint32 start_time = SDL_GetTicks();
     
     while (data->thread_running) {
@@ -227,7 +227,7 @@ static bool mock_initialize(InputSource* source, const InputConfig* config) {
         return false;
     }
     
-    source->impl = data;
+    source->impl.mock = data;
     source->name = "Mock Input";
     
     SDL_LogInfo(SDL_LOG_CATEGORY_INPUT, "Mock input source initialized");
@@ -235,7 +235,7 @@ static bool mock_initialize(InputSource* source, const InputConfig* config) {
 }
 
 static bool mock_start(InputSource* source, InputHandler* handler) {
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     data->handler = handler;
     data->thread_running = true;
     
@@ -245,7 +245,7 @@ static bool mock_start(InputSource* source, InputHandler* handler) {
 }
 
 static void mock_stop(InputSource* source) {
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     
     /* Stop pattern thread if running */
     if (data->thread_running) {
@@ -270,7 +270,7 @@ static bool mock_get_capabilities(InputSource* source, InputCapabilities* caps) 
 }
 
 static void mock_cleanup(InputSource* source) {
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     
     mock_stop(source);
     
@@ -285,7 +285,7 @@ static void mock_cleanup(InputSource* source) {
 void input_mock_queue_event(InputSource* source, SDL_Event* event) {
     if (!source || source->type != INPUT_SOURCE_MOCK) return;
     
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     
     pthread_mutex_lock(&data->queue_mutex);
     if (data->queue_size < data->queue_capacity) {
@@ -297,7 +297,7 @@ void input_mock_queue_event(InputSource* source, SDL_Event* event) {
 void input_mock_start_pattern(InputSource* source, int pattern) {
     if (!source || source->type != INPUT_SOURCE_MOCK) return;
     
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     
     /* Stop existing pattern */
     if (data->pattern != PATTERN_NONE && data->thread_running) {
@@ -320,7 +320,7 @@ void input_mock_stop_pattern(InputSource* source) {
 void input_mock_configure_pattern(InputSource* source, int delay_ms, int duration_ms) {
     if (!source || source->type != INPUT_SOURCE_MOCK) return;
     
-    MockData* data = (MockData*)source->impl;
+    MockData* data = source->impl.mock;
     data->pattern_delay_ms = delay_ms;
     data->pattern_duration_ms = duration_ms;
 }

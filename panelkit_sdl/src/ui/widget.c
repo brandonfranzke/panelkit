@@ -671,7 +671,6 @@ void widget_default_layout(Widget* widget) {
 void widget_default_destroy(Widget* widget) {
     // Base cleanup is handled by widget_destroy
     // This is for type-specific cleanup
-    if (widget && widget->impl_data) {
-        free(widget->impl_data);
-    }
+    // Currently no default cleanup needed
+    (void)widget; // Suppress unused parameter warning
 }

@@ -20,7 +20,7 @@ typedef struct {
 /* Initialize the input source */
 static bool sdl_initialize(InputSource* source, const InputConfig* config) {
     (void)config; /* Unused for SDL native */
-    SDLNativeData* data = (SDLNativeData*)source->impl;
+    SDLNativeData* data = source->impl.sdl;
     
     /* Check SDL video subsystem is initialized */
     if (!SDL_WasInit(SDL_INIT_VIDEO)) {
@@ -42,7 +42,7 @@ static bool sdl_initialize(InputSource* source, const InputConfig* config) {
 
 /* Start input processing */
 static bool sdl_start(InputSource* source, InputHandler* handler) {
-    SDLNativeData* data = (SDLNativeData*)source->impl;
+    SDLNativeData* data = source->impl.sdl;
     data->handler = handler;
     
     /* SDL native doesn't need a separate thread - events come through SDL_PollEvent */
@@ -58,7 +58,7 @@ static void sdl_stop(InputSource* source) {
 
 /* Get input capabilities */
 static bool sdl_get_capabilities(InputSource* source, InputCapabilities* caps) {
-    SDLNativeData* data = (SDLNativeData*)source->impl;
+    SDLNativeData* data = source->impl.sdl;
     
     if (!caps) {
         return false;
@@ -81,11 +81,11 @@ static bool sdl_get_capabilities(InputSource* source, InputCapabilities* caps) {
 
 /* Cleanup and destroy */
 static void sdl_cleanup(InputSource* source) {
-    SDLNativeData* data = (SDLNativeData*)source->impl;
+    SDLNativeData* data = source->impl.sdl;
     
     /* Free implementation data */
     free(data);
-    source->impl = NULL;
+    source->impl.sdl = NULL;
 }
 
 /* Create SDL native input source */
@@ -104,7 +104,7 @@ InputSource* input_source_sdl_native_create(void) {
     /* Initialize structure */
     source->type = INPUT_SOURCE_SDL_NATIVE;
     source->name = "SDL Native";
-    source->impl = data;
+    source->impl.sdl = data;
     source->initialize = sdl_initialize;
     source->start = sdl_start;
     source->stop = sdl_stop;

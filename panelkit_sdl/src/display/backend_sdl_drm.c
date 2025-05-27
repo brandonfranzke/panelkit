@@ -215,11 +215,11 @@ static int setup_drm_display(SDLDRMBackendImpl* impl) {
 
 /* Present function - copy SDL surface to DRM buffer */
 static void sdl_drm_backend_present(DisplayBackend* backend) {
-    if (!backend || !backend->impl) {
+    if (!backend || !backend->impl.sdl_drm) {
         return;
     }
     
-    SDLDRMBackendImpl* impl = (SDLDRMBackendImpl*)backend->impl;
+    SDLDRMBackendImpl* impl = backend->impl.sdl_drm;
     if (!impl->buffer) {
         return;
     }
@@ -255,11 +255,11 @@ static void sdl_drm_backend_present(DisplayBackend* backend) {
 
 /* Cleanup function */
 static void sdl_drm_backend_cleanup(DisplayBackend* backend) {
-    if (!backend || !backend->impl) {
+    if (!backend || !backend->impl.sdl_drm) {
         return;
     }
     
-    SDLDRMBackendImpl* impl = (SDLDRMBackendImpl*)backend->impl;
+    SDLDRMBackendImpl* impl = backend->impl.sdl_drm;
     
     /* Destroy DRM resources */
     destroy_drm_buffer(impl->buffer);
@@ -283,7 +283,7 @@ static void sdl_drm_backend_cleanup(DisplayBackend* backend) {
     }
     
     free(impl);
-    backend->impl = NULL;
+    backend->impl.sdl_drm = NULL;
 }
 
 /* Create SDL+DRM backend */
@@ -306,7 +306,7 @@ DisplayBackend* display_backend_sdl_drm_create(const DisplayConfig* config) {
     /* Set up backend structure */
     backend->type = DISPLAY_BACKEND_SDL_DRM;
     backend->name = "SDL+DRM";
-    backend->impl = impl;
+    backend->impl.sdl_drm = impl;
     backend->present = sdl_drm_backend_present;
     backend->cleanup = sdl_drm_backend_cleanup;
     

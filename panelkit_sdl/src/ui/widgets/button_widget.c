@@ -135,11 +135,11 @@ void button_widget_set_publish_event(ButtonWidget* button,
     if (event_name) {
         button->publish_event = PK_STRDUP(event_name);
         
-        if (data && data_size > 0) {
-            button->publish_data = malloc(data_size);
+        if (data && data_size >= sizeof(ButtonEventData)) {
+            button->publish_data = malloc(sizeof(ButtonEventData));
             if (button->publish_data) {
-                memcpy(button->publish_data, data, data_size);
-                button->publish_data_size = data_size;
+                memcpy(button->publish_data, data, sizeof(ButtonEventData));
+                button->publish_data_size = sizeof(ButtonEventData);
             }
         }
     }
@@ -161,13 +161,12 @@ void button_widget_click(ButtonWidget* button) {
     if (button->publish_event && button->base.event_system) {
         // Debug: print the actual data being published
         if (button->publish_data && button->publish_data_size >= sizeof(ButtonEventData)) {
-            ButtonEventData* data = (ButtonEventData*)button->publish_data;
-            
             // Update timestamp
-            data->timestamp = SDL_GetTicks();
+            button->publish_data->timestamp = SDL_GetTicks();
             
             log_debug("Button '%s' publishing: page=%d button=%d text='%s'", 
-                     button->base.id, data->page, data->button_index, data->button_text);
+                     button->base.id, button->publish_data->page, 
+                     button->publish_data->button_index, button->publish_data->button_text);
         }
         
         event_publish(button->base.event_system,

@@ -33,6 +33,10 @@ typedef struct {
     bool vsync;
 } DisplayConfig;
 
+/* Forward declarations for implementation types */
+struct SDLBackendImpl;
+struct SDLDRMBackendImpl;
+
 /* Display backend interface */
 struct DisplayBackend {
     /* Backend type identifier */
@@ -41,8 +45,11 @@ struct DisplayBackend {
     /* Backend name for logging */
     const char* name;
     
-    /* Private implementation data */
-    void* impl;
+    /* Type-safe implementation data */
+    union {
+        struct SDLBackendImpl* sdl;
+        struct SDLDRMBackendImpl* sdl_drm;
+    } impl;
     
     /* SDL window handle (may be NULL for some backends) */
     SDL_Window* window;

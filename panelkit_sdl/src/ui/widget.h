@@ -85,9 +85,6 @@ struct Widget {
     // Layout functions
     void (*layout)(Widget* widget);
     void (*measure)(Widget* widget, int* width, int* height);
-    
-    // Private implementation data
-    void* impl_data;            // [OWNER: widget] [TYPE: widget-specific]
 };
 
 // Widget lifecycle functions

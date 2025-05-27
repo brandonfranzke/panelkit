@@ -2,6 +2,7 @@
 #define BUTTON_WIDGET_H
 
 #include "../widget.h"
+#include "../../events/event_types.h"
 
 // Forward declaration
 typedef struct ButtonWidget ButtonWidget;
@@ -25,7 +26,7 @@ typedef struct ButtonWidget {
     
     // Optional event to publish on click
     char* publish_event;          // [OWNER: widget] [ALLOC: strdup]
-    void* publish_data;           // [OWNER: widget] [TYPE: ButtonEventData*]
+    ButtonEventData* publish_data; // [OWNER: widget] [ALLOC: malloc]
     size_t publish_data_size;
 } ButtonWidget;
 

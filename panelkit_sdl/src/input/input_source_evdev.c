@@ -77,7 +77,7 @@ static void inject_sdl_touch_event(EvdevData* data, Uint32 type, int id, float x
 
 /* Initialize the input source */
 static bool evdev_initialize(InputSource* source, const InputConfig* config) {
-    EvdevData* data = (EvdevData*)source->impl;
+    EvdevData* data = source->impl.evdev;
     
     /* Store configuration */
     data->auto_detect = config->auto_detect_devices;
@@ -114,7 +114,7 @@ static bool evdev_initialize(InputSource* source, const InputConfig* config) {
 
 /* Start input processing */
 static bool evdev_start(InputSource* source, InputHandler* handler) {
-    EvdevData* data = (EvdevData*)source->impl;
+    EvdevData* data = source->impl.evdev;
     
     data->handler = handler;
     data->thread_running = true;
@@ -135,7 +135,7 @@ static bool evdev_start(InputSource* source, InputHandler* handler) {
 
 /* Stop input processing */
 static void evdev_stop(InputSource* source) {
-    EvdevData* data = (EvdevData*)source->impl;
+    EvdevData* data = source->impl.evdev;
     
     if (data->thread_running) {
         data->thread_running = false;
@@ -146,7 +146,7 @@ static void evdev_stop(InputSource* source) {
 
 /* Get input capabilities */
 static bool evdev_get_capabilities(InputSource* source, InputCapabilities* caps) {
-    EvdevData* data = (EvdevData*)source->impl;
+    EvdevData* data = source->impl.evdev;
     
     if (!caps || data->fd < 0) {
         return false;
@@ -166,7 +166,7 @@ static bool evdev_get_capabilities(InputSource* source, InputCapabilities* caps)
 
 /* Cleanup and destroy */
 static void evdev_cleanup(InputSource* source) {
-    EvdevData* data = (EvdevData*)source->impl;
+    EvdevData* data = source->impl.evdev;
     
     /* Stop thread if running */
     if (data->thread_running) {
@@ -178,13 +178,13 @@ static void evdev_cleanup(InputSource* source) {
     
     /* Free implementation data */
     free(data);
-    source->impl = NULL;
+    source->impl.evdev = NULL;
 }
 
 /* Input reading thread */
 static void* evdev_read_thread(void* arg) {
     InputSource* source = (InputSource*)arg;
-    EvdevData* data = (EvdevData*)source->impl;
+    EvdevData* data = source->impl.evdev;
     struct input_event ev;
     
     log_info("Evdev read thread started for %s", data->device_path);
@@ -540,7 +540,7 @@ InputSource* input_source_linux_evdev_create(void) {
     /* Initialize structure */
     source->type = INPUT_SOURCE_LINUX_EVDEV;
     source->name = "Linux evdev";
-    source->impl = data;
+    source->impl.evdev = data;
     source->initialize = evdev_initialize;
     source->start = evdev_start;
     source->stop = evdev_stop;

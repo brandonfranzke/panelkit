@@ -51,6 +51,11 @@ typedef struct {
     bool enable_mouse_emulation; /* Emulate mouse from touch events */
 } InputConfig;
 
+/* Forward declarations for implementation types */
+struct SDLNativeData;
+struct EvdevData;
+struct MockData;
+
 /**
  * Input source interface (Strategy pattern)
  * Implementations provide specific input reading mechanisms
@@ -62,8 +67,13 @@ struct InputSource {
     /* Source name for logging */
     const char* name;
     
-    /* Private implementation data */
-    void* impl;
+    /* Type-safe implementation data */
+    union {
+        struct SDLNativeData* sdl;
+        struct EvdevData* evdev;
+        struct MockData* mock;
+        void* custom;  /* For custom sources */
+    } impl;
     
     /* Initialize the input source
      * @param source The input source instance

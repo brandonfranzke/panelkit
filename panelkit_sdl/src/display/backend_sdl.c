@@ -16,11 +16,11 @@ typedef struct {
 
 /* Cleanup function */
 static void sdl_backend_cleanup(DisplayBackend* backend) {
-    if (!backend || !backend->impl) {
+    if (!backend || !backend->impl.sdl) {
         return;
     }
     
-    SDLBackendImpl* impl = (SDLBackendImpl*)backend->impl;
+    SDLBackendImpl* impl = backend->impl.sdl;
     
     /* Destroy SDL resources if we own them */
     if (backend->renderer) {
@@ -39,7 +39,7 @@ static void sdl_backend_cleanup(DisplayBackend* backend) {
     }
     
     free(impl);
-    backend->impl = NULL;
+    backend->impl.sdl = NULL;
 }
 
 /* Present function - standard SDL doesn't need extra work */
@@ -97,7 +97,7 @@ DisplayBackend* display_backend_sdl_create(const DisplayConfig* config) {
     /* Set up backend structure */
     backend->type = DISPLAY_BACKEND_SDL;
     backend->name = "Standard SDL";
-    backend->impl = impl;
+    backend->impl.sdl = impl;
     backend->present = sdl_backend_present;
     backend->cleanup = sdl_backend_cleanup;
     backend->set_vsync = sdl_backend_set_vsync;
