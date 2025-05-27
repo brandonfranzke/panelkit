@@ -100,8 +100,11 @@ set(SOURCES
     src/state/state_event_bridge.c
     src/events/event_system.c
     # src/ui/event_button_poc.c  # Phase 6: Removed POC file
-    # Widget integration layer (parallel to existing UI)
-    src/ui/widget_integration.c
+    # Widget integration layer (modular components)
+    src/ui/widget_integration_core.c
+    src/ui/widget_integration_state.c
+    src/ui/widget_integration_events.c
+    src/ui/widget_integration_widgets.c
     # Widget system (shadow UI tree)
     src/ui/widget.c
     src/ui/widget_manager.c
