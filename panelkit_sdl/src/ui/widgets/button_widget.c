@@ -152,6 +152,22 @@ void button_widget_click(ButtonWidget* button) {
     
     // Publish event
     if (button->publish_event && button->base.event_system) {
+        // Debug: print the actual data being published
+        if (button->publish_data && button->publish_data_size >= sizeof(struct {int button_index; int page;})) {
+            struct {
+                int button_index;
+                int page;
+                uint32_t timestamp;
+                char button_text[32];
+            } *data = (void*)button->publish_data;
+            
+            // Update timestamp
+            data->timestamp = SDL_GetTicks();
+            
+            log_debug("Button '%s' publishing: page=%d button=%d text='%s'", 
+                     button->base.id, data->page, data->button_index, data->button_text);
+        }
+        
         event_publish(button->base.event_system,
                      button->publish_event,
                      button->publish_data,
@@ -167,10 +183,21 @@ static void button_widget_render(Widget* widget, SDL_Renderer* renderer) {
         return;
     }
     
-    log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d color (%d,%d,%d)", 
+    log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d color (%d,%d,%d) children=%zu", 
               button->base.id, widget->bounds.x, widget->bounds.y, 
               widget->bounds.w, widget->bounds.h,
-              widget->background_color.r, widget->background_color.g, widget->background_color.b);
+              widget->background_color.r, widget->background_color.g, widget->background_color.b,
+              widget->child_count);
+    
+    // Debug: print child positions
+    for (size_t i = 0; i < widget->child_count; i++) {
+        Widget* child = widget->children[i];
+        if (child) {
+            log_debug("  Child %zu: %s at (%d,%d) size %dx%d", 
+                     i, child->id, child->bounds.x, child->bounds.y,
+                     child->bounds.w, child->bounds.h);
+        }
+    }
     
     // Update background color based on state
     if (widget_has_state(widget, WIDGET_STATE_DISABLED)) {
@@ -207,17 +234,34 @@ static void button_widget_handle_event(Widget* widget, const SDL_Event* event) {
         return;
     }
     
+    // Debug all button events
+    if (event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP) {
+        log_debug("button_widget_handle_event: %s '%s' at (%d,%d) state_flags=0x%x",
+                 event->type == SDL_MOUSEBUTTONDOWN ? "MOUSEDOWN" : "MOUSEUP",
+                 widget->id, event->button.x, event->button.y, widget->state_flags);
+    }
+    
+    // Handle click BEFORE calling default handler (which clears PRESSED state)
+    if (event->type == SDL_MOUSEBUTTONUP && 
+        event->button.button == SDL_BUTTON_LEFT) {
+        
+        bool has_pressed = widget_has_state(widget, WIDGET_STATE_PRESSED);
+        bool contains_point = widget_contains_point(widget, event->button.x, event->button.y);
+        
+        if (has_pressed || contains_point) {
+            log_debug("Button '%s' MOUSEUP: pressed=%d contains=%d at (%d,%d) bounds=(%d,%d,%dx%d)",
+                     widget->id, has_pressed, contains_point, 
+                     event->button.x, event->button.y,
+                     widget->bounds.x, widget->bounds.y, widget->bounds.w, widget->bounds.h);
+        }
+        
+        if (has_pressed && contains_point) {
+            button_widget_click(button);
+        }
+    }
+    
     // Call base handler for hover/press states
     widget_default_handle_event(widget, event);
-    
-    // Handle click
-    if (event->type == SDL_MOUSEBUTTONUP && 
-        event->button.button == SDL_BUTTON_LEFT &&
-        widget_has_state(widget, WIDGET_STATE_PRESSED) &&
-        widget_contains_point(widget, event->button.x, event->button.y)) {
-        
-        button_widget_click(button);
-    }
     
     // Handle keyboard activation
     if (event->type == SDL_KEYDOWN &&

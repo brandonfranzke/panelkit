@@ -366,13 +366,13 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
             widget_set_relative_bounds(button, 20, 100, 200, 50);
             
             // Create text widget as child of button
-            Widget* label = (Widget*)text_widget_create("page0_button0_text", "Change Color", font);
+            Widget* label = (Widget*)text_widget_create("page0_button0_text", "Change Text Color", font);
             if (label) {
-                // Text fills button area minus padding
+                // Text fills button area minus padding (relative to button)
                 int padding = button->padding;
-                widget_set_bounds(label, 
-                    button->bounds.x + padding,
-                    button->bounds.y + padding,
+                widget_set_relative_bounds(label, 
+                    padding,
+                    padding,
                     button->bounds.w - padding * 2,
                     button->bounds.h - padding * 2);
                 text_widget_set_alignment(label, TEXT_ALIGN_CENTER);
@@ -399,7 +399,8 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                     click_data->button_index = 0;
                     click_data->page = 0;
                     click_data->timestamp = 0; // Will be set when clicked
-                    strncpy(click_data->button_text, "Change Color", sizeof(click_data->button_text) - 1);
+                    strncpy(click_data->button_text, "Change Text Color", sizeof(click_data->button_text) - 1);
+                    log_debug("Setting up button page0_button0: index=0 page=0 text='Change Text Color'");
                     button_widget_set_publish_event(btn, "ui.button_pressed", 
                                                   click_data, sizeof(*click_data));
                 }
@@ -412,8 +413,8 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     // Page 1 buttons (color buttons)
     if (integration->page_widgets[1]) {
         const char* button_labels[] = {
-            "Blue", "Green", "Gray", "Time", "Yellow", 
-            "Fetch User", "", "", ""
+            "Blue", "Random", "Time", "Go to Page 1", "Refresh User", 
+            "Exit App", "Button 7", "Button 8", "Button 9"
         };
         
         for (int i = 0; i < 9; i++) {
@@ -439,11 +440,11 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                     snprintf(text_id, sizeof(text_id), "%s_text", button_id);
                     Widget* label = (Widget*)text_widget_create(text_id, button_labels[i], font);
                     if (label) {
-                        // Text fills button area minus padding
+                        // Text fills button area minus padding (relative to button)
                         int padding = button->padding;
-                        widget_set_bounds(label,
-                            button->bounds.x + padding,
-                            button->bounds.y + padding,
+                        widget_set_relative_bounds(label,
+                            padding,
+                            padding,
                             button->bounds.w - padding * 2,
                             button->bounds.h - padding * 2);
                         text_widget_set_alignment(label, TEXT_ALIGN_CENTER);
@@ -471,6 +472,8 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                             click_data->page = 1;
                             click_data->timestamp = 0; // Will be set when clicked
                             strncpy(click_data->button_text, button_labels[i], sizeof(click_data->button_text) - 1);
+                            log_debug("Setting up button %s: index=%d page=1 text='%s'", 
+                                     button_id, i, button_labels[i]);
                             button_widget_set_publish_event(btn, "ui.button_pressed", 
                                                           click_data, sizeof(*click_data));
                         }
@@ -482,9 +485,9 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
         }
     }
     
-    // Set page 1 as initially active
-    if (integration->widget_manager && integration->page_widgets[0]) {
-        widget_manager_set_active_root(integration->widget_manager, "page_0");
+    // Set page manager as the active root - it will handle page switching
+    if (integration->widget_manager && integration->page_manager) {
+        widget_manager_set_active_root(integration->widget_manager, "page_manager");
     }
     
     // Add UI widgets to pages
@@ -505,6 +508,8 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
     
     Widget* button = integration->button_widgets[page][button_index];
     if (button && button->type == WIDGET_TYPE_BUTTON) {
+        ButtonWidget* btn = (ButtonWidget*)button;
+        
         // Update button text if provided by updating the text widget child
         if (text && button->child_count > 0) {
             // Find the text widget child (should be the first child)
@@ -514,6 +519,18 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
                     text_widget_set_text(child, text);
                     break;
                 }
+            }
+            
+            // Also update the publish data to reflect new text
+            if (btn->publish_data && btn->publish_data_size >= sizeof(struct {int button_index; int page; uint32_t timestamp; char button_text[32];})) {
+                struct {
+                    int button_index;
+                    int page;
+                    uint32_t timestamp;
+                    char button_text[32];
+                } *click_data = (void*)btn->publish_data;
+                strncpy(click_data->button_text, text, sizeof(click_data->button_text) - 1);
+                click_data->button_text[sizeof(click_data->button_text) - 1] = '\0';
             }
         }
         
@@ -663,18 +680,12 @@ static void widget_button_click_handler(const char* event_name, const void* data
              button_data->page, button_data->button_index, button_data->button_text);
     
     // Handle actions based on page and button
-    if (button_data->page == 0) { // Page 1 (zero-indexed)
+    if (button_data->page == 0) { // Page 0 (first page)
         switch (button_data->button_index) {
-            case 0: { // Change text color button
-                // Get current text color index
-                size_t size;
-                time_t timestamp;
-                int* text_color = (int*)state_store_get(integration->state_store, "app", "page1_text_color", &size, &timestamp);
-                int new_color = text_color ? ((*text_color + 1) % 7) : 1;
-                if (text_color) free(text_color);
-                
-                state_store_set(integration->state_store, "app", "page1_text_color", &new_color, sizeof(int));
-                log_debug("Widget handler: Text color changed to index %d via state store", new_color);
+            case 0: { // "Change Color" button - should transition to page 1
+                int target_page = 1;
+                event_publish(integration->event_system, "app.page_transition", &target_page, sizeof(int));
+                log_debug("Widget handler: Page transition to %d requested via event system", target_page);
                 break;
             }
         }

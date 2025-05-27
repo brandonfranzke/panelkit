@@ -418,6 +418,28 @@ void widget_perform_layout(Widget* widget) {
     }
 }
 
+void widget_update_child_bounds(Widget* parent) {
+    if (!parent) {
+        return;
+    }
+    
+    // Update absolute bounds of all children based on relative bounds
+    for (size_t i = 0; i < parent->child_count; i++) {
+        Widget* child = parent->children[i];
+        if (child) {
+            // Update child's absolute position based on parent's current position
+            child->bounds.x = parent->bounds.x + child->relative_bounds.x;
+            child->bounds.y = parent->bounds.y + child->relative_bounds.y;
+            // Width and height remain the same
+            child->bounds.w = child->relative_bounds.w;
+            child->bounds.h = child->relative_bounds.h;
+            
+            // Recursively update grandchildren
+            widget_update_child_bounds(child);
+        }
+    }
+}
+
 void widget_render(Widget* widget, SDL_Renderer* renderer) {
     if (!widget || !renderer || !widget_is_visible(widget)) {
         return;
@@ -460,6 +482,15 @@ void widget_handle_event(Widget* widget, const SDL_Event* event) {
         return;
     }
     
+    // Debug logging for button events
+    if ((event->type == SDL_MOUSEBUTTONUP || event->type == SDL_MOUSEBUTTONDOWN) && 
+        widget->type == WIDGET_TYPE_BUTTON) {
+        log_debug("widget_handle_event: %s widget='%s' at (%d,%d,%dx%d) visible=%d",
+                 event->type == SDL_MOUSEBUTTONUP ? "MOUSEUP" : "MOUSEDOWN",
+                 widget->id, widget->bounds.x, widget->bounds.y, 
+                 widget->bounds.w, widget->bounds.h, widget_is_visible(widget));
+    }
+    
     // Let widget handle event first
     if (widget->handle_event) {
         widget->handle_event(widget, event);
@@ -487,20 +518,38 @@ Widget* widget_hit_test(Widget* root, int x, int y) {
         return NULL;
     }
     
-    // Check children first (front to back)
+    // First check if this widget contains the point
+    if (!widget_contains_point(root, x, y)) {
+        return NULL;
+    }
+    
+    // Check children (front to back) for a better hit
+    Widget* child_hit = NULL;
     for (int i = root->child_count - 1; i >= 0; i--) {
         Widget* hit = widget_hit_test(root->children[i], x, y);
         if (hit) {
-            return hit;
+            child_hit = hit;
+            break;
         }
     }
     
-    // Then check this widget
-    if (widget_contains_point(root, x, y)) {
-        return root;
+    // Check if this widget is truly interactive (not just a container with scroll handling)
+    bool is_interactive = (root->type == WIDGET_TYPE_BUTTON);
+    
+    // If we're interactive, return this widget unless child is also interactive
+    if (is_interactive && root->handle_event) {
+        if (!child_hit || child_hit->type != WIDGET_TYPE_BUTTON) {
+            return root;
+        }
     }
     
-    return NULL;
+    // Return the child hit if we found one, otherwise this widget
+    if (child_hit) {
+        return child_hit;
+    }
+    
+    // This widget contains the point and has no child hits
+    return root;
 }
 
 void widget_update(Widget* widget, double delta_time) {

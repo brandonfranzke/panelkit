@@ -157,14 +157,18 @@ void page_manager_handle_swipe(Widget* widget, float offset, bool is_complete) {
     
     if (is_complete) {
         // Swipe complete - determine if we should change pages
-        float abs_offset = fabsf(offset);
+        float normalized_offset = offset / widget->bounds.w;
+        float abs_normalized = fabsf(normalized_offset);
         
-        if (abs_offset > SWIPE_THRESHOLD && manager->transition_state == PAGE_TRANSITION_DRAGGING) {
+        log_debug("Swipe complete: offset=%.1f normalized=%.3f threshold=%.1f", 
+                 offset, normalized_offset, SWIPE_THRESHOLD);
+        
+        if (abs_normalized > SWIPE_THRESHOLD && manager->transition_state == PAGE_TRANSITION_DRAGGING) {
             // Change page
             int new_page = manager->current_page;
-            if (offset < 0 && manager->current_page < manager->page_count - 1) {
+            if (normalized_offset < 0 && manager->current_page < manager->page_count - 1) {
                 new_page = manager->current_page + 1;
-            } else if (offset > 0 && manager->current_page > 0) {
+            } else if (normalized_offset > 0 && manager->current_page > 0) {
                 new_page = manager->current_page - 1;
             }
             
@@ -182,16 +186,20 @@ void page_manager_handle_swipe(Widget* widget, float offset, bool is_complete) {
             manager->transition_state = PAGE_TRANSITION_ANIMATING;
         }
     } else {
-        // Dragging
+        // Dragging - normalize offset to page width
+        float normalized_offset = offset / widget->bounds.w;
         manager->transition_state = PAGE_TRANSITION_DRAGGING;
-        manager->transition_offset = offset;
-        manager->drag_offset = offset;
+        manager->transition_offset = normalized_offset;
+        manager->drag_offset = normalized_offset;
         
         // Apply elastic resistance at boundaries
-        if ((manager->current_page == 0 && offset > 0) ||
-            (manager->current_page == manager->page_count - 1 && offset < 0)) {
+        if ((manager->current_page == 0 && normalized_offset > 0) ||
+            (manager->current_page == manager->page_count - 1 && normalized_offset < 0)) {
             manager->transition_offset *= ELASTIC_RESISTANCE;
         }
+        
+        log_debug("Page drag: offset=%.1f normalized=%.3f transition=%.3f", 
+                 offset, normalized_offset, manager->transition_offset);
     }
     
     // Show indicators while interacting
@@ -275,8 +283,15 @@ static void page_manager_update(Widget* widget, double delta_time) {
     for (int i = 0; i < manager->page_count; i++) {
         if (manager->pages[i]) {
             float page_offset = (i - manager->current_page) + manager->transition_offset;
-            manager->pages[i]->bounds.x = widget->bounds.x + (int)(page_offset * widget->bounds.w);
-            manager->pages[i]->bounds.y = widget->bounds.y;
+            int new_x = widget->bounds.x + (int)(page_offset * widget->bounds.w);
+            int new_y = widget->bounds.y;
+            
+            // Update page position
+            manager->pages[i]->bounds.x = new_x;
+            manager->pages[i]->bounds.y = new_y;
+            
+            // Update all child widget positions recursively
+            widget_update_child_bounds(manager->pages[i]);
         }
     }
 }
@@ -360,10 +375,72 @@ static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
 
 // Handle events
 static void page_manager_handle_event(Widget* widget, const SDL_Event* event) {
-    // For now, page manager doesn't directly handle SDL events
-    // It responds to higher-level events through the event system
-    (void)widget;
-    (void)event;
+    if (!widget || !event) return;
+    PageManagerWidget* manager = (PageManagerWidget*)widget;
+    
+    // Track drag state
+    static bool is_dragging = false;
+    static int drag_start_x = 0;
+    static int drag_page_start = 0;
+    
+    // Don't handle events if we're not the target of a drag
+    if (!is_dragging && event->type != SDL_MOUSEBUTTONDOWN && event->type != SDL_FINGERDOWN) {
+        return;
+    }
+    
+    switch (event->type) {
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_FINGERDOWN: {
+            int x = (event->type == SDL_MOUSEBUTTONDOWN) ? 
+                    event->button.x : 
+                    (int)(event->tfinger.x * widget->bounds.w);
+            
+            if (widget_contains_point(widget, x, 
+                (event->type == SDL_MOUSEBUTTONDOWN) ? event->button.y : 
+                (int)(event->tfinger.y * widget->bounds.h))) {
+                is_dragging = true;
+                drag_start_x = x;
+                drag_page_start = manager->current_page;
+                manager->drag_offset = 0.0f;
+                manager->transition_state = PAGE_TRANSITION_DRAGGING;
+                
+                // Show indicators
+                manager->show_indicators = true;
+                manager->indicator_alpha = INDICATOR_DEFAULT_ALPHA;
+                manager->last_interaction_time = SDL_GetTicks();
+            }
+            break;
+        }
+        
+        case SDL_MOUSEMOTION:
+        case SDL_FINGERMOTION: {
+            if (is_dragging) {
+                int x = (event->type == SDL_MOUSEMOTION) ? 
+                        event->motion.x : 
+                        (int)(event->tfinger.x * widget->bounds.w);
+                
+                float delta_x = (float)(x - drag_start_x);
+                log_debug("Page manager drag: delta_x=%.1f, start_x=%d, current_x=%d", 
+                         delta_x, drag_start_x, x);
+                page_manager_handle_swipe(widget, delta_x, false);
+            }
+            break;
+        }
+        
+        case SDL_MOUSEBUTTONUP:
+        case SDL_FINGERUP: {
+            if (is_dragging) {
+                int x = (event->type == SDL_MOUSEBUTTONUP) ? 
+                        event->button.x : 
+                        (int)(event->tfinger.x * widget->bounds.w);
+                
+                float delta_x = (float)(x - drag_start_x);
+                page_manager_handle_swipe(widget, delta_x, true);
+                is_dragging = false;
+            }
+            break;
+        }
+    }
 }
 
 // Destroy function

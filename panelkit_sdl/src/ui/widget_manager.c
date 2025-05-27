@@ -240,6 +240,15 @@ void widget_manager_handle_event(WidgetManager* manager, const SDL_Event* event)
             
             Widget* hit = widget_hit_test(manager->active_root, x, y);
             if (hit) {
+                log_debug("WIDGET HIT: id='%s' type=%d at click pos (%d,%d), widget bounds=(%d,%d,%dx%d)", 
+                         hit->id, hit->type, x, y,
+                         hit->bounds.x, hit->bounds.y, hit->bounds.w, hit->bounds.h);
+                
+                // If it's a button, log additional info
+                if (hit->type == WIDGET_TYPE_BUTTON) {
+                    log_debug("HIT is a button widget: %s", hit->id);
+                }
+                
                 manager->pressed_widget = hit;
                 widget_set_state(hit, WIDGET_STATE_PRESSED, true);
                 
@@ -253,10 +262,7 @@ void widget_manager_handle_event(WidgetManager* manager, const SDL_Event* event)
         
         case SDL_MOUSEBUTTONUP:
         case SDL_FINGERUP: {
-            if (manager->pressed_widget) {
-                widget_set_state(manager->pressed_widget, WIDGET_STATE_PRESSED, false);
-                manager->pressed_widget = NULL;
-            }
+            // Don't clear pressed state yet - let widgets handle the event first
             break;
         }
         
@@ -266,6 +272,13 @@ void widget_manager_handle_event(WidgetManager* manager, const SDL_Event* event)
     
     // Let active root handle event
     widget_handle_event(manager->active_root, event);
+    
+    // Now clear pressed state after widgets have handled the event
+    if ((event->type == SDL_MOUSEBUTTONUP || event->type == SDL_FINGERUP) && 
+        manager->pressed_widget) {
+        widget_set_state(manager->pressed_widget, WIDGET_STATE_PRESSED, false);
+        manager->pressed_widget = NULL;
+    }
 }
 
 void widget_manager_update(WidgetManager* manager) {

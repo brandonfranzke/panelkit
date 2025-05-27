@@ -116,6 +116,17 @@
 - **Impact**: Bugs when states get out of sync
 - **Solution**: Single source of truth for state
 
+### 21. **WIDGET_RENDER Mode Still Depends on Legacy Systems**
+- **Issue**: In WIDGET_RENDER mode, still reading from legacy globals and systems:
+  - Background color from global `bg_color` variable
+  - Page transitions still call legacy `pages_transition_to()`
+  - Button actions affect legacy state that must sync back
+- **Impact**: Widget system not truly independent, can't remove legacy code
+- **Solution**: Make WIDGET_RENDER mode completely self-contained:
+  - Read ALL state from widget state store
+  - Widget page manager handles all transitions internally
+  - No sync back to legacy systems when in widget mode
+
 ---
 
 ## Previous Implementation Attempts (For Reference)

@@ -118,6 +118,7 @@ void widget_set_bounds(Widget* widget, int x, int y, int width, int height);
 void widget_set_relative_bounds(Widget* widget, int x, int y, int width, int height);
 void widget_invalidate_layout(Widget* widget);
 void widget_perform_layout(Widget* widget);
+void widget_update_child_bounds(Widget* parent);
 
 // Rendering
 void widget_render(Widget* widget, SDL_Renderer* renderer);

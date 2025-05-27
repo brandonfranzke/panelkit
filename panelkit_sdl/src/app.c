@@ -518,6 +518,11 @@ int main(int argc, char* argv[]) {
     while (!quit) {
         Uint32 current_time = SDL_GetTicks();
         
+        // Page state variables (used in legacy mode)
+        int current_page = 0;
+        int target_page = -1;
+        float transition_offset = 0.0f;
+        
         // Note: SDL event processing happens below
         
         // Process SDL events for unified input handling
@@ -581,45 +586,83 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Update page transitions
-        pages_update_transition();
-        gestures_set_current_page(pages_get_current());
-        
-        // Sync page state with widget integration
-        if (widget_integration) {
-            static int last_page = -1;
-            int current_page_idx = pages_get_current();
-            if (current_page_idx != last_page) {
-                if (last_page >= 0) {
-                    widget_integration_mirror_page_change(widget_integration, last_page, current_page_idx);
-                }
-                widget_integration_sync_page_state(widget_integration, current_page_idx, true);
-                last_page = current_page_idx;
-            }
-        }
-        
-        // Update API manager
-        api_manager_update(api_manager, current_time);
-        
-        // Sync state changes from widget store back to globals (must happen before rendering)
-        if (widget_integration) {
-            widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time, &quit, &page1_text_color);
-        }
-        
-        // Clear screen
-        SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-        SDL_RenderClear(renderer);
-        
-        // Get page state for debug info
-        int current_page = pages_get_current();
-        int target_page = pages_get_target_page();
-        float transition_offset = pages_get_transition_offset();
-        
         // WIDGET RENDERING: Check if we should use widget-based rendering
         bool use_widget_rendering = widget_integration && widget_integration->page_manager && 
                                    getenv("WIDGET_RENDER") != NULL;
         
         if (use_widget_rendering) {
+            // === WIDGET MODE: Completely independent rendering path ===
+            
+            // Update API manager (still needed for data)
+            api_manager_update(api_manager, current_time);
+            
+            // Get ALL state from widget system
+            SDL_Color widget_bg_color = {33, 33, 33, 255}; // Default
+            if (widget_integration && widget_integration->state_store) {
+                size_t size;
+                time_t timestamp;
+                SDL_Color* stored_color = (SDL_Color*)state_store_get(widget_integration->state_store, 
+                                                                      "app", "bg_color", &size, &timestamp);
+                if (stored_color && size == sizeof(SDL_Color)) {
+                    widget_bg_color = *stored_color;
+                    free(stored_color);
+                }
+                
+                // Check quit flag from widget state
+                bool* stored_quit = (bool*)state_store_get(widget_integration->state_store, 
+                                                          "app", "quit", &size, &timestamp);
+                if (stored_quit && size == sizeof(bool)) {
+                    quit = *stored_quit;
+                    free(stored_quit);
+                }
+            }
+            
+            // Clear screen with widget background color
+            SDL_SetRenderDrawColor(renderer, widget_bg_color.r, widget_bg_color.g, 
+                                 widget_bg_color.b, widget_bg_color.a);
+            SDL_RenderClear(renderer);
+            
+        } else {
+            // === LEGACY MODE: Original rendering path ===
+            
+            // Update page transitions
+            pages_update_transition();
+            gestures_set_current_page(pages_get_current());
+            
+            // Sync page state with widget integration
+            if (widget_integration) {
+                static int last_page = -1;
+                int current_page_idx = pages_get_current();
+                if (current_page_idx != last_page) {
+                    if (last_page >= 0) {
+                        widget_integration_mirror_page_change(widget_integration, last_page, current_page_idx);
+                    }
+                    widget_integration_sync_page_state(widget_integration, current_page_idx, true);
+                    last_page = current_page_idx;
+                }
+            }
+            
+            // Update API manager
+            api_manager_update(api_manager, current_time);
+            
+            // Sync state changes from widget store back to globals (must happen before rendering)
+            if (widget_integration) {
+                widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time, &quit, &page1_text_color);
+            }
+            
+            // Clear screen
+            SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
+            SDL_RenderClear(renderer);
+            
+            // Get page state for debug info
+            current_page = pages_get_current();
+            target_page = pages_get_target_page();
+            transition_offset = pages_get_transition_offset();
+        }
+        
+        if (use_widget_rendering) {
+            // === WIDGET MODE RENDERING ===
+            
             // Update widget rendering based on current state
             widget_integration_update_rendering(widget_integration);
             
@@ -634,11 +677,10 @@ int main(int argc, char* argv[]) {
                 widget_integration->page_manager->render(widget_integration->page_manager, renderer);
             }
         } else {
-            // Use old rendering system
+            // === LEGACY MODE RENDERING ===
             
-        // Render current page(s)
-        
-        if (target_page != -1) {
+            // Render current page(s)
+            if (target_page != -1) {
             // Render both pages during transition
             float current_offset = transition_offset * actual_width;
             float target_offset = current_offset + (target_page > current_page ? actual_width : -actual_width);
@@ -661,8 +703,14 @@ int main(int argc, char* argv[]) {
         } // End of old rendering system
         
         // Draw debug overlay if enabled (at bottom of screen - two lines)
-        // MIGRATION DEMO: Could replace with: widget_integration_get_show_debug(widget_integration)
-        if (show_debug) {
+        bool should_show_debug = false;
+        if (use_widget_rendering) {
+            should_show_debug = widget_integration_get_show_debug(widget_integration);
+        } else {
+            should_show_debug = show_debug;
+        }
+        
+        if (should_show_debug) {
             const char* gesture_name = 
                 gestures_get_state() == GESTURE_NONE ? "NONE" :
                 gestures_get_state() == GESTURE_POTENTIAL ? "POTENTIAL" :
@@ -872,6 +920,11 @@ void render_page(int page_index, float offset_x) {
             snprintf(page->button_texts[2], 64, "%s\n%s", time_str, date_str);
         } else {
             strcpy(page->button_texts[2], "Time (off)");
+        }
+        
+        // Sync button text to widget system
+        if (widget_integration) {
+            widget_integration_sync_button_state(widget_integration, 1, 2, page->button_texts[2], true);
         }
         
         // Render all buttons with scroll position applied
