@@ -1,3 +1,11 @@
+/**
+ * @file api_manager.h
+ * @brief High-level API service management
+ * 
+ * Manages multiple API endpoints, handles authentication, caching,
+ * and provides a unified interface for API operations.
+ */
+
 #ifndef API_MANAGER_H
 #define API_MANAGER_H
 
@@ -62,8 +70,8 @@ typedef struct {
 /**
  * Callback for successful data fetch.
  * 
- * @param data Fetched user data (borrowed)
- * @param context User-provided context
+ * @param data Fetched user data (required, borrowed reference)
+ * @param context User-provided context (optional)
  */
 typedef void (*api_data_callback)(const UserData* data, void* context);
 
@@ -71,8 +79,8 @@ typedef void (*api_data_callback)(const UserData* data, void* context);
  * Callback for API errors.
  * 
  * @param error Error type
- * @param message Error description (borrowed)
- * @param context User-provided context
+ * @param message Error description (optional, borrowed reference)
+ * @param context User-provided context (optional)
  */
 typedef void (*api_error_callback)(ApiError error, const char* message, void* context);
 
@@ -80,7 +88,7 @@ typedef void (*api_error_callback)(ApiError error, const char* message, void* co
  * Callback for state changes.
  * 
  * @param state New API state
- * @param context User-provided context
+ * @param context User-provided context (optional)
  */
 typedef void (*api_state_callback)(ApiState state, void* context);
 
@@ -110,7 +118,7 @@ void api_manager_destroy(ApiManager* manager);
  * 
  * @param manager API manager (required)
  * @param callback Callback function (can be NULL to clear)
- * @param context User context passed to callback
+ * @param context User context passed to callback (optional)
  */
 void api_manager_set_data_callback(ApiManager* manager, api_data_callback callback, void* context);
 
@@ -119,7 +127,7 @@ void api_manager_set_data_callback(ApiManager* manager, api_data_callback callba
  * 
  * @param manager API manager (required)
  * @param callback Callback function (can be NULL to clear)
- * @param context User context passed to callback
+ * @param context User context passed to callback (optional)
  */
 void api_manager_set_error_callback(ApiManager* manager, api_error_callback callback, void* context);
 
@@ -128,7 +136,7 @@ void api_manager_set_error_callback(ApiManager* manager, api_error_callback call
  * 
  * @param manager API manager (required)
  * @param callback Callback function (can be NULL to clear)
- * @param context User context passed to callback
+ * @param context User context passed to callback (optional)
  */
 void api_manager_set_state_callback(ApiManager* manager, api_state_callback callback, void* context);
 

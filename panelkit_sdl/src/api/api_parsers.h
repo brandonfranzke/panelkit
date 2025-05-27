@@ -1,3 +1,10 @@
+/**
+ * @file api_parsers.h
+ * @brief JSON parsing utilities for API responses
+ * 
+ * Provides type-safe parsing of API responses into domain structures.
+ */
+
 #ifndef API_PARSERS_H
 #define API_PARSERS_H
 

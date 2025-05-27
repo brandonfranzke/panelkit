@@ -1,3 +1,11 @@
+/**
+ * @file config_manager.h
+ * @brief Configuration management system
+ * 
+ * Loads, validates, and manages application configuration from
+ * multiple sources with hot-reload support.
+ */
+
 #ifndef CONFIG_MANAGER_H
 #define CONFIG_MANAGER_H
 
@@ -86,7 +94,7 @@ bool config_manager_load_file(ConfigManager* manager, const char* path, ConfigSo
  * Apply command-line configuration override.
  * 
  * @param manager Config manager (required)
- * @param key Configuration key path (e.g., "display.width")
+ * @param key Configuration key path (e.g., "display.width") (required)
  * @param value Value to set (required)
  * @return true on success, false on error
  * @note Uses CONFIG_SOURCE_CLI priority
@@ -129,7 +137,7 @@ bool config_generate_default(const char* path, bool include_comments);
  * Get integer configuration value by path.
  * 
  * @param manager Config manager (required)
- * @param path Dot-separated path (e.g., "display.width")
+ * @param path Dot-separated path (e.g., "display.width") (required)
  * @param value Receives the value (required)
  * @return true if found and valid, false otherwise
  */
@@ -139,7 +147,7 @@ bool config_get_int(const ConfigManager* manager, const char* path, int* value);
  * Get boolean configuration value by path.
  * 
  * @param manager Config manager (required)
- * @param path Dot-separated path (e.g., "display.fullscreen")
+ * @param path Dot-separated path (e.g., "display.fullscreen") (required)
  * @param value Receives the value (required)
  * @return true if found and valid, false otherwise
  */
@@ -149,7 +157,7 @@ bool config_get_bool(const ConfigManager* manager, const char* path, bool* value
  * Get float configuration value by path.
  * 
  * @param manager Config manager (required)
- * @param path Dot-separated path (e.g., "ui.scale")
+ * @param path Dot-separated path (e.g., "ui.scale") (required)
  * @param value Receives the value (required)
  * @return true if found and valid, false otherwise
  */
@@ -159,7 +167,7 @@ bool config_get_float(const ConfigManager* manager, const char* path, float* val
  * Get string configuration value by path.
  * 
  * @param manager Config manager (required)
- * @param path Dot-separated path (e.g., "api.base_url")
+ * @param path Dot-separated path (e.g., "api.base_url") (required)
  * @param buffer Buffer to receive string (required)
  * @param buffer_size Size of buffer
  * @return true if found and copied, false otherwise
@@ -180,7 +188,7 @@ bool config_manager_has_changed(const ConfigManager* manager);
  * Get the source of a configuration value.
  * 
  * @param manager Config manager (required)
- * @param path Dot-separated path to check
+ * @param path Dot-separated path to check (required)
  * @return Source that provided the value
  */
 ConfigSource config_get_source(const ConfigManager* manager, const char* path);

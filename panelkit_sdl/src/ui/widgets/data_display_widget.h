@@ -1,3 +1,11 @@
+/**
+ * @file data_display_widget.h
+ * @brief Widget for displaying user data
+ * 
+ * Specialized widget for showing formatted user information
+ * retrieved from API calls.
+ */
+
 #ifndef DATA_DISPLAY_WIDGET_H
 #define DATA_DISPLAY_WIDGET_H
 

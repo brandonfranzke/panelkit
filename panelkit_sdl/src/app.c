@@ -53,6 +53,7 @@ InputHandler* input_handler = NULL;     // Input abstraction
 ConfigManager* config_manager = NULL;   // Configuration system
 TTF_Font* font = NULL;
 TTF_Font* large_font = NULL;
+// TODO: Remove - was only used by removed render_api_data function
 TTF_Font* small_font = NULL; // Smaller font for API data
 bool quit = false;
 
@@ -60,9 +61,11 @@ bool quit = false;
 SDL_Color bg_color = {33, 33, 33, 255}; // Default dark gray
 
 // Time display
+// TODO: Remove - now handled by widget state store
 bool show_time = true; // Whether to show time on the third button
 
 // Page 1 specific
+// TODO: Remove when layout/theme system is implemented - now handled by widget state
 char page1_text[256] = "Welcome to Page 1! Swipe right to see buttons.";
 int page1_text_color = 0; // 0=white, 1=red, 2=green, 3=blue, etc.
 SDL_Color text_colors[] = {
@@ -77,6 +80,7 @@ SDL_Color text_colors[] = {
 
 // API manager
 ApiManager* api_manager = NULL;
+// TODO: Remove - user data now stored in state store via widget integration
 UserData current_user_data = {0};
 
 // Widget integration layer (runs parallel to existing system)
@@ -97,9 +101,6 @@ void on_api_data_received(const UserData* data, void* context);
 void on_api_error(ApiError error, const char* message, void* context);
 void on_api_state_changed(ApiState state, void* context);
 
-// Old API functions (to be replaced)
-void render_api_data(SDL_Renderer* renderer, int x, int y);
-
 // Simple text rendering for debug overlay
 void draw_text_left(const char* text, int x, int y, SDL_Color color) {
     if (!text || !font || !renderer) return;
@@ -117,23 +118,6 @@ void draw_text_left(const char* text, int x, int y, SDL_Color color) {
     SDL_FreeSurface(surface);
 }
 
-// Small text rendering for API data
-void draw_small_text_left(const char* text, int x, int y, SDL_Color color, int max_width) {
-    (void)max_width; // TODO: Implement text wrapping
-    if (!text || !small_font || !renderer) return;
-    
-    SDL_Surface* surface = TTF_RenderText_Solid(small_font, text, color);
-    if (!surface) return;
-    
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    if (texture) {
-        SDL_Rect dst = {x, y, surface->w, surface->h};
-        SDL_RenderCopy(renderer, texture, NULL, &dst);
-        SDL_DestroyTexture(texture);
-    }
-    
-    SDL_FreeSurface(surface);
-}
 
 // Configuration helper functions
 static DisplayBackendType backend_type_from_string(const char* str) {
@@ -654,66 +638,6 @@ int main(int argc, char* argv[]) {
 }
 
 
-void render_api_data(SDL_Renderer* renderer, int x, int y) {
-    (void)renderer; // Unused parameter
-    
-    SDL_Color text_color = {255, 255, 255, 255};
-    
-    // Calculate the maximum width for text (with proper padding like buttons)
-    int right_padding = BUTTON_PADDING; // Use same padding as buttons
-    int max_width = actual_width - x - right_padding;
-    
-    // Set line height for smaller font - exact from original
-    int line_height = 25;
-    
-    ApiState state = api_manager_get_state(api_manager);
-    
-    if (state == API_STATE_LOADING) {
-        draw_small_text_left("Loading user data...", x, y, text_color, max_width);
-    }
-    else if (state == API_STATE_SUCCESS && current_user_data.is_valid) {
-        // Render the API data nicely formatted - exact format from original
-        char buffer[256];
-        
-        // Name
-        snprintf(buffer, sizeof(buffer), "Name: %s", current_user_data.name);
-        draw_small_text_left(buffer, x, y, text_color, max_width);
-        
-        // Age
-        snprintf(buffer, sizeof(buffer), "Age: %d", current_user_data.age);
-        draw_small_text_left(buffer, x, y + line_height, text_color, max_width);
-        
-        // Nationality
-        snprintf(buffer, sizeof(buffer), "Nationality: %s", current_user_data.nationality);
-        draw_small_text_left(buffer, x, y + line_height * 2, text_color, max_width);
-        
-        // Location
-        snprintf(buffer, sizeof(buffer), "Location: %s", current_user_data.location);
-        draw_small_text_left(buffer, x, y + line_height * 3, text_color, max_width);
-        
-        // Email 
-        snprintf(buffer, sizeof(buffer), "Email: %s", current_user_data.email);
-        draw_small_text_left(buffer, x, y + line_height * 4, text_color, max_width);
-        
-        // Phone
-        snprintf(buffer, sizeof(buffer), "Phone: %s", current_user_data.phone);
-        draw_small_text_left(buffer, x, y + line_height * 5, text_color, max_width);
-        
-        // Picture URL info (just show that it's available)
-        if (strlen(current_user_data.picture_url) > 0) {
-            draw_small_text_left("Image URL available", x, y + line_height * 6, text_color, max_width);
-        }
-    }
-    else if (state == API_STATE_ERROR) {
-        const char* error_msg = api_manager_get_error_message(api_manager);
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "Error: %s", error_msg);
-        draw_small_text_left(buffer, x, y, text_color, max_width);
-    }
-    else {
-        draw_small_text_left("No user data loaded", x, y, text_color, max_width);
-    }
-}
 
 // API callback functions
 void on_api_data_received(const UserData* data, void* context) {

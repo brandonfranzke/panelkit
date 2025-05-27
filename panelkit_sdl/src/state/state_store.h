@@ -1,3 +1,11 @@
+/**
+ * @file state_store.h
+ * @brief Key-value state storage system
+ * 
+ * Thread-safe storage for application state with namespace support,
+ * TTL, and change notifications.
+ */
+
 #ifndef STATE_STORE_H
 #define STATE_STORE_H
 
@@ -28,12 +36,12 @@ typedef struct {
 /**
  * Iterator callback for state store traversal.
  * 
- * @param type_name Data type name
- * @param id Item identifier within type
- * @param data Item data payload
+ * @param type_name Data type name (borrowed reference)
+ * @param id Item identifier within type (borrowed reference)
+ * @param data Item data payload (borrowed reference, only valid during callback)
  * @param data_size Size of data in bytes
  * @param timestamp When item was stored
- * @param user_context User-provided context
+ * @param user_context User-provided context (optional)
  * @return true to continue iteration, false to stop
  */
 typedef bool (*state_store_iterator)(const char* type_name, const char* id,

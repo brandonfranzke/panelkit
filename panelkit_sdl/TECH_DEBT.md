@@ -16,73 +16,33 @@
 
 ### Code Quality
 
+3. **Global State in app.c**
+   - **Issue**: 20+ global variables (window, renderer, fonts, etc.)
+   - **Impact**: Hard to test, not thread-safe, tight coupling
+   - **Solution**: Create application context struct, pass through call chain
+
 ### Performance
 
-3. **No Dirty Region Tracking**
+4. **No Dirty Region Tracking**
     - **Issue**: Always redraw entire screen
     - **Impact**: Poor performance, battery drain
     - **Solution**: Implement dirty rectangle system
 
-4. **Inefficient Hit Testing**
+5. **Inefficient Hit Testing**
     - **Issue**: Linear search through widget tree
     - **Impact**: Slow with many widgets
     - **Solution**: Spatial indexing or caching
 
 ### Testing & Documentation
 
-5. **No Unit Tests**
+6. **No Unit Tests**
     - **Issue**: No automated testing for widgets
     - **Impact**: Regressions, hard to refactor
     - **Solution**: Add unit test framework and tests
 
-6. **Inconsistent API Documentation**
-    - **Issue**: Some functions documented, many aren't
-    - **Impact**: Have to read source to understand API
-    - **Solution**: Document all public APIs consistently
+## Planned Improvements
 
-## Next Planned Improvements
-
-### 1. Error Recovery System (Comprehensive)
-**Status**: Foundation built, comprehensive implementation needed
-
-**What's Done**:
-- Created PkError enum and error.h/error.c infrastructure
-- Thread-local error storage with pk_get/set_last_error()
-- Updated 3 example functions (widget_create, widget_add_child, event_subscribe)
-
-**What's Needed for Comprehensive Implementation**:
-
-**Phase 1: Systematic Error Propagation (1 day)**
-- Update every function that can fail to call pk_set_last_error()
-- Functions to update:
-  - All widget creation functions (30+ functions)
-  - Config loading/parsing (10+ functions)
-  - API communication (15+ functions)
-  - State store operations (10+ functions)
-  - Display/Input initialization (10+ functions)
-
-**Phase 2: Error Propagation Patterns (4 hours)**
-- Implement error bubbling up call stacks
-- Add PK_RETURN_IF_ERROR macro for propagation
-- Ensure errors don't get lost in wrapper functions
-
-**Phase 3: Recovery Strategies (1 day)**
-- Network failures: Exponential backoff retry
-- Config errors: Fallback to defaults with warnings
-- Memory exhaustion: Graceful degradation
-- Widget creation failures: Cleanup partial state
-
-**Phase 4: User-Visible Error Handling (4 hours)**
-- Create error notification widget
-- Status bar for non-fatal errors
-- Error logging to file
-- Debug mode error display overlay
-
-**Verification**:
-- Ensure all error paths clean up resources
-- No silent failures anywhere
-
-### 2. Layout Management System
+### Layout Management System
 **Approach**: Replace hardcoded positioning with flexible layout managers
 
 **Implementation ideas**:
@@ -98,24 +58,16 @@
 
 ## Priority Order
 
-### Completed ✅
-- Logging cleanup - Fixed duplicate macros across 13 files
-- Type Safety Phase 1+2 - Replaced anonymous structs, added safe casting
-- Type Safety Phase 3 - Replaced void* with typed unions for impl data
-- Event System String Coupling - Implemented strongly typed event system
-- Memory Management - Fixed event system memory leak, documented ownership patterns
-- Error Recovery - Added PkError system with thread-local error context
-
-### High Priority (Next Tasks)
+### High Priority
 1. Layout management (#1) - Replace hardcoded positioning
 
-### Medium Priority (Future)
-2. Theme system (#2) - Configurable colors and styles
-3. Performance optimizations (#3, #4) - Dirty regions and hit testing
+### Medium Priority
+2. Global state cleanup (#3) - Create app context structure
+3. Theme system (#2) - Configurable colors and styles
+4. Performance optimizations (#4, #5) - Dirty regions and hit testing
 
-### Low Priority (Nice to Have)
-4. Testing infrastructure (#5) - Unit tests for widgets
-5. API documentation (#6) - Complete documentation
+### Low Priority
+5. Testing infrastructure (#6) - Unit tests for widgets
 
 ## Optional Enhancements
 

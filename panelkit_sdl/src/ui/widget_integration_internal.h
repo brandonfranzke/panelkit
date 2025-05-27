@@ -1,3 +1,10 @@
+/**
+ * @file widget_integration_internal.h
+ * @brief Internal widget integration structures
+ * 
+ * Private implementation details for the widget integration layer.
+ */
+
 #ifndef WIDGET_INTEGRATION_INTERNAL_H
 #define WIDGET_INTEGRATION_INTERNAL_H
 

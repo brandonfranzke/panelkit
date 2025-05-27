@@ -1,3 +1,11 @@
+/**
+ * @file weather_widget.h
+ * @brief Weather information display widget
+ * 
+ * Widget for displaying weather data including temperature,
+ * conditions, and forecasts.
+ */
+
 #ifndef WEATHER_WIDGET_H
 #define WEATHER_WIDGET_H
 

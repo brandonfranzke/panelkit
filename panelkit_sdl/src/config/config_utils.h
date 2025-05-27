@@ -1,3 +1,10 @@
+/**
+ * @file config_utils.h
+ * @brief Configuration utility functions
+ * 
+ * Helper functions for configuration validation and manipulation.
+ */
+
 #ifndef CONFIG_UTILS_H
 #define CONFIG_UTILS_H
 

@@ -1,3 +1,10 @@
+/**
+ * @file time_widget.h
+ * @brief Real-time clock display widget
+ * 
+ * Widget that displays current time with customizable format.
+ */
+
 #ifndef TIME_WIDGET_H
 #define TIME_WIDGET_H
 

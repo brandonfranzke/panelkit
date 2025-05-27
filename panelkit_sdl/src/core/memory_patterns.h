@@ -1,3 +1,10 @@
+/**
+ * @file memory_patterns.h
+ * @brief Memory ownership and lifetime patterns
+ * 
+ * Documents memory management conventions used throughout the codebase.
+ */
+
 #ifndef MEMORY_PATTERNS_H
 #define MEMORY_PATTERNS_H
 

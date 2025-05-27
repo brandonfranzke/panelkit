@@ -1,3 +1,10 @@
+/**
+ * @file page_widget.h
+ * @brief Page container widget
+ * 
+ * Container widget that represents a full-screen page in the UI.
+ */
+
 #ifndef PAGE_WIDGET_H
 #define PAGE_WIDGET_H
 

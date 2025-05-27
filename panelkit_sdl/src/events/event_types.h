@@ -1,3 +1,10 @@
+/**
+ * @file event_types.h
+ * @brief Event data structure definitions
+ * 
+ * Defines strongly-typed event data structures for the event system.
+ */
+
 #ifndef EVENT_TYPES_H
 #define EVENT_TYPES_H
 

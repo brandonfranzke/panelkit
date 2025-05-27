@@ -1,3 +1,10 @@
+/**
+ * @file config_defaults.h
+ * @brief Default configuration values
+ * 
+ * Defines compile-time defaults for all configuration parameters.
+ */
+
 #ifndef CONFIG_DEFAULTS_H
 #define CONFIG_DEFAULTS_H
 

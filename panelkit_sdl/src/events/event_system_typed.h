@@ -1,3 +1,10 @@
+/**
+ * @file event_system_typed.h
+ * @brief Type-safe event publishing functions
+ * 
+ * Provides strongly-typed wrappers for publishing common event types.
+ */
+
 #ifndef EVENT_SYSTEM_TYPED_H
 #define EVENT_SYSTEM_TYPED_H
 

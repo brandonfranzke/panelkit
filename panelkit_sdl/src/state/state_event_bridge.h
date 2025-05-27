@@ -1,3 +1,10 @@
+/**
+ * @file state_event_bridge.h
+ * @brief Bridge between event system and state store
+ * 
+ * Automatically caches events in the state store based on configuration.
+ */
+
 #ifndef STATE_EVENT_BRIDGE_H
 #define STATE_EVENT_BRIDGE_H
 

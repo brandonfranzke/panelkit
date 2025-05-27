@@ -1,3 +1,11 @@
+/**
+ * @file widget_integration.h
+ * @brief Widget system integration layer
+ * 
+ * Bridges the widget system with the rest of the application,
+ * managing state synchronization and event routing.
+ */
+
 #ifndef WIDGET_INTEGRATION_H
 #define WIDGET_INTEGRATION_H
 

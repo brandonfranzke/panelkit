@@ -11,10 +11,10 @@ typedef struct EventSystem EventSystem;
 /**
  * Event handler function signature.
  * 
- * @param event_name Name of the event being fired
- * @param data Event data payload (only valid during callback)
+ * @param event_name Name of the event being fired (borrowed reference)
+ * @param data Event data payload (borrowed reference, only valid during callback)
  * @param data_size Size of the data payload in bytes
- * @param context User-provided context from subscription
+ * @param context User-provided context from subscription (optional)
  */
 typedef void (*event_handler_func)(const char* event_name, 
                                   const void* data, 

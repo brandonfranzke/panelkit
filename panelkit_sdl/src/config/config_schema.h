@@ -1,3 +1,10 @@
+/**
+ * @file config_schema.h
+ * @brief Configuration data structures
+ * 
+ * Defines the complete configuration schema for the application.
+ */
+
 #ifndef CONFIG_SCHEMA_H
 #define CONFIG_SCHEMA_H
 

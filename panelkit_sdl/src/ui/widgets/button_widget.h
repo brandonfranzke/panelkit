@@ -1,3 +1,10 @@
+/**
+ * @file button_widget.h
+ * @brief Interactive button widget
+ * 
+ * Clickable button widget with customizable appearance and behavior.
+ */
+
 #ifndef BUTTON_WIDGET_H
 #define BUTTON_WIDGET_H
 

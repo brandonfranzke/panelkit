@@ -1,3 +1,10 @@
+/**
+ * @file text_widget.h
+ * @brief Simple text display widget
+ * 
+ * Widget for displaying static or dynamic text with alignment options.
+ */
+
 #ifndef TEXT_WIDGET_H
 #define TEXT_WIDGET_H
 

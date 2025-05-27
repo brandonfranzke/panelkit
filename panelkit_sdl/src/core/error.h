@@ -1,8 +1,6 @@
-#ifndef PK_ERROR_H
-#define PK_ERROR_H
-
 /**
- * PanelKit Error Handling System
+ * @file error.h
+ * @brief PanelKit error handling system
  * 
  * This module provides consistent error handling across the codebase.
  * 
@@ -13,6 +11,9 @@
  * - NULL/false returns can use pk_get_last_error() for details
  * - Thread-safe error context via thread-local storage
  */
+
+#ifndef PK_ERROR_H
+#define PK_ERROR_H
 
 /* Error codes for PanelKit operations */
 typedef enum {

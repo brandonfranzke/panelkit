@@ -1,3 +1,10 @@
+/**
+ * @file page_manager_widget.h
+ * @brief Multi-page navigation widget
+ * 
+ * Manages multiple pages with transitions, gestures, and indicators.
+ */
+
 #ifndef PAGE_MANAGER_WIDGET_H
 #define PAGE_MANAGER_WIDGET_H
 

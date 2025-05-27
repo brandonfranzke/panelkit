@@ -1,3 +1,11 @@
+/**
+ * @file api_client.h
+ * @brief Low-level HTTP client for API communication
+ * 
+ * Provides HTTP request/response handling with connection pooling,
+ * timeout management, and retry capabilities.
+ */
+
 #ifndef API_CLIENT_H
 #define API_CLIENT_H
 

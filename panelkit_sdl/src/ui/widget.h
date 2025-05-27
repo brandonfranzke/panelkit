@@ -1,3 +1,11 @@
+/**
+ * @file widget.h
+ * @brief Core widget system interface
+ * 
+ * Base widget structure and functions for the UI framework.
+ * All UI elements inherit from the base Widget type.
+ */
+
 #ifndef WIDGET_H
 #define WIDGET_H
 

@@ -1,3 +1,11 @@
+/**
+ * @file widget_factory.h
+ * @brief Widget creation factory
+ * 
+ * Factory pattern for creating widgets with registered types
+ * and default configurations.
+ */
+
 #ifndef WIDGET_FACTORY_H
 #define WIDGET_FACTORY_H
 

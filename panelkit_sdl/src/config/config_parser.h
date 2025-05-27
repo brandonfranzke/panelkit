@@ -1,3 +1,10 @@
+/**
+ * @file config_parser.h
+ * @brief YAML configuration file parser
+ * 
+ * Parses YAML configuration files into the application's config structure.
+ */
+
 #ifndef CONFIG_PARSER_H
 #define CONFIG_PARSER_H
 
