@@ -116,6 +116,8 @@ set(SOURCES
     src/ui/widgets/time_widget.c
     src/ui/widgets/data_display_widget.c
     src/ui/page_widget.c
+    src/ui/debug_overlay.c
+    src/ui/error_notification.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c

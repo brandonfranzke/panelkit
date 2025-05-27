@@ -13,6 +13,7 @@
 #include "core/logger.h"
 #include "core/build_info.h"
 #include "core/error.h"
+#include "core/error_logger.h"
 #include "display/display_backend.h"
 #include "input/input_handler.h"
 #include "input/input_debug.h"
@@ -177,6 +178,14 @@ int main(int argc, char* argv[]) {
     
     if (!logger_init(config_file, "panelkit")) {
         fprintf(stderr, "Warning: Using fallback logging\n");
+    }
+    
+    // Initialize error logger
+    ErrorLogConfig error_log_config = error_logger_default_config();
+    error_log_config.log_directory = "logs";
+    error_log_config.log_to_console = false;  // Main logger already logs to console
+    if (!error_logger_init(&error_log_config)) {
+        log_warn("Failed to initialize error logger - errors will not be logged to file");
     }
     
     // Log startup
@@ -638,6 +647,7 @@ int main(int argc, char* argv[]) {
     display_backend_destroy(display_backend);
     
     log_info("=== PanelKit Shutdown Complete ===");
+    error_logger_shutdown();
     logger_shutdown();
     
     return 0;

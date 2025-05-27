@@ -1,4 +1,5 @@
 #include "error.h"
+#include "error_logger.h"
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,6 +142,13 @@ void pk_set_last_error_with_context(PkError error, const char* fmt, ...) {
             va_end(args);
         } else {
             info->context[0] = '\0';
+        }
+        
+        /* Log error if error logging is initialized and this is an actual error */
+        if (error != PK_OK) {
+            /* Note: We don't have file/line info here, but the logger can be
+             * enhanced to extract it from the call stack if needed */
+            error_logger_log(error, __FILE__, __LINE__, "pk_set_last_error", info->context);
         }
     }
 }
