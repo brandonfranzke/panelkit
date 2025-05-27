@@ -18,10 +18,8 @@
 #include <string.h>
 #include <SDL2/SDL.h>
 
-// External font references from main app
-extern TTF_Font* font;
-extern TTF_Font* large_font;
-extern TTF_Font* small_font;
+// Note: Fonts are now passed in via widget_integration_set_fonts()
+// No more global font dependencies!
 
 // Simple logging macros for integration layer
 #ifndef log_info
@@ -130,6 +128,20 @@ void widget_integration_set_dimensions(WidgetIntegration* integration, int width
     integration->screen_height = height;
     
     log_debug("Set integration dimensions: %dx%d", width, height);
+}
+
+void widget_integration_set_fonts(WidgetIntegration* integration, 
+                                  TTF_Font* regular, TTF_Font* large, TTF_Font* small) {
+    if (!integration) {
+        return;
+    }
+    
+    integration->font_regular = regular;
+    integration->font_large = large;
+    integration->font_small = small;
+    
+    log_debug("Set integration fonts: regular=%p, large=%p, small=%p", 
+              (void*)regular, (void*)large, (void*)small);
 }
 
 void widget_integration_enable_events(WidgetIntegration* integration) {
@@ -366,7 +378,7 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
             widget_set_relative_bounds(button, 20, 100, 200, 50);
             
             // Create text widget as child of button
-            Widget* label = (Widget*)text_widget_create("page0_button0_text", "Change Text Color", font);
+            Widget* label = (Widget*)text_widget_create("page0_button0_text", "Change Text Color", integration->font_regular);
             if (label) {
                 // Text fills button area minus padding (relative to button)
                 int padding = button->padding;
@@ -438,7 +450,7 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                     // Create text widget as child of button
                     char text_id[64];
                     snprintf(text_id, sizeof(text_id), "%s_text", button_id);
-                    Widget* label = (Widget*)text_widget_create(text_id, button_labels[i], font);
+                    Widget* label = (Widget*)text_widget_create(text_id, button_labels[i], integration->font_regular);
                     if (label) {
                         // Text fills button area minus padding (relative to button)
                         int padding = button->padding;
@@ -917,14 +929,18 @@ void widget_integration_sync_state_to_globals(WidgetIntegration* integration,
 static void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
     if (!integration || !integration->renderer) return;
     
-    // Use fonts from the app
+    // Ensure fonts are set before creating widgets
+    if (!integration->font_regular || !integration->font_large || !integration->font_small) {
+        log_error("Fonts not set! Call widget_integration_set_fonts() first");
+        return;
+    }
     
     // Populate Page 0 (Welcome page)
     if (integration->page_widgets[0]) {
         Widget* page = integration->page_widgets[0];
         
         // Title text
-        Widget* title = (Widget*)text_widget_create("page0_title", "Welcome to PanelKit!", large_font);
+        Widget* title = (Widget*)text_widget_create("page0_title", "Welcome to PanelKit!", integration->font_large);
         if (title) {
             widget_set_bounds(title, 0, 60, integration->screen_width, 40);
             text_widget_set_alignment(title, TEXT_ALIGN_CENTER);
@@ -933,7 +949,7 @@ static void widget_integration_populate_page_widgets(WidgetIntegration* integrat
         
         // Welcome message (will be updated from state)
         Widget* welcome_text = (Widget*)text_widget_create("page0_welcome", 
-            "Welcome to Page 1!", font);
+            "Welcome to Page 1!", integration->font_regular);
         if (welcome_text) {
             widget_set_bounds(welcome_text, 0, 280, integration->screen_width, 30);
             text_widget_set_alignment(welcome_text, TEXT_ALIGN_CENTER);
@@ -941,7 +957,7 @@ static void widget_integration_populate_page_widgets(WidgetIntegration* integrat
         }
         
         Widget* instruction_text = (Widget*)text_widget_create("page0_instruction", 
-            "Swipe right to see buttons.", font);
+            "Swipe right to see buttons.", integration->font_regular);
         if (instruction_text) {
             widget_set_bounds(instruction_text, 0, 310, integration->screen_width, 30);
             text_widget_set_alignment(instruction_text, TEXT_ALIGN_CENTER);
@@ -954,7 +970,7 @@ static void widget_integration_populate_page_widgets(WidgetIntegration* integrat
         Widget* page = integration->page_widgets[1];
         
         // Time widget (will be toggled based on show_time)
-        Widget* time_widget = (Widget*)time_widget_create("page1_time", "%H:%M:%S", large_font);
+        Widget* time_widget = (Widget*)time_widget_create("page1_time", "%H:%M:%S", integration->font_large);
         if (time_widget) {
             // Position it where the Time button would show it
             widget_set_bounds(time_widget, 
@@ -964,7 +980,7 @@ static void widget_integration_populate_page_widgets(WidgetIntegration* integrat
         
         // API data display
         Widget* data_display = (Widget*)data_display_widget_create("page1_data", 
-            small_font, font);
+            integration->font_small, integration->font_regular);
         if (data_display) {
             // Position on the right side
             widget_set_bounds(data_display, 

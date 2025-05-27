@@ -12,6 +12,11 @@ typedef struct WidgetManager WidgetManager;
 typedef struct WidgetFactory WidgetFactory;
 typedef struct Widget Widget;
 
+// SDL_ttf forward declaration - use the correct struct name
+#ifndef SDL_TTF_H_
+typedef struct TTF_Font TTF_Font;
+#endif
+
 // Widget integration layer - runs parallel to existing system
 // This layer gradually replaces internal state without changing visuals
 typedef struct WidgetIntegration {
@@ -41,6 +46,11 @@ typedef struct WidgetIntegration {
     // Screen dimensions
     int screen_width;
     int screen_height;
+    
+    // Font resources (passed in, not global)
+    TTF_Font* font_regular;
+    TTF_Font* font_large;
+    TTF_Font* font_small;
 } WidgetIntegration;
 
 // Lifecycle
@@ -49,6 +59,8 @@ void widget_integration_destroy(WidgetIntegration* integration);
 
 // Setup
 void widget_integration_set_dimensions(WidgetIntegration* integration, int width, int height);
+void widget_integration_set_fonts(WidgetIntegration* integration, 
+                                  TTF_Font* regular, TTF_Font* large, TTF_Font* small);
 
 // Migration controls - enable components gradually
 void widget_integration_enable_events(WidgetIntegration* integration);

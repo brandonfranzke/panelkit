@@ -488,6 +488,7 @@ int main(int argc, char* argv[]) {
         log_warn("Widget integration layer failed to initialize - continuing without it");
     } else {
         widget_integration_set_dimensions(widget_integration, actual_width, actual_height);
+        widget_integration_set_fonts(widget_integration, font, large_font, small_font);
         
         // Create shadow widgets that mirror existing UI structure
         widget_integration_create_shadow_widgets(widget_integration);
