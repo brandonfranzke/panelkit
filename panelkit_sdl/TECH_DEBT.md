@@ -2,10 +2,11 @@
 
 ## Critical Issues (Fix Before Testing)
 
-### 1. **Button Text Rendering**
+### 1. **Button Text Rendering** ✅ COMPLETE
 - **Issue**: Buttons draw placeholder rectangles instead of actual text
 - **Impact**: Completely broken UI in widget mode
 - **Solution**: Make buttons composable containers that can hold text widgets
+- **Status**: FIXED in commit 7c01aba - Buttons now use text widgets as children
 
 ### 2. **Global Font Dependencies**
 - **Issue**: Widgets rely on `extern TTF_Font*` variables
@@ -17,10 +18,11 @@
 - **Impact**: Confusing API, prone to errors
 - **Solution**: Standardize widget creation with consistent factory pattern
 
-### 4. **Missing Child Support in Buttons**
+### 4. **Missing Child Support in Buttons** ✅ COMPLETE
 - **Issue**: Buttons have `child_capacity = 0`, can't compose
 - **Impact**: Can't add text widgets or icons to buttons
 - **Solution**: Make buttons proper containers
+- **Status**: FIXED in commit 7c01aba - Buttons now have child_capacity=2
 
 ## Major Architectural Issues (Fix After Basic Functionality)
 

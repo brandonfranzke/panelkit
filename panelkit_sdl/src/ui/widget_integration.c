@@ -381,6 +381,30 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
             
             widget_add_child(integration->page_widgets[0], button);
             integration->button_widgets[0][0] = button;
+            
+            // Configure button to publish events
+            if (button->type == WIDGET_TYPE_BUTTON) {
+                ButtonWidget* btn = (ButtonWidget*)button;
+                btn->base.event_system = integration->event_system;
+                
+                // Set up event data for this button
+                struct {
+                    int button_index;
+                    int page;
+                    uint32_t timestamp;
+                    char button_text[32];
+                } *click_data = malloc(sizeof(*click_data));
+                
+                if (click_data) {
+                    click_data->button_index = 0;
+                    click_data->page = 0;
+                    click_data->timestamp = 0; // Will be set when clicked
+                    strncpy(click_data->button_text, "Change Color", sizeof(click_data->button_text) - 1);
+                    button_widget_set_publish_event(btn, "ui.button_pressed", 
+                                                  click_data, sizeof(*click_data));
+                }
+            }
+            
             log_debug("Created shadow button widget: page0_button0 with text");
         }
     }
@@ -428,6 +452,30 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                     
                     widget_add_child(integration->page_widgets[1], button);
                     integration->button_widgets[1][i] = button;
+                    
+                    // Configure button to publish events
+                    if (button->type == WIDGET_TYPE_BUTTON) {
+                        ButtonWidget* btn = (ButtonWidget*)button;
+                        btn->base.event_system = integration->event_system;
+                        
+                        // Set up event data for this button
+                        struct {
+                            int button_index;
+                            int page;
+                            uint32_t timestamp;
+                            char button_text[32];
+                        } *click_data = malloc(sizeof(*click_data));
+                        
+                        if (click_data) {
+                            click_data->button_index = i;
+                            click_data->page = 1;
+                            click_data->timestamp = 0; // Will be set when clicked
+                            strncpy(click_data->button_text, button_labels[i], sizeof(click_data->button_text) - 1);
+                            button_widget_set_publish_event(btn, "ui.button_pressed", 
+                                                          click_data, sizeof(*click_data));
+                        }
+                    }
+                    
                     log_debug("Created shadow button widget: %s with text", button_id);
                 }
             }
