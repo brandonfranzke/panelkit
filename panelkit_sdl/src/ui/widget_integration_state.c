@@ -9,10 +9,18 @@
 #include <stdio.h>
 #include <string.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 // Initialize application state in the state store
 void widget_integration_init_app_state(WidgetIntegration* integration) {
-    if (!integration || !integration->state_store) return;
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->state_store) {
+        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        return;
+    }
     
     log_debug("Initializing application state in state store");
     
@@ -59,7 +67,14 @@ void widget_integration_init_app_state(WidgetIntegration* integration) {
 
 // Get current page from state store
 int widget_integration_get_current_page(WidgetIntegration* integration) {
-    if (!integration || !integration->state_store) return 0;
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return 0;
+    }
+    if (!integration->state_store) {
+        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        return 0;
+    }
     
     size_t size;
     time_t timestamp;
@@ -147,7 +162,15 @@ void* widget_integration_get_user_data(WidgetIntegration* integration, size_t* s
 
 void widget_integration_mirror_user_data(WidgetIntegration* integration,
                                         const void* user_data, size_t data_size) {
-    if (!integration || !integration->state_tracking_enabled || !user_data) {
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!user_data) {
+        error_set(ERROR_INVALID_PARAMETER, "user_data cannot be NULL");
+        return;
+    }
+    if (!integration->state_tracking_enabled) {
         return;
     }
     
@@ -164,7 +187,19 @@ void widget_integration_mirror_user_data(WidgetIntegration* integration,
 
 void widget_integration_mirror_api_state(WidgetIntegration* integration,
                                         const char* state_name, const char* value) {
-    if (!integration || !integration->state_tracking_enabled || !state_name || !value) {
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!state_name) {
+        error_set(ERROR_INVALID_PARAMETER, "state_name cannot be NULL");
+        return;
+    }
+    if (!value) {
+        error_set(ERROR_INVALID_PARAMETER, "value cannot be NULL");
+        return;
+    }
+    if (!integration->state_tracking_enabled) {
         return;
     }
     
@@ -188,7 +223,14 @@ void widget_integration_mirror_api_state(WidgetIntegration* integration,
 // Sync state from widget store back to global variables (for gradual migration)
 void widget_integration_sync_state_to_globals(WidgetIntegration* integration, 
                                              SDL_Color* bg_color, bool* show_time, bool* quit, int* page1_text_color) {
-    if (!integration || !integration->state_store) return;
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->state_store) {
+        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        return;
+    }
     
     size_t size;
     time_t timestamp;

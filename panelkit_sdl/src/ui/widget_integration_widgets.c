@@ -17,9 +17,18 @@
 #include <stdio.h>
 #include <string.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
-    if (!integration || !integration->widget_manager || integration->shadow_widgets_created) {
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->widget_manager) {
+        error_set(ERROR_INVALID_STATE, "widget manager not initialized");
+        return;
+    }
+    if (integration->shadow_widgets_created) {
         return;
     }
     
@@ -28,6 +37,7 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     // Create page manager widget
     integration->page_manager = page_manager_widget_create("page_manager", integration->num_pages);
     if (!integration->page_manager) {
+        error_set(ERROR_SYSTEM, "Failed to create page manager widget");
         log_error("Failed to create page manager widget");
         return;
     }
@@ -195,7 +205,11 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
 void widget_integration_sync_button_state(WidgetIntegration* integration, 
                                         int page, int button_index, 
                                         const char* text, bool enabled) {
-    if (!integration || !integration->shadow_widgets_created || 
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->shadow_widgets_created || 
         page < 0 || page >= integration->num_pages ||
         button_index < 0 || button_index >= 9) {
         return;
@@ -234,7 +248,11 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
 
 void widget_integration_sync_page_state(WidgetIntegration* integration,
                                        int page_index, bool is_active) {
-    if (!integration || !integration->shadow_widgets_created || 
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->shadow_widgets_created || 
         !integration->page_manager ||
         page_index < 0 || page_index >= integration->num_pages) {
         return;
@@ -266,10 +284,18 @@ Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int
 
 // Populate pages with actual UI widgets
 void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
-    if (!integration || !integration->renderer) return;
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->renderer) {
+        error_set(ERROR_INVALID_STATE, "renderer not set");
+        return;
+    }
     
     // Ensure fonts are set before creating widgets
     if (!integration->font_regular || !integration->font_large || !integration->font_small) {
+        error_set(ERROR_INVALID_STATE, "Fonts not set - call widget_integration_set_fonts() first");
         log_error("Fonts not set! Call widget_integration_set_fonts() first");
         return;
     }
@@ -334,7 +360,14 @@ void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
 
 // Update widget rendering based on state
 void widget_integration_update_rendering(WidgetIntegration* integration) {
-    if (!integration || !integration->state_store) return;
+    if (!integration) {
+        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        return;
+    }
+    if (!integration->state_store) {
+        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        return;
+    }
     
     size_t size;
     time_t timestamp;

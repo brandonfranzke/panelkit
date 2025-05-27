@@ -1,6 +1,7 @@
 #include "api_parsers.h"
 #include "../json/json_parser.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,12 +16,17 @@ bool api_parsers_init(void) {
     parser_registry = calloc(registry_capacity, sizeof(ApiParserEntry));
     if (!parser_registry) {
         log_error("Failed to allocate parser registry");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "api_parsers_init: Failed to allocate %zu bytes for registry",
+            registry_capacity * sizeof(ApiParserEntry));
         return false;
     }
     
     // Register built-in parsers
     if (!api_parsers_register("randomuser", "get_user", "RandomUser API Parser", parse_randomuser_get_user)) {
         log_error("Failed to register randomuser parser");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE,
+            "api_parsers_init: Failed to register built-in randomuser parser");
         return false;
     }
     
@@ -40,6 +46,8 @@ void api_parsers_cleanup(void) {
 bool api_parsers_register(const char* service_id, const char* endpoint_id, 
                           const char* parser_name, api_parser_func parse_func) {
     if (!service_id || !endpoint_id || !parser_name || !parse_func) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_parsers_register: Missing required parameter(s)");
         return false;
     }
     
@@ -48,6 +56,9 @@ bool api_parsers_register(const char* service_id, const char* endpoint_id,
         size_t new_capacity = registry_capacity * 2;
         ApiParserEntry* new_registry = realloc(parser_registry, new_capacity * sizeof(ApiParserEntry));
         if (!new_registry) {
+            pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                "api_parsers_register: Failed to expand registry to %zu entries",
+                new_capacity);
             log_error("Failed to expand parser registry");
             return false;
         }
@@ -69,6 +80,9 @@ bool api_parsers_register(const char* service_id, const char* endpoint_id,
 
 api_parser_func api_parsers_get(const char* service_id, const char* endpoint_id) {
     if (!service_id || !endpoint_id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_parsers_get: service_id=%p, endpoint_id=%p",
+            (void*)service_id, (void*)endpoint_id);
         return NULL;
     }
     
@@ -84,6 +98,9 @@ api_parser_func api_parsers_get(const char* service_id, const char* endpoint_id)
 
 const char* api_parsers_get_name(const char* service_id, const char* endpoint_id) {
     if (!service_id || !endpoint_id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_parsers_get_name: service_id=%p, endpoint_id=%p",
+            (void*)service_id, (void*)endpoint_id);
         return NULL;
     }
     
@@ -106,6 +123,12 @@ bool parse_randomuser_get_user(const char* response_data, size_t data_len,
                               const ApiServiceConfig* service, 
                               const ApiEndpointConfig* endpoint, 
                               UserData* output) {
+    if (!response_data || !output) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "parse_randomuser_get_user: response_data=%p, output=%p",
+            (void*)response_data, (void*)output);
+        return false;
+    }
     if (!response_data || data_len == 0 || !output) {
         log_error("Invalid parameters for randomuser parser");
         return false;
@@ -119,6 +142,8 @@ bool parse_randomuser_get_user(const char* response_data, size_t data_len,
     JsonParser* parser = json_parser_create();
     if (!parser) {
         log_error("Failed to create JSON parser for randomuser");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "parse_randomuser_get_user: Failed to create JSON parser");
         return false;
     }
     
@@ -126,6 +151,9 @@ bool parse_randomuser_get_user(const char* response_data, size_t data_len,
     if (!success) {
         const JsonParseError* error = json_parser_get_error(parser);
         log_error("Failed to parse randomuser response: %s", error ? error->message : "unknown error");
+        pk_set_last_error_with_context(PK_ERROR_PARSE,
+            "parse_randomuser_get_user: JSON parse failed: %s",
+            error ? error->message : "unknown error");
     } else {
         log_info("Successfully parsed randomuser data: %s %s", output->first_name, output->last_name);
     }
@@ -137,6 +165,9 @@ bool parse_randomuser_get_user(const char* response_data, size_t data_len,
 // Helper functions for accessing service configuration
 const char* api_service_get_header(const ApiServiceConfig* service, const char* header_name) {
     if (!service || !header_name || !service->headers[0]) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_service_get_header: service=%p, header_name=%p",
+            (void*)service, (void*)header_name);
         return NULL;
     }
     
@@ -149,6 +180,9 @@ const char* api_service_get_header(const ApiServiceConfig* service, const char* 
 
 const char* api_service_get_meta(const ApiServiceConfig* service, const char* meta_key) {
     if (!service || !meta_key || !service->meta[0]) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_service_get_meta: service=%p, meta_key=%p",
+            (void*)service, (void*)meta_key);
         return NULL;
     }
     

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "core/error.h"
 
 // Forward declarations
 static PkError data_display_widget_render(Widget* widget, SDL_Renderer* renderer);
@@ -9,8 +10,28 @@ static void data_display_widget_destroy(Widget* widget);
 static void data_display_widget_layout(Widget* widget);
 
 Widget* data_display_widget_create(const char* id, TTF_Font* label_font, TTF_Font* value_font) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "id is NULL in data_display_widget_create");
+        return NULL;
+    }
+    if (!label_font) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "label_font is NULL in data_display_widget_create");
+        return NULL;
+    }
+    if (!value_font) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "value_font is NULL in data_display_widget_create");
+        return NULL;
+    }
+    
     DataDisplayWidget* data_widget = calloc(1, sizeof(DataDisplayWidget));
-    if (!data_widget) return NULL;
+    if (!data_widget) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate data display widget");
+        return NULL;
+    }
     
     // Initialize base widget
     Widget* base = &data_widget->base;
@@ -26,6 +47,12 @@ Widget* data_display_widget_create(const char* id, TTF_Font* label_font, TTF_Fon
     // Initialize arrays
     base->child_capacity = 8; // 4 labels + 4 values
     base->children = calloc(base->child_capacity, sizeof(Widget*));
+    if (!base->children) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate children array for data display widget");
+        free(data_widget);
+        return NULL;
+    }
     base->event_capacity = 0;
     base->subscribed_events = NULL;
     

@@ -1,5 +1,6 @@
 #include "api_client.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include "../core/sdl_includes.h"
 #include <curl/curl.h>
 #include <stdlib.h>
@@ -30,6 +31,9 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, ApiRespo
     char* new_data = realloc(response->data, response->size + realsize + 1);
     if (!new_data) {
         log_error("Failed to allocate memory for API response");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "write_callback: Failed to allocate %zu bytes for response",
+            response->size + realsize + 1);
         return 0;
     }
     
@@ -45,6 +49,8 @@ ApiClient* api_client_create(const ApiClientConfig* config) {
     ApiClient* client = calloc(1, sizeof(ApiClient));
     if (!client) {
         log_error("Failed to allocate API client");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "api_client_create: Failed to allocate %zu bytes", sizeof(ApiClient));
         return NULL;
     }
     
@@ -52,6 +58,8 @@ ApiClient* api_client_create(const ApiClientConfig* config) {
     client->curl = curl_easy_init();
     if (!client->curl) {
         log_error("Failed to initialize CURL");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "api_client_create: curl_easy_init failed");
         free(client);
         return NULL;
     }
@@ -66,6 +74,8 @@ ApiClient* api_client_create(const ApiClientConfig* config) {
     // Initialize mutex
     if (pthread_mutex_init(&client->mutex, NULL) != 0) {
         log_error("Failed to initialize mutex");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "api_client_create: pthread_mutex_init failed");
         curl_easy_cleanup(client->curl);
         free(client);
         return NULL;
@@ -110,6 +120,9 @@ ApiClientError api_client_request(ApiClient* client,
                                   const char* body,
                                   ApiResponse* response) {
     if (!client || !url || !response) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_client_request: client=%p, url=%p, response=%p",
+            (void*)client, (void*)url, (void*)response);
         return API_CLIENT_ERROR_INVALID_URL;
     }
     
@@ -200,13 +213,22 @@ ApiClientError api_client_request(ApiClient* client,
             switch (curl_result) {
                 case CURLE_OUT_OF_MEMORY:
                     result = API_CLIENT_ERROR_MEMORY;
+                    pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                        "api_client_request: CURL out of memory on attempt %d/%d",
+                        attempt, max_attempts);
                     break;  // Don't retry memory errors
                 case CURLE_OPERATION_TIMEDOUT:
                     result = API_CLIENT_ERROR_TIMEOUT;
+                    pk_set_last_error_with_context(PK_ERROR_TIMEOUT,
+                        "api_client_request: Request to %s timed out (attempt %d/%d)",
+                        url, attempt, max_attempts);
                     // Continue retry loop for timeouts
                     break;
                 default:
                     result = API_CLIENT_ERROR_NETWORK;
+                    pk_set_last_error_with_context(PK_ERROR_NETWORK,
+                        "api_client_request: CURL error %d: %s (attempt %d/%d)",
+                        curl_result, curl_easy_strerror(curl_result), attempt, max_attempts);
                     // Continue retry loop for network errors
                     break;
             }
@@ -217,6 +239,9 @@ ApiClientError api_client_request(ApiClient* client,
             if (response->error_message) {
                 sprintf(response->error_message, "%s (attempt %d/%d)", 
                         error_msg, attempt, max_attempts);
+            } else {
+                pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                    "api_client_request: Failed to allocate error message");
             }
             
             // Don't retry memory errors
@@ -267,12 +292,18 @@ ApiClientError api_client_request_async(ApiClient* client,
                                          api_client_callback callback,
                                          void* user_data) {
     if (!client || !url) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "api_client_request_async: client=%p, url=%p",
+            (void*)client, (void*)url);
         return API_CLIENT_ERROR_INVALID_URL;
     }
     
     // Create async request structure
     AsyncRequest* req = malloc(sizeof(AsyncRequest));
     if (!req) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "api_client_request_async: Failed to allocate %zu bytes for request",
+            sizeof(AsyncRequest));
         return API_CLIENT_ERROR_MEMORY;
     }
     
@@ -284,6 +315,8 @@ ApiClientError api_client_request_async(ApiClient* client,
     req->user_data = user_data;
     
     if (!req->url || (body && !req->body)) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "api_client_request_async: Failed to allocate URL/body strings");
         free(req->url);
         free(req->body);
         free(req);
@@ -299,6 +332,8 @@ ApiClientError api_client_request_async(ApiClient* client,
     pthread_t thread;
     if (pthread_create(&thread, NULL, async_request_thread, req) != 0) {
         log_error("Failed to create async request thread");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "api_client_request_async: pthread_create failed for URL %s", url);
         free(req->url);
         free(req->body);
         free(req);

@@ -1,7 +1,13 @@
 #include "config_defaults.h"
+#include "../core/error.h"
 #include <string.h>
 
 void config_init_display_defaults(ConfigDisplay* display) {
+    if (!display) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_display_defaults: display is NULL");
+        return;
+    }
     display->width = DEFAULT_DISPLAY_WIDTH;
     display->height = DEFAULT_DISPLAY_HEIGHT;
     display->fullscreen = DEFAULT_DISPLAY_FULLSCREEN;
@@ -11,6 +17,11 @@ void config_init_display_defaults(ConfigDisplay* display) {
 }
 
 void config_init_input_defaults(ConfigInput* input) {
+    if (!input) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_input_defaults: input is NULL");
+        return;
+    }
     strncpy(input->source, DEFAULT_INPUT_SOURCE, CONFIG_MAX_STRING - 1);
     input->source[CONFIG_MAX_STRING - 1] = '\0';
     
@@ -22,6 +33,11 @@ void config_init_input_defaults(ConfigInput* input) {
 }
 
 void config_init_api_defaults(ConfigApi* api) {
+    if (!api) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_api_defaults: api is NULL");
+        return;
+    }
     // Set defaults
     api->default_timeout_ms = DEFAULT_API_TIMEOUT_MS;
     api->default_retry_count = DEFAULT_API_RETRY_COUNT;
@@ -37,6 +53,11 @@ void config_init_api_defaults(ConfigApi* api) {
 }
 
 static void config_init_colors_defaults(ColorScheme* colors) {
+    if (!colors) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_colors_defaults: colors is NULL");
+        return;
+    }
     strncpy(colors->background, DEFAULT_COLOR_BACKGROUND, CONFIG_MAX_COLOR - 1);
     colors->background[CONFIG_MAX_COLOR - 1] = '\0';
     
@@ -84,6 +105,11 @@ static void config_init_layout_defaults(LayoutConfig* layout) {
 }
 
 void config_init_ui_defaults(ConfigUI* ui) {
+    if (!ui) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_ui_defaults: ui is NULL");
+        return;
+    }
     config_init_colors_defaults(&ui->colors);
     config_init_fonts_defaults(&ui->fonts);
     config_init_animations_defaults(&ui->animations);
@@ -91,6 +117,11 @@ void config_init_ui_defaults(ConfigUI* ui) {
 }
 
 void config_init_logging_defaults(ConfigLogging* logging) {
+    if (!logging) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_logging_defaults: logging is NULL");
+        return;
+    }
     strncpy(logging->level, DEFAULT_LOG_LEVEL, CONFIG_MAX_STRING - 1);
     logging->level[CONFIG_MAX_STRING - 1] = '\0';
     
@@ -103,6 +134,11 @@ void config_init_logging_defaults(ConfigLogging* logging) {
 }
 
 void config_init_system_defaults(ConfigSystem* system) {
+    if (!system) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_system_defaults: system is NULL");
+        return;
+    }
     system->startup_page = DEFAULT_SYSTEM_STARTUP_PAGE;
     system->debug_overlay = DEFAULT_SYSTEM_DEBUG_OVERLAY;
     system->allow_exit = DEFAULT_SYSTEM_ALLOW_EXIT;
@@ -111,6 +147,11 @@ void config_init_system_defaults(ConfigSystem* system) {
 }
 
 void config_init_defaults(Config* config) {
+    if (!config) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_init_defaults: config is NULL");
+        return;
+    }
     // Clear the structure
     memset(config, 0, sizeof(Config));
     

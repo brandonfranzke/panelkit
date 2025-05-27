@@ -1,4 +1,6 @@
 #include "time_widget.h"
+#include "../core/error.h"
+#include "../core/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -9,8 +11,18 @@ static PkError time_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void time_widget_destroy(Widget* widget);
 
 Widget* time_widget_create(const char* id, const char* format, TTF_Font* font) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "time_widget_create: id is NULL");
+        return NULL;
+    }
+    
     TimeWidget* time_widget = calloc(1, sizeof(TimeWidget));
-    if (!time_widget) return NULL;
+    if (!time_widget) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "time_widget_create: Failed to allocate %zu bytes", sizeof(TimeWidget));
+        return NULL;
+    }
     
     // Initialize base widget
     Widget* base = &time_widget->base;
@@ -26,6 +38,12 @@ Widget* time_widget_create(const char* id, const char* format, TTF_Font* font) {
     // Initialize arrays
     base->child_capacity = 1;
     base->children = calloc(1, sizeof(Widget*));
+    if (!base->children) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "time_widget_create: Failed to allocate children array");
+        free(time_widget);
+        return NULL;
+    }
     base->event_capacity = 0;
     base->subscribed_events = NULL;
     
@@ -39,12 +57,24 @@ Widget* time_widget_create(const char* id, const char* format, TTF_Font* font) {
     char text_id[128];
     snprintf(text_id, sizeof(text_id), "%s_text", id);
     time_widget->text_widget = (TextWidget*)text_widget_create(text_id, "00:00:00", font);
-    if (time_widget->text_widget) {
-        widget_add_child(base, (Widget*)time_widget->text_widget);
-        
-        // Copy size from text widget
-        base->bounds = time_widget->text_widget->base.bounds;
+    if (!time_widget->text_widget) {
+        pk_set_last_error_with_context(PK_ERROR_WIDGET_NOT_FOUND,
+            "time_widget_create: Failed to create internal text widget");
+        free(base->children);
+        free(time_widget);
+        return NULL;
     }
+    
+    if (!widget_add_child(base, (Widget*)time_widget->text_widget)) {
+        log_error("Failed to add text widget as child");
+        widget_destroy((Widget*)time_widget->text_widget);
+        free(base->children);
+        free(time_widget);
+        return NULL;
+    }
+    
+    // Copy size from text widget
+    base->bounds = time_widget->text_widget->base.bounds;
     
     return (Widget*)time_widget;
 }

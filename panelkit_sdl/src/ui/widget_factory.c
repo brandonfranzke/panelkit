@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 #define INITIAL_CREATOR_CAPACITY 16
 
@@ -15,6 +16,9 @@ WidgetFactory* widget_factory_create(void) {
     WidgetFactory* factory = calloc(1, sizeof(WidgetFactory));
     if (!factory) {
         log_error("Failed to allocate widget factory");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "widget_factory_create: Failed to allocate %zu bytes",
+            sizeof(WidgetFactory));
         return NULL;
     }
     
@@ -22,6 +26,9 @@ WidgetFactory* widget_factory_create(void) {
     factory->creators = calloc(factory->creator_capacity, 
                              sizeof(factory->creators[0]));
     if (!factory->creators) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "widget_factory_create: Failed to allocate creator array (%zu bytes)",
+            factory->creator_capacity * sizeof(factory->creators[0]));
         free(factory);
         return NULL;
     }
@@ -44,6 +51,9 @@ bool widget_factory_register(WidgetFactory* factory,
                            const char* type_name,
                            widget_creator_func creator) {
     if (!factory || !type_name || !creator) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_register: factory=%p, type_name=%p, creator=%p",
+            (void*)factory, (void*)type_name, (void*)creator);
         return false;
     }
     
@@ -51,6 +61,8 @@ bool widget_factory_register(WidgetFactory* factory,
     for (size_t i = 0; i < factory->creator_count; i++) {
         if (strcmp(factory->creators[i].type_name, type_name) == 0) {
             log_error("Widget type '%s' already registered", type_name);
+            pk_set_last_error_with_context(PK_ERROR_ALREADY_EXISTS,
+                "widget_factory_register: Type '%s' already registered", type_name);
             return false;
         }
     }
@@ -62,6 +74,9 @@ bool widget_factory_register(WidgetFactory* factory,
                                    new_capacity * sizeof(factory->creators[0]));
         if (!new_creators) {
             log_error("Failed to grow creators array");
+            pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                "widget_factory_register: Failed to grow array to %zu entries",
+                new_capacity);
             return false;
         }
         factory->creators = new_creators;
@@ -81,6 +96,9 @@ bool widget_factory_register(WidgetFactory* factory,
 
 bool widget_factory_unregister(WidgetFactory* factory, const char* type_name) {
     if (!factory || !type_name) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_unregister: factory=%p, type_name=%p",
+            (void*)factory, (void*)type_name);
         return false;
     }
     
@@ -105,6 +123,9 @@ Widget* widget_factory_create_widget(WidgetFactory* factory,
                                    const char* id,
                                    void* params) {
     if (!factory || !type_name || !id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_create_widget: factory=%p, type_name=%p, id=%p",
+            (void*)factory, (void*)type_name, (void*)id);
         return NULL;
     }
     
@@ -114,24 +135,40 @@ Widget* widget_factory_create_widget(WidgetFactory* factory,
             Widget* widget = factory->creators[i].creator(id, params);
             if (widget) {
                 log_debug("Created widget '%s' of type '%s'", id, type_name);
+            } else {
+                pk_set_last_error_with_context(PK_ERROR_WIDGET_INVALID_TYPE,
+                    "widget_factory_create_widget: Creator for '%s' failed to create '%s'",
+                    type_name, id);
             }
             return widget;
         }
     }
     
     log_error("Unknown widget type '%s'", type_name);
+    pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+        "widget_factory_create_widget: No creator registered for type '%s'", type_name);
     return NULL;
 }
 
 // Built-in widget creators
 
 Widget* widget_factory_create_button(const char* id, void* params) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_create_button: id is NULL");
+        return NULL;
+    }
     // Create empty button - label will be added as child widget
     ButtonWidget* button = button_widget_create(id);
     return button ? &button->base : NULL;
 }
 
 Widget* widget_factory_create_weather(const char* id, void* params) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_create_weather: id is NULL");
+        return NULL;
+    }
     WeatherParams* weather_params = (WeatherParams*)params;
     const char* location = weather_params ? weather_params->location : "Unknown";
     
@@ -140,14 +177,25 @@ Widget* widget_factory_create_weather(const char* id, void* params) {
 }
 
 Widget* widget_factory_create_page_manager(const char* id, void* params) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_create_page_manager: id is NULL");
+        return NULL;
+    }
     int page_count = params ? *(int*)params : 2;  // Default to 2 pages
     return page_manager_widget_create(id, page_count);
 }
 
 Widget* widget_factory_create_label(const char* id, void* params) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_create_label: id is NULL");
+        return NULL;
+    }
     // For now, create a basic widget as a label
     Widget* label = widget_create(id, WIDGET_TYPE_LABEL);
     if (!label) {
+        /* Error context already set by widget_create */
         return NULL;
     }
     
@@ -167,8 +215,14 @@ Widget* widget_factory_create_label(const char* id, void* params) {
 }
 
 Widget* widget_factory_create_container(const char* id, void* params) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "widget_factory_create_container: id is NULL");
+        return NULL;
+    }
     Widget* container = widget_create(id, WIDGET_TYPE_CONTAINER);
     if (!container) {
+        /* Error context already set by widget_create */
         return NULL;
     }
     
@@ -190,6 +244,7 @@ Widget* widget_factory_create_container(const char* id, void* params) {
 WidgetFactory* widget_factory_create_default(void) {
     WidgetFactory* factory = widget_factory_create();
     if (!factory) {
+        /* Error context already set by widget_factory_create */
         return NULL;
     }
     

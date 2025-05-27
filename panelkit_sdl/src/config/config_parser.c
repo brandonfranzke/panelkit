@@ -28,6 +28,9 @@ typedef struct {
 ConfigParser* config_parser_create(void) {
     ConfigParser* parser = calloc(1, sizeof(ConfigParser));
     if (!parser) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "config_parser_create: Failed to allocate %zu bytes",
+            sizeof(ConfigParser));
         return NULL;
     }
     
@@ -404,6 +407,9 @@ static bool process_yaml_stream(ParseContext* ctx) {
 
 bool config_parser_parse(ConfigParser* parser, const char* yaml_content, size_t length, Config* config) {
     if (!parser || !yaml_content || !config) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_parser_parse: parser=%p, yaml_content=%p, config=%p",
+            (void*)parser, (void*)yaml_content, (void*)config);
         return false;
     }
     
@@ -449,6 +455,9 @@ bool config_parser_parse(ConfigParser* parser, const char* yaml_content, size_t 
 
 bool config_parser_parse_file(ConfigParser* parser, const char* filename, Config* config) {
     if (!parser || !filename || !config) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "config_parser_parse_file: parser=%p, filename=%p, config=%p",
+            (void*)parser, (void*)filename, (void*)config);
         return false;
     }
     
@@ -456,6 +465,8 @@ bool config_parser_parse_file(ConfigParser* parser, const char* filename, Config
     FILE* file = fopen(filename, "rb");
     if (!file) {
         set_parse_error(parser, "Failed to open configuration file: %s", filename);
+        pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+            "config_parser_parse_file: Failed to open %s", filename);
         return false;
     }
     
@@ -466,6 +477,8 @@ bool config_parser_parse_file(ConfigParser* parser, const char* filename, Config
     
     if (file_size <= 0 || file_size > 1024 * 1024) { // Max 1MB config file
         set_parse_error(parser, "Invalid configuration file size");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_DATA,
+            "config_parser_parse_file: File size %ld bytes (max 1MB)", file_size);
         fclose(file);
         return false;
     }
@@ -474,6 +487,8 @@ bool config_parser_parse_file(ConfigParser* parser, const char* filename, Config
     char* content = malloc(file_size + 1);
     if (!content) {
         set_parse_error(parser, "Failed to allocate memory for configuration file");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "config_parser_parse_file: Failed to allocate %ld bytes", file_size + 1);
         fclose(file);
         return false;
     }
@@ -483,6 +498,8 @@ bool config_parser_parse_file(ConfigParser* parser, const char* filename, Config
     
     if (read_size != (size_t)file_size) {
         set_parse_error(parser, "Failed to read configuration file");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "config_parser_parse_file: Read %zu bytes, expected %ld", read_size, file_size);
         free(content);
         return false;
     }

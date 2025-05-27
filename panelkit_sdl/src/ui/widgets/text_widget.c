@@ -1,4 +1,6 @@
 #include "text_widget.h"
+#include "../core/error.h"
+#include "../core/logger.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -8,8 +10,18 @@ static void text_widget_destroy(Widget* widget);
 static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* renderer);
 
 Widget* text_widget_create(const char* id, const char* text, TTF_Font* font) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "text_widget_create: id is NULL");
+        return NULL;
+    }
+    
     TextWidget* text_widget = calloc(1, sizeof(TextWidget));
-    if (!text_widget) return NULL;
+    if (!text_widget) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "text_widget_create: Failed to allocate %zu bytes", sizeof(TextWidget));
+        return NULL;
+    }
     
     // Initialize base widget
     Widget* base = &text_widget->base;
@@ -29,6 +41,12 @@ Widget* text_widget_create(const char* id, const char* text, TTF_Font* font) {
     
     // Set text properties
     text_widget->text = text ? strdup(text) : strdup("");
+    if (!text_widget->text) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "text_widget_create: Failed to allocate text string");
+        free(text_widget);
+        return NULL;
+    }
     text_widget->font = font;
     text_widget->color = (SDL_Color){255, 255, 255, 255}; // Default white
     text_widget->alignment = TEXT_ALIGN_CENTER;
@@ -47,19 +65,32 @@ Widget* text_widget_create(const char* id, const char* text, TTF_Font* font) {
 }
 
 void text_widget_set_text(Widget* widget, const char* text) {
-    if (!widget || widget->type != WIDGET_TYPE_LABEL) return;
+    if (!widget || widget->type != WIDGET_TYPE_LABEL) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+            "text_widget_set_text: Invalid widget or type");
+        return;
+    }
     TextWidget* text_widget = (TextWidget*)widget;
     
     if (text_widget->text) {
         free(text_widget->text);
     }
     text_widget->text = text ? strdup(text) : strdup("");
+    if (!text_widget->text) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "text_widget_set_text: Failed to allocate text string");
+        return;
+    }
     text_widget->needs_update = true;
     widget->state_flags |= WIDGET_STATE_DIRTY;
 }
 
 void text_widget_set_color(Widget* widget, SDL_Color color) {
-    if (!widget || widget->type != WIDGET_TYPE_LABEL) return;
+    if (!widget || widget->type != WIDGET_TYPE_LABEL) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+            "text_widget_set_color: Invalid widget or type");
+        return;
+    }
     TextWidget* text_widget = (TextWidget*)widget;
     
     text_widget->color = color;
@@ -68,7 +99,11 @@ void text_widget_set_color(Widget* widget, SDL_Color color) {
 }
 
 void text_widget_set_alignment(Widget* widget, TextAlignment alignment) {
-    if (!widget || widget->type != WIDGET_TYPE_LABEL) return;
+    if (!widget || widget->type != WIDGET_TYPE_LABEL) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+            "text_widget_set_alignment: Invalid widget or type");
+        return;
+    }
     TextWidget* text_widget = (TextWidget*)widget;
     
     text_widget->alignment = alignment;
@@ -76,7 +111,11 @@ void text_widget_set_alignment(Widget* widget, TextAlignment alignment) {
 }
 
 void text_widget_set_font(Widget* widget, TTF_Font* font) {
-    if (!widget || widget->type != WIDGET_TYPE_LABEL) return;
+    if (!widget || widget->type != WIDGET_TYPE_LABEL) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+            "text_widget_set_font: Invalid widget or type");
+        return;
+    }
     TextWidget* text_widget = (TextWidget*)widget;
     
     text_widget->font = font;

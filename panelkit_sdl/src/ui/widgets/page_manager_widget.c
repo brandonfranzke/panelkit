@@ -8,6 +8,7 @@
 #include <math.h>
 #include <SDL2/SDL.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 // Animation constants
 #define TRANSITION_SPEED 0.12f
@@ -25,8 +26,23 @@ static void page_manager_destroy(Widget* widget);
 
 // Create a new page manager widget
 Widget* page_manager_widget_create(const char* id, int page_count) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "id is NULL in page_manager_widget_create");
+        return NULL;
+    }
+    if (page_count <= 0) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_ARGUMENT,
+                                       "page_count must be positive in page_manager_widget_create");
+        return NULL;
+    }
+    
     PageManagerWidget* manager = calloc(1, sizeof(PageManagerWidget));
-    if (!manager) return NULL;
+    if (!manager) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate page manager widget");
+        return NULL;
+    }
     
     // Initialize base widget
     Widget* base = &manager->base;
@@ -44,6 +60,8 @@ Widget* page_manager_widget_create(const char* id, int page_count) {
     base->child_capacity = page_count;
     base->children = calloc(base->child_capacity, sizeof(Widget*));
     if (!base->children) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate children array for page manager");
         free(manager->pages);
         free(manager);
         return NULL;
@@ -52,6 +70,8 @@ Widget* page_manager_widget_create(const char* id, int page_count) {
     base->event_capacity = 4;
     base->subscribed_events = calloc(base->event_capacity, sizeof(char*));
     if (!base->subscribed_events) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate event array for page manager");
         free(base->children);
         free(manager->pages);
         free(manager);
@@ -61,6 +81,14 @@ Widget* page_manager_widget_create(const char* id, int page_count) {
     // Initialize page management
     manager->page_count = page_count;
     manager->pages = calloc(page_count, sizeof(Widget*));
+    if (!manager->pages) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate pages array for page manager");
+        free(base->subscribed_events);
+        free(base->children);
+        free(manager);
+        return NULL;
+    }
     manager->current_page = 0;
     manager->target_page = -1;
     manager->transition_state = PAGE_TRANSITION_NONE;

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 // Forward declarations for virtual functions
 static PkError weather_widget_render(Widget* widget, SDL_Renderer* renderer);
@@ -16,9 +17,21 @@ static void weather_widget_handle_data_event(Widget* widget, const char* event_n
 static void weather_widget_destroy(Widget* widget);
 
 WeatherWidget* weather_widget_create(const char* id, const char* location) {
+    if (!id) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "id is NULL in weather_widget_create");
+        return NULL;
+    }
+    if (!location) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "location is NULL in weather_widget_create");
+        return NULL;
+    }
+    
     WeatherWidget* weather = calloc(1, sizeof(WeatherWidget));
     if (!weather) {
-        log_error("Failed to allocate weather widget");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate weather widget");
         return NULL;
     }
     
@@ -40,6 +53,8 @@ WeatherWidget* weather_widget_create(const char* id, const char* location) {
     base->event_capacity = 4;
     base->subscribed_events = calloc(base->event_capacity, sizeof(char*));
     if (!base->subscribed_events) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate event array for weather widget");
         free(weather);
         return NULL;
     }
@@ -72,7 +87,14 @@ WeatherWidget* weather_widget_create(const char* id, const char* location) {
 }
 
 void weather_widget_set_location(WeatherWidget* widget, const char* location) {
-    if (!widget || !location) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in weather_widget_set_location");
+        return;
+    }
+    if (!location) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "location is NULL in weather_widget_set_location");
         return;
     }
     
@@ -83,6 +105,8 @@ void weather_widget_set_location(WeatherWidget* widget, const char* location) {
 
 void weather_widget_set_units(WeatherWidget* widget, bool use_celsius) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in weather_widget_set_units");
         return;
     }
     
@@ -94,6 +118,8 @@ void weather_widget_set_display_options(WeatherWidget* widget,
                                       bool show_humidity, 
                                       bool show_description) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in weather_widget_set_display_options");
         return;
     }
     
@@ -103,7 +129,14 @@ void weather_widget_set_display_options(WeatherWidget* widget,
 }
 
 void weather_widget_set_data(WeatherWidget* widget, const WeatherData* data) {
-    if (!widget || !data) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in weather_widget_set_data");
+        return;
+    }
+    if (!data) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "data is NULL in weather_widget_set_data");
         return;
     }
     
