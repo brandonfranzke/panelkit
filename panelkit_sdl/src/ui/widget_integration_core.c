@@ -12,13 +12,14 @@
 
 WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     if (!renderer) {
-        error_set(ERROR_INVALID_PARAMETER, "renderer cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "renderer cannot be NULL");
         return NULL;
     }
     
     WidgetIntegration* integration = calloc(1, sizeof(WidgetIntegration));
     if (!integration) {
-        error_set(ERROR_MEMORY, "Failed to allocate widget integration");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY, 
+            "widget_integration_create: Failed to allocate widget integration");
         log_error("Failed to allocate widget integration");
         return NULL;
     }
@@ -28,7 +29,8 @@ WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     // Create state store (always available)
     integration->state_store = state_store_create();
     if (!integration->state_store) {
-        error_set(ERROR_SYSTEM, "Failed to create state store for integration");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM, 
+            "widget_integration_create: Failed to create state store for integration");
         log_error("Failed to create state store for integration");
         free(integration);
         return NULL;
@@ -37,7 +39,8 @@ WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     // Create event system (always available)
     integration->event_system = event_system_create();
     if (!integration->event_system) {
-        error_set(ERROR_SYSTEM, "Failed to create event system for integration");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM, 
+            "widget_integration_create: Failed to create event system for integration");
         log_error("Failed to create event system for integration");
         state_store_destroy(integration->state_store);
         free(integration);
@@ -49,7 +52,8 @@ WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
                                                       integration->event_system,
                                                       integration->state_store);
     if (!integration->widget_manager) {
-        error_set(ERROR_SYSTEM, "Failed to create widget manager for integration");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM, 
+            "widget_integration_create: Failed to create widget manager for integration");
         log_error("Failed to create widget manager for integration");
         event_system_destroy(integration->event_system);
         state_store_destroy(integration->state_store);
@@ -60,7 +64,8 @@ WidgetIntegration* widget_integration_create(SDL_Renderer* renderer) {
     // Create widget factory
     integration->widget_factory = widget_factory_create_default();
     if (!integration->widget_factory) {
-        error_set(ERROR_SYSTEM, "Failed to create widget factory for integration");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM, 
+            "widget_integration_create: Failed to create widget factory for integration");
         log_error("Failed to create widget factory for integration");
         widget_manager_destroy(integration->widget_manager);
         event_system_destroy(integration->event_system);
@@ -106,7 +111,7 @@ void widget_integration_destroy(WidgetIntegration* integration) {
 
 void widget_integration_set_dimensions(WidgetIntegration* integration, int width, int height) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "integration cannot be NULL");
         return;
     }
     
@@ -119,7 +124,7 @@ void widget_integration_set_dimensions(WidgetIntegration* integration, int width
 void widget_integration_set_fonts(WidgetIntegration* integration, 
                                   TTF_Font* regular, TTF_Font* large, TTF_Font* small) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "integration cannot be NULL");
         return;
     }
     

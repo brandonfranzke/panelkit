@@ -13,6 +13,9 @@
 #include "error.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <time.h>
+#include <unistd.h>
+#include <pthread.h>
 
 /* Error log configuration */
 typedef struct {

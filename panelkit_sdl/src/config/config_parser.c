@@ -3,6 +3,7 @@
 #include "config_utils.h"
 #include "../yaml/yaml.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>

@@ -162,7 +162,8 @@ void error_logger_log_entry(const ErrorLogEntry* entry) {
     
     /* Format timestamp */
     char timestamp[64];
-    struct tm* tm_info = localtime(&entry->timestamp);
+    time_t entry_time = entry->timestamp;
+    struct tm* tm_info = localtime(&entry_time);
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
     
     /* Write to file */

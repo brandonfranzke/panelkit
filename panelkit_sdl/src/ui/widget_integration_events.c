@@ -20,7 +20,7 @@ static void widget_api_refresh_handler(uint32_t timestamp, void* context);
 void widget_integration_mirror_touch_event(WidgetIntegration* integration, 
                                           int x, int y, bool is_down) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "integration cannot be NULL");
         return;
     }
     if (!integration->events_enabled) {
@@ -42,7 +42,7 @@ void widget_integration_mirror_touch_event(WidgetIntegration* integration,
 void widget_integration_mirror_button_press(WidgetIntegration* integration,
                                            int button_index, const char* button_text) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "integration cannot be NULL");
         return;
     }
     if (!integration->events_enabled) {
@@ -74,7 +74,7 @@ void widget_integration_mirror_button_press(WidgetIntegration* integration,
 void widget_integration_mirror_page_change(WidgetIntegration* integration,
                                           int from_page, int to_page) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "integration cannot be NULL");
         return;
     }
     if (!integration->events_enabled) {
@@ -95,11 +95,11 @@ void widget_integration_mirror_page_change(WidgetIntegration* integration,
 // Enable widget-based button handling
 void widget_integration_enable_button_handling(WidgetIntegration* integration) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "integration cannot be NULL");
         return;
     }
     if (!integration->event_system) {
-        error_set(ERROR_INVALID_STATE, "event system not initialized");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "event system not initialized");
         return;
     }
     

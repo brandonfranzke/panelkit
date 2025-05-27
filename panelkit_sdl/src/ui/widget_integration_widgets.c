@@ -21,11 +21,11 @@
 
 void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_create_shadow_widgets: integration cannot be NULL");
         return;
     }
     if (!integration->widget_manager) {
-        error_set(ERROR_INVALID_STATE, "widget manager not initialized");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_create_shadow_widgets: widget manager not initialized");
         return;
     }
     if (integration->shadow_widgets_created) {
@@ -37,7 +37,7 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     // Create page manager widget
     integration->page_manager = page_manager_widget_create("page_manager", integration->num_pages);
     if (!integration->page_manager) {
-        error_set(ERROR_SYSTEM, "Failed to create page manager widget");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM, "widget_integration_create_shadow_widgets: Failed to create page manager widget");
         log_error("Failed to create page manager widget");
         return;
     }
@@ -206,7 +206,7 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
                                         int page, int button_index, 
                                         const char* text, bool enabled) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_sync_button_state: integration cannot be NULL");
         return;
     }
     if (!integration->shadow_widgets_created || 
@@ -249,7 +249,7 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
 void widget_integration_sync_page_state(WidgetIntegration* integration,
                                        int page_index, bool is_active) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_sync_page_state: integration cannot be NULL");
         return;
     }
     if (!integration->shadow_widgets_created || 
@@ -285,17 +285,17 @@ Widget* widget_integration_get_button_widget(WidgetIntegration* integration, int
 // Populate pages with actual UI widgets
 void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_populate_page_widgets: integration cannot be NULL");
         return;
     }
     if (!integration->renderer) {
-        error_set(ERROR_INVALID_STATE, "renderer not set");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_populate_page_widgets: renderer not set");
         return;
     }
     
     // Ensure fonts are set before creating widgets
     if (!integration->font_regular || !integration->font_large || !integration->font_small) {
-        error_set(ERROR_INVALID_STATE, "Fonts not set - call widget_integration_set_fonts() first");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_populate_page_widgets: Fonts not set - call widget_integration_set_fonts() first");
         log_error("Fonts not set! Call widget_integration_set_fonts() first");
         return;
     }
@@ -361,11 +361,11 @@ void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
 // Update widget rendering based on state
 void widget_integration_update_rendering(WidgetIntegration* integration) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_update_rendering: integration cannot be NULL");
         return;
     }
     if (!integration->state_store) {
-        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_update_rendering: state store not initialized");
         return;
     }
     

@@ -14,11 +14,11 @@
 // Initialize application state in the state store
 void widget_integration_init_app_state(WidgetIntegration* integration) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_init_app_state: integration cannot be NULL");
         return;
     }
     if (!integration->state_store) {
-        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_init_app_state: state store not initialized");
         return;
     }
     
@@ -68,11 +68,11 @@ void widget_integration_init_app_state(WidgetIntegration* integration) {
 // Get current page from state store
 int widget_integration_get_current_page(WidgetIntegration* integration) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_get_current_page: integration cannot be NULL");
         return 0;
     }
     if (!integration->state_store) {
-        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_get_current_page: state store not initialized");
         return 0;
     }
     
@@ -163,11 +163,11 @@ void* widget_integration_get_user_data(WidgetIntegration* integration, size_t* s
 void widget_integration_mirror_user_data(WidgetIntegration* integration,
                                         const void* user_data, size_t data_size) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_mirror_user_data: integration cannot be NULL");
         return;
     }
     if (!user_data) {
-        error_set(ERROR_INVALID_PARAMETER, "user_data cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_mirror_user_data: user_data cannot be NULL");
         return;
     }
     if (!integration->state_tracking_enabled) {
@@ -188,15 +188,15 @@ void widget_integration_mirror_user_data(WidgetIntegration* integration,
 void widget_integration_mirror_api_state(WidgetIntegration* integration,
                                         const char* state_name, const char* value) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_mirror_api_state: integration cannot be NULL");
         return;
     }
     if (!state_name) {
-        error_set(ERROR_INVALID_PARAMETER, "state_name cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_mirror_api_state: state_name cannot be NULL");
         return;
     }
     if (!value) {
-        error_set(ERROR_INVALID_PARAMETER, "value cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_mirror_api_state: value cannot be NULL");
         return;
     }
     if (!integration->state_tracking_enabled) {
@@ -224,11 +224,11 @@ void widget_integration_mirror_api_state(WidgetIntegration* integration,
 void widget_integration_sync_state_to_globals(WidgetIntegration* integration, 
                                              SDL_Color* bg_color, bool* show_time, bool* quit, int* page1_text_color) {
     if (!integration) {
-        error_set(ERROR_INVALID_PARAMETER, "integration cannot be NULL");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM, "widget_integration_sync_state_to_globals: integration cannot be NULL");
         return;
     }
     if (!integration->state_store) {
-        error_set(ERROR_INVALID_STATE, "state store not initialized");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE, "widget_integration_sync_state_to_globals: state store not initialized");
         return;
     }
     

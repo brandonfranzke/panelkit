@@ -32,7 +32,7 @@ Widget* page_manager_widget_create(const char* id, int page_count) {
         return NULL;
     }
     if (page_count <= 0) {
-        pk_set_last_error_with_context(PK_ERROR_INVALID_ARGUMENT,
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
                                        "page_count must be positive in page_manager_widget_create");
         return NULL;
     }
