@@ -2,6 +2,7 @@
 #include "widget_integration_internal.h"
 #include "../state/state_store.h"
 #include "../events/event_system.h"
+#include "../events/event_types.h"
 #include "widgets/page_manager_widget.h"
 #include "../core/sdl_includes.h"
 #include <stdlib.h>
@@ -21,11 +22,7 @@ void widget_integration_mirror_touch_event(WidgetIntegration* integration,
     }
     
     // Mirror touch events to widget event system
-    struct {
-        int x, y;
-        bool is_down;
-        uint32_t timestamp;
-    } touch_data = {x, y, is_down, SDL_GetTicks()};
+    TouchEventData touch_data = {x, y, is_down, SDL_GetTicks()};
     
     const char* event_name = is_down ? "input.touch_down" : "input.touch_up";
     event_publish(integration->event_system, event_name, &touch_data, sizeof(touch_data));
@@ -50,12 +47,7 @@ void widget_integration_mirror_button_press(WidgetIntegration* integration,
     }
     
     // Mirror button press to widget event system
-    struct {
-        int button_index;
-        int page;
-        uint32_t timestamp;
-        char button_text[32];
-    } button_data = {button_index, current_page, SDL_GetTicks(), {0}};
+    ButtonEventData button_data = {button_index, current_page, SDL_GetTicks(), {0}};
     
     if (button_text) {
         strncpy(button_data.button_text, button_text, sizeof(button_data.button_text) - 1);
@@ -76,11 +68,7 @@ void widget_integration_mirror_page_change(WidgetIntegration* integration,
     state_store_set(integration->state_store, "app", "current_page", &to_page, sizeof(int));
     
     // Mirror page change to widget event system
-    struct {
-        int from_page;
-        int to_page;
-        uint32_t timestamp;
-    } page_data = {from_page, to_page, SDL_GetTicks()};
+    PageChangeEventData page_data = {from_page, to_page, SDL_GetTicks()};
     
     event_publish(integration->event_system, "ui.page_changed", &page_data, sizeof(page_data));
     
@@ -109,16 +97,11 @@ void widget_integration_enable_button_handling(WidgetIntegration* integration) {
 // Widget-based button click handler
 static void widget_button_click_handler(const char* event_name, const void* data, size_t data_size, void* context) {
     WidgetIntegration* integration = (WidgetIntegration*)context;
-    if (!integration || !data || data_size < sizeof(struct { int button_index; int page; })) {
+    if (!integration || !data || data_size < sizeof(ButtonEventData)) {
         return;
     }
     
-    struct {
-        int button_index;
-        int page;
-        uint32_t timestamp;
-        char button_text[32];
-    } *button_data = (void*)data;
+    const ButtonEventData* button_data = (const ButtonEventData*)data;
     
     log_debug("Widget button click handler: page=%d button=%d text='%s'",
              button_data->page, button_data->button_index, button_data->button_text);
@@ -219,10 +202,7 @@ static void widget_api_refresh_handler(const char* event_name, const void* data,
     
     // In widget mode, we could handle API refresh directly
     // For now, still publish the event as API manager is shared between modes
-    struct {
-        uint32_t timestamp;
-        char source[32];
-    } api_event;
+    ApiRefreshData api_event;
     
     api_event.timestamp = SDL_GetTicks();
     strcpy(api_event.source, "widget_system");

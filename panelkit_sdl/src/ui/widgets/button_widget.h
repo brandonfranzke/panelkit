@@ -21,11 +21,11 @@ typedef struct ButtonWidget {
     
     // Callback
     button_click_callback on_click;
-    void* user_data;
+    void* user_data;              // [OWNER: caller] [TYPE: app-specific]
     
     // Optional event to publish on click
-    char* publish_event;
-    void* publish_data;
+    char* publish_event;          // [OWNER: widget] [ALLOC: strdup]
+    void* publish_data;           // [OWNER: widget] [TYPE: ButtonEventData*]
     size_t publish_data_size;
 } ButtonWidget;
 

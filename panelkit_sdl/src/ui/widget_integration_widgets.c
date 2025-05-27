@@ -2,6 +2,7 @@
 #include "widget_integration_internal.h"
 #include "../state/state_store.h"
 #include "../events/event_system.h"
+#include "../events/event_types.h"
 #include "widget_manager.h"
 #include "widget_factory.h"
 #include "widget.h"
@@ -92,12 +93,7 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                 btn->base.event_system = integration->event_system;
                 
                 // Set up event data for this button
-                struct {
-                    int button_index;
-                    int page;
-                    uint32_t timestamp;
-                    char button_text[32];
-                } *click_data = malloc(sizeof(*click_data));
+                ButtonEventData* click_data = malloc(sizeof(ButtonEventData));
                 
                 if (click_data) {
                     click_data->button_index = 0;
@@ -164,12 +160,7 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                         btn->base.event_system = integration->event_system;
                         
                         // Set up event data for this button
-                        struct {
-                            int button_index;
-                            int page;
-                            uint32_t timestamp;
-                            char button_text[32];
-                        } *click_data = malloc(sizeof(*click_data));
+                        ButtonEventData* click_data = malloc(sizeof(ButtonEventData));
                         
                         if (click_data) {
                             click_data->button_index = i;
@@ -226,13 +217,8 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
             }
             
             // Also update the publish data to reflect new text
-            if (btn->publish_data && btn->publish_data_size >= sizeof(struct {int button_index; int page; uint32_t timestamp; char button_text[32];})) {
-                struct {
-                    int button_index;
-                    int page;
-                    uint32_t timestamp;
-                    char button_text[32];
-                } *click_data = (void*)btn->publish_data;
+            if (btn->publish_data && btn->publish_data_size >= sizeof(ButtonEventData)) {
+                ButtonEventData* click_data = (ButtonEventData*)btn->publish_data;
                 strncpy(click_data->button_text, text, sizeof(click_data->button_text) - 1);
                 click_data->button_text[sizeof(click_data->button_text) - 1] = '\0';
             }

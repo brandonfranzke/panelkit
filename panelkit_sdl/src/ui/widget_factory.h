@@ -28,20 +28,6 @@ bool widget_factory_register(WidgetFactory* factory,
 bool widget_factory_unregister(WidgetFactory* factory, const char* type_name);
 
 // Widget creation
-Widget* widget_factory_create_widget(WidgetFactory* factory,
-                                   const char* type_name,
-                                   const char* id,
-                                   void* params);
-
-// Built-in widget creators
-Widget* widget_factory_create_button(const char* id, void* params);
-Widget* widget_factory_create_weather(const char* id, void* params);
-Widget* widget_factory_create_label(const char* id, void* params);
-Widget* widget_factory_create_container(const char* id, void* params);
-
-// Default factory with built-in widgets registered
-WidgetFactory* widget_factory_create_default(void);
-
 // Parameters for built-in widgets
 typedef struct {
     const char* label;
@@ -59,5 +45,26 @@ typedef struct {
     int columns;
     int rows;
 } ContainerParams;
+
+// Widget creation
+Widget* widget_factory_create_widget(WidgetFactory* factory,
+                                   const char* type_name,
+                                   const char* id,
+                                   void* params);
+
+// Built-in widget creators
+Widget* widget_factory_create_button(const char* id, void* params);
+Widget* widget_factory_create_weather(const char* id, void* params);
+Widget* widget_factory_create_label(const char* id, void* params);
+Widget* widget_factory_create_container(const char* id, void* params);
+
+// Type-safe widget creators (Phase 2)
+struct ButtonWidget* widget_factory_create_button_typed(const char* id, const ButtonParams* params);
+struct WeatherWidget* widget_factory_create_weather_typed(const char* id, const WeatherParams* params);
+struct TextWidget* widget_factory_create_label_typed(const char* id, const LabelParams* params);
+Widget* widget_factory_create_container_typed(const char* id, const ContainerParams* params);
+
+// Default factory with built-in widgets registered
+WidgetFactory* widget_factory_create_default(void);
 
 #endif // WIDGET_FACTORY_H

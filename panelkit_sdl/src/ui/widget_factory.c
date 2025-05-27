@@ -1,7 +1,9 @@
 #include "widget_factory.h"
+#include "widget.h"
 #include "widgets/button_widget.h"
 #include "widgets/weather_widget.h"
 #include "widgets/page_manager_widget.h"
+#include "widgets/text_widget.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -199,4 +201,28 @@ WidgetFactory* widget_factory_create_default(void) {
     
     log_info("Created default widget factory with built-in types");
     return factory;
+}
+
+// Type-safe widget creators (Phase 2)
+struct ButtonWidget* widget_factory_create_button_typed(const char* id, const ButtonParams* params) {
+    // Use the generic creator but cast the result safely
+    Widget* widget = widget_factory_create_button(id, (void*)params);
+    return CAST_TO_BUTTON(widget);
+}
+
+struct WeatherWidget* widget_factory_create_weather_typed(const char* id, const WeatherParams* params) {
+    Widget* widget = widget_factory_create_weather(id, (void*)params);
+    // Note: CAST_TO_WEATHER returns void*, need proper cast
+    return (widget && widget->type == WIDGET_TYPE_WEATHER) ? (struct WeatherWidget*)widget : NULL;
+}
+
+struct TextWidget* widget_factory_create_label_typed(const char* id, const LabelParams* params) {
+    Widget* widget = widget_factory_create_label(id, (void*)params);
+    // Note: CAST_TO_LABEL returns void*, need proper cast
+    return (widget && widget->type == WIDGET_TYPE_LABEL) ? (struct TextWidget*)widget : NULL;
+}
+
+Widget* widget_factory_create_container_typed(const char* id, const ContainerParams* params) {
+    Widget* widget = widget_factory_create_container(id, (void*)params);
+    return CAST_TO_CONTAINER(widget);
 }

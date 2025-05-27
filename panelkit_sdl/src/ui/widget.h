@@ -87,7 +87,7 @@ struct Widget {
     void (*measure)(Widget* widget, int* width, int* height);
     
     // Private implementation data
-    void* impl_data;
+    void* impl_data;            // [OWNER: widget] [TYPE: widget-specific]
 };
 
 // Widget lifecycle functions
@@ -137,5 +137,21 @@ void widget_default_render(Widget* widget, SDL_Renderer* renderer);
 void widget_default_handle_event(Widget* widget, const SDL_Event* event);
 void widget_default_layout(Widget* widget);
 void widget_default_destroy(Widget* widget);
+
+// Type-safe casting macros
+#define WIDGET_CAST(type, widget) \
+    ((widget) && (widget)->type == (type) ? (widget) : NULL)
+
+#define CAST_TO_BUTTON(widget) \
+    ((widget) && (widget)->type == WIDGET_TYPE_BUTTON ? (ButtonWidget*)(widget) : NULL)
+
+#define CAST_TO_LABEL(widget) \
+    ((widget) && (widget)->type == WIDGET_TYPE_LABEL ? (void*)(widget) : NULL)
+
+#define CAST_TO_WEATHER(widget) \
+    ((widget) && (widget)->type == WIDGET_TYPE_WEATHER ? (void*)(widget) : NULL)
+
+#define CAST_TO_CONTAINER(widget) \
+    ((widget) && (widget)->type == WIDGET_TYPE_CONTAINER ? (widget) : NULL)
 
 #endif // WIDGET_H

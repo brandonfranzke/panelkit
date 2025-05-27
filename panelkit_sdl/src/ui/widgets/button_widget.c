@@ -1,5 +1,6 @@
 #include "button_widget.h"
 #include "../../events/event_system.h"
+#include "../../events/event_types.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -147,13 +148,8 @@ void button_widget_click(ButtonWidget* button) {
     // Publish event
     if (button->publish_event && button->base.event_system) {
         // Debug: print the actual data being published
-        if (button->publish_data && button->publish_data_size >= sizeof(struct {int button_index; int page;})) {
-            struct {
-                int button_index;
-                int page;
-                uint32_t timestamp;
-                char button_text[32];
-            } *data = (void*)button->publish_data;
+        if (button->publish_data && button->publish_data_size >= sizeof(ButtonEventData)) {
+            ButtonEventData* data = (ButtonEventData*)button->publish_data;
             
             // Update timestamp
             data->timestamp = SDL_GetTicks();
