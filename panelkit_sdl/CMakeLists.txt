@@ -84,9 +84,10 @@ endif()
 set(SOURCES
     src/app.c
     # src/api_functions.c  # Replaced by modular API system
-    src/ui/gestures.c
-    src/ui/pages.c
-    src/ui/rendering.c
+    # Legacy UI files removed - using widget system only
+    # src/ui/gestures.c
+    # src/ui/pages.c
+    # src/ui/rendering.c
     src/api/api_client.c
     src/api/api_manager.c
     src/json/json_parser.c

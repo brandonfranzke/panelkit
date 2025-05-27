@@ -16,11 +16,6 @@
 #include "input/input_handler.h"
 #include "input/input_debug.h"
 
-// UI modules
-#include "ui/gestures.h"
-#include "ui/pages.h"
-#include "ui/rendering.h"
-
 // API modules
 #include "api/api_manager.h"
 
@@ -94,12 +89,6 @@ Uint32 fps = 0;
 // Function prototypes
 static void on_system_page_transition(const char* event_name, const void* data, size_t data_size, void* context);
 static void on_system_api_refresh(const char* event_name, const void* data, size_t data_size, void* context);
-void initialize_pages();
-void render_page(int page_index, float offset_x);
-int get_button_at_position(int x, int y, int scroll_offset);
-void handle_click(int button_index);
-void handle_drag(int delta_x, int delta_y, bool is_horizontal);
-void handle_swipe(float offset, bool is_complete);
 
 // API callback functions
 void on_api_data_received(const UserData* data, void* context);
@@ -109,36 +98,39 @@ void on_api_state_changed(ApiState state, void* context);
 // Old API functions (to be replaced)
 void render_api_data(SDL_Renderer* renderer, int x, int y);
 
-// Callback for button hit testing
-int button_hit_test(int x, int y, int page_index) {
-    Page* page = pages_get(page_index);
-    if (!page) return -1;
+// Simple text rendering for debug overlay
+void draw_text_left(const char* text, int x, int y, SDL_Color color) {
+    if (!text || !font || !renderer) return;
     
-    return get_button_at_position(x, y, page->scroll_position);
-}
-
-// Callback for gesture clicks
-void on_gesture_click(int button_index) {
-    handle_click(button_index);
-}
-
-// Callback for gesture drags
-void on_gesture_drag(int delta_x, int delta_y, bool is_horizontal) {
-    if (!is_horizontal) {
-        // Vertical drag - update scroll
-        int current_page = pages_get_current();
-        pages_update_scroll(current_page, delta_y);
+    SDL_Surface* surface = TTF_RenderText_Solid(font, text, color);
+    if (!surface) return;
+    
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (texture) {
+        SDL_Rect dst = {x, y, surface->w, surface->h};
+        SDL_RenderCopy(renderer, texture, NULL, &dst);
+        SDL_DestroyTexture(texture);
     }
+    
+    SDL_FreeSurface(surface);
 }
 
-// Callback for gesture swipes
-void on_gesture_swipe(float offset, bool is_complete) {
-    pages_handle_swipe(offset, is_complete);
-}
-
-// Callback for page rendering
-void on_page_render(int page_index, float offset_x) {
-    render_page(page_index, offset_x);
+// Small text rendering for API data
+void draw_small_text_left(const char* text, int x, int y, SDL_Color color, int max_width) {
+    (void)max_width; // TODO: Implement text wrapping
+    if (!text || !small_font || !renderer) return;
+    
+    SDL_Surface* surface = TTF_RenderText_Solid(small_font, text, color);
+    if (!surface) return;
+    
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (texture) {
+        SDL_Rect dst = {x, y, surface->w, surface->h};
+        SDL_RenderCopy(renderer, texture, NULL, &dst);
+        SDL_DestroyTexture(texture);
+    }
+    
+    SDL_FreeSurface(surface);
 }
 
 // Configuration helper functions
@@ -444,18 +436,8 @@ int main(int argc, char* argv[]) {
         input_debug_log_device_caps(input_handler->config.device_path);
     }
     
-    // Initialize modules
-    gestures_init(on_gesture_click, on_gesture_drag, on_gesture_swipe, button_hit_test);
-    pages_init(2, on_page_render);  // 2 pages
-    pages_set_dimensions(actual_width, actual_height);
-    rendering_init(renderer, font, large_font, small_font);
-    rendering_set_dimensions(actual_width, actual_height);
-    
     // Apply UI configuration
     bg_color = parse_color(config->ui.colors.background);
-    
-    // Initialize pages
-    initialize_pages();
     
     // Initialize API manager
     // TODO: Update to use new multi-service API structure
@@ -519,11 +501,6 @@ int main(int argc, char* argv[]) {
     while (!quit) {
         Uint32 current_time = SDL_GetTicks();
         
-        // Page state variables (used in legacy mode)
-        int current_page = 0;
-        int target_page = -1;
-        float transition_offset = 0.0f;
-        
         // Note: SDL event processing happens below
         
         // Process SDL events for unified input handling
@@ -538,60 +515,15 @@ int main(int argc, char* argv[]) {
                 }
                 quit = true; // Will be synced from widget state
             }
-            // Handle SDL touch events
-            else if (e.type == SDL_FINGERDOWN) {
-                int touch_x = (int)(e.tfinger.x * actual_width);
-                int touch_y = (int)(e.tfinger.y * actual_height);
-                handle_touch_down(touch_x, touch_y, "touch");
-                // Mirror to widget integration layer
-                if (widget_integration) {
-                    widget_integration_mirror_touch_event(widget_integration, touch_x, touch_y, true);
-                }
-            }
-            else if (e.type == SDL_FINGERUP) {
-                int touch_x = (int)(e.tfinger.x * actual_width);
-                int touch_y = (int)(e.tfinger.y * actual_height);
-                handle_touch_up(touch_x, touch_y, "touch");
-                // Mirror to widget integration layer
-                if (widget_integration) {
-                    widget_integration_mirror_touch_event(widget_integration, touch_x, touch_y, false);
-                }
-            }
-            else if (e.type == SDL_FINGERMOTION) {
-                int touch_x = (int)(e.tfinger.x * actual_width);
-                int touch_y = (int)(e.tfinger.y * actual_height);
-                handle_touch_motion(touch_x, touch_y, "touch");
-            }
-            // Handle mouse events as touch
-            else if (e.type == SDL_MOUSEBUTTONDOWN) {
-                handle_touch_down(e.button.x, e.button.y, "mouse");
-                // Mirror to widget integration layer
-                if (widget_integration) {
-                    widget_integration_mirror_touch_event(widget_integration, e.button.x, e.button.y, true);
-                }
-            }
-            else if (e.type == SDL_MOUSEBUTTONUP) {
-                handle_touch_up(e.button.x, e.button.y, "mouse");
-                // Mirror to widget integration layer
-                if (widget_integration) {
-                    widget_integration_mirror_touch_event(widget_integration, e.button.x, e.button.y, false);
-                }
-            }
-            else if (e.type == SDL_MOUSEMOTION && (e.motion.state & SDL_BUTTON_LMASK)) {
-                handle_touch_motion(e.motion.x, e.motion.y, "mouse");
-            }
             
-            // Forward SDL events to widget manager for WIDGET_RENDER mode
-            if (widget_integration && widget_integration->widget_manager && getenv("WIDGET_RENDER") != NULL) {
+            // Forward SDL events to widget manager
+            if (widget_integration && widget_integration->widget_manager) {
                 widget_manager_handle_event(widget_integration->widget_manager, &e);
             }
         }
         
-        // WIDGET RENDERING: Check if we should use widget-based rendering
-        bool use_widget_rendering = widget_integration && widget_integration->page_manager && 
-                                   getenv("WIDGET_RENDER") != NULL;
-        
-        if (use_widget_rendering) {
+        // Always use widget rendering
+        if (widget_integration && widget_integration->page_manager) {
             // === WIDGET MODE: Completely independent rendering path ===
             
             // Update API manager (still needed for data)
@@ -623,45 +555,9 @@ int main(int argc, char* argv[]) {
                                  widget_bg_color.b, widget_bg_color.a);
             SDL_RenderClear(renderer);
             
-        } else {
-            // === LEGACY MODE: Original rendering path ===
-            
-            // Update page transitions
-            pages_update_transition();
-            gestures_set_current_page(pages_get_current());
-            
-            // Sync page state with widget integration
-            if (widget_integration) {
-                static int last_page = -1;
-                int current_page_idx = pages_get_current();
-                if (current_page_idx != last_page) {
-                    if (last_page >= 0) {
-                        widget_integration_mirror_page_change(widget_integration, last_page, current_page_idx);
-                    }
-                    widget_integration_sync_page_state(widget_integration, current_page_idx, true);
-                    last_page = current_page_idx;
-                }
-            }
-            
-            // Update API manager
-            api_manager_update(api_manager, current_time);
-            
-            // Sync state changes from widget store back to globals (must happen before rendering)
-            if (widget_integration) {
-                widget_integration_sync_state_to_globals(widget_integration, &bg_color, &show_time, &quit, &page1_text_color);
-            }
-            
-            // Clear screen
-            SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a);
-            SDL_RenderClear(renderer);
-            
-            // Get page state for debug info
-            current_page = pages_get_current();
-            target_page = pages_get_target_page();
-            transition_offset = pages_get_transition_offset();
         }
         
-        if (use_widget_rendering) {
+        if (widget_integration && widget_integration->page_manager) {
             // === WIDGET MODE RENDERING ===
             
             // Update widget rendering based on current state
@@ -677,70 +573,21 @@ int main(int argc, char* argv[]) {
             if (widget_integration->page_manager->render) {
                 widget_integration->page_manager->render(widget_integration->page_manager, renderer);
             }
-        } else {
-            // === LEGACY MODE RENDERING ===
-            
-            // Render current page(s)
-            if (target_page != -1) {
-            // Render both pages during transition
-            float current_offset = transition_offset * actual_width;
-            float target_offset = current_offset + (target_page > current_page ? actual_width : -actual_width);
-            
-            render_page(current_page, current_offset);
-            render_page(target_page, target_offset);
-        } else {
-            // Render single page
-            render_page(current_page, 0);
         }
-        
-        // Render page indicators if visible
-        if (pages_should_show_indicators()) {
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, pages_get_indicator_alpha());
-            render_page_indicators(current_page, pages_get_total(), transition_offset);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        }
-        
-        } // End of old rendering system
         
         // Draw debug overlay if enabled (at bottom of screen - two lines)
-        bool should_show_debug = false;
-        if (use_widget_rendering) {
-            should_show_debug = widget_integration_get_show_debug(widget_integration);
-        } else {
-            should_show_debug = show_debug;
-        }
+        bool should_show_debug = widget_integration ? 
+            widget_integration_get_show_debug(widget_integration) : false;
         
         if (should_show_debug) {
-            const char* gesture_name = 
-                gestures_get_state() == GESTURE_NONE ? "NONE" :
-                gestures_get_state() == GESTURE_POTENTIAL ? "POTENTIAL" :
-                gestures_get_state() == GESTURE_CLICK ? "CLICK" :
-                gestures_get_state() == GESTURE_DRAG_VERT ? "DRAG_VERT" :
-                gestures_get_state() == GESTURE_DRAG_HORZ ? "DRAG_HORZ" : "HOLD";
-                
-            const char* transition_state = 
-                pages_get_transition_state() == TRANSITION_NONE ? "NONE" :
-                pages_get_transition_state() == TRANSITION_DRAGGING ? "DRAGGING" : "ANIMATING";
-            
-            // Demonstrate state migration: Get page from widget integration
-            int widget_current_page = widget_integration ? 
-                widget_integration_get_current_page(widget_integration) : current_page;
-            
-            // First line: Page | FPS | Gesture (showing both old and new state)
+            // Simple FPS display for now
+            // TODO: Implement full widget-based debug overlay
             char debug_line1[256];
-            snprintf(debug_line1, sizeof(debug_line1), "Page: %d/%d | FPS: %d | Gesture: %s", 
-                    current_page + 1, widget_current_page + 1, fps, gesture_name);
+            int widget_current_page = widget_integration ? 
+                widget_integration_get_current_page(widget_integration) : 0;
+            snprintf(debug_line1, sizeof(debug_line1), "Page: %d | FPS: %d", 
+                    widget_current_page + 1, fps);
             draw_text_left(debug_line1, 10, actual_height - 55, (SDL_Color){255, 255, 255, 128});
-            
-            // Second line: Button | Transition | Scroll
-            Page* current_page_data = pages_get(current_page);
-            char debug_line2[256];
-            snprintf(debug_line2, sizeof(debug_line2), "Button: %d | Transition: %s (%.2f) | Scroll: %d/%d", 
-                    gestures_get_button(), transition_state, transition_offset,
-                    current_page_data ? current_page_data->scroll_position : 0,
-                    current_page_data ? current_page_data->max_scroll : 0);
-            draw_text_left(debug_line2, 10, actual_height - 30, (SDL_Color){200, 200, 200, 128});
         }
         
         
@@ -793,240 +640,6 @@ int main(int argc, char* argv[]) {
     logger_shutdown();
     
     return 0;
-}
-
-// Initialize all pages - exact same implementation as original
-void initialize_pages() {
-    Page* page0 = pages_get(0);
-    Page* page1 = pages_get(1);
-    
-    // Page 1 - Text page
-    page0->scroll_position = 0;
-    page0->max_scroll = 0; // No scrolling needed
-    page0->title = "Text Page";
-    page0->button_count = 1;
-    strcpy(page0->button_texts[0], "Change Text Color");
-    page0->button_colors[0] = (SDL_Color){52, 152, 219, 255}; // Blue
-    
-    // Page 2 - Buttons page
-    page1->scroll_position = 0;
-    page1->title = "Buttons Page";
-    page1->button_count = 9;
-    
-    // Button texts
-    strcpy(page1->button_texts[0], "Blue");
-    strcpy(page1->button_texts[1], "Random");
-    strcpy(page1->button_texts[2], "Time"); // Will be updated with time
-    strcpy(page1->button_texts[3], "Go to Page 1");
-    strcpy(page1->button_texts[4], "Refresh User");
-    strcpy(page1->button_texts[5], "Exit App");
-    strcpy(page1->button_texts[6], "Button 7");
-    strcpy(page1->button_texts[7], "Button 8");
-    strcpy(page1->button_texts[8], "Button 9");
-    
-    // Button colors
-    page1->button_colors[0] = (SDL_Color){41, 128, 185, 255};  // Blue
-    page1->button_colors[1] = (SDL_Color){142, 68, 173, 255};  // Purple
-    page1->button_colors[2] = (SDL_Color){142, 142, 142, 255}; // Gray
-    page1->button_colors[3] = (SDL_Color){231, 76, 60, 255};   // Red
-    page1->button_colors[4] = (SDL_Color){39, 174, 96, 255};  // Green (for refresh)
-    page1->button_colors[5] = (SDL_Color){192, 57, 43, 255};   // Dark Red (for exit)
-    page1->button_colors[6] = (SDL_Color){52, 152, 219, 255};  // Blue
-    page1->button_colors[7] = (SDL_Color){241, 196, 15, 255};  // Yellow
-    page1->button_colors[8] = (SDL_Color){230, 126, 34, 255};  // Orange
-    
-    // Calculate max scroll for page 2 (add space for title)
-    int total_content_height = 90 + BUTTON_PADDING + page1->button_count * (BUTTON_HEIGHT + BUTTON_PADDING);
-    page1->max_scroll = total_content_height - actual_height;
-    if (page1->max_scroll < 0) page1->max_scroll = 0;
-}
-
-// Render a page - exact same implementation as original
-void render_page(int page_index, float offset_x) {
-    Page* page = pages_get(page_index);
-    if (!page) return;
-    
-    // Save current clip rect
-    SDL_Rect old_clip;
-    SDL_RenderGetClipRect(renderer, &old_clip);
-    
-    // Set clip rect for this page (with offset)
-    SDL_Rect page_clip = {
-        (int)offset_x,
-        0,
-        actual_width,
-        actual_height
-    };
-    SDL_RenderSetClipRect(renderer, &page_clip);
-    
-    if (page_index == 0) {
-        // Page 1: Text display
-        // Draw title
-        draw_large_text(page->title, (int)(actual_width/2 + offset_x), 60, (SDL_Color){255, 255, 255, 255});
-        
-        // Draw single button
-        int button_x = (actual_width - BUTTON_WIDTH) / 2;
-        int button_y = 200;
-        int button_height = BUTTON_HEIGHT / 2;
-        
-        // Determine button state based on current gesture
-        ButtonState button_state = BUTTON_NORMAL;
-        if (gestures_get_state() != GESTURE_NONE && 
-            gestures_get_button() == 0 && 
-            gestures_get_page() == page_index &&
-            pages_get_current() == page_index) {
-            button_state = BUTTON_PRESSED;
-        }
-        
-        render_button((int)(button_x + offset_x), button_y, BUTTON_WIDTH, button_height,
-                     page->button_texts[0], page->button_colors[0], button_state);
-        
-        // Draw text content below button with proper spacing - split into two lines
-        SDL_Color current_text_color = text_colors[page1_text_color];
-        draw_text("Welcome to Page 1!", (int)(actual_width/2 + offset_x), button_y + button_height + 80, current_text_color);
-        draw_text("Swipe right to see buttons.", (int)(actual_width/2 + offset_x), button_y + button_height + 110, current_text_color);
-    }
-    else if (page_index == 1) {
-        // Page 2: Scrollable buttons
-        // Get current scroll position
-        int scroll_position = page->scroll_position;
-        
-        // Create separate clip rects for the scrollable and fixed areas
-        
-        // First, create clip rect just for the scrollable button area on the left side
-        SDL_Rect button_area_rect = {
-            (int)offset_x, 0, 
-            BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING, // Width includes left padding, button width, and right padding
-            actual_height
-        };
-        SDL_RenderSetClipRect(renderer, &button_area_rect);
-        
-        // Draw page title in the button area (scrolls with content)
-        int title_y = 60 - scroll_position;
-        if (title_y >= 0 && title_y <= actual_height) {
-            draw_large_text(page->title, (BUTTON_PADDING + BUTTON_WIDTH) / 2 + (int)offset_x, title_y, 
-                          (SDL_Color){255, 255, 255, 255});
-        }
-        
-        // Update time for button 3
-        if (show_time) {
-            time_t rawtime;
-            struct tm* timeinfo;
-            time(&rawtime);
-            timeinfo = localtime(&rawtime);
-            // Format: HH:MM:SS on first line, YYYY-MMM-DD on second line
-            char time_str[32], date_str[32];
-            strftime(time_str, sizeof(time_str), "%H:%M:%S", timeinfo);
-            strftime(date_str, sizeof(date_str), "%Y-%b-%d", timeinfo); // %b gives short month name
-            snprintf(page->button_texts[2], 64, "%s\n%s", time_str, date_str);
-        } else {
-            strcpy(page->button_texts[2], "Time (off)");
-        }
-        
-        // Sync button text to widget system
-        if (widget_integration) {
-            widget_integration_sync_button_state(widget_integration, 1, 2, page->button_texts[2], true);
-        }
-        
-        // Render all buttons with scroll position applied
-        for (int i = 0; i < page->button_count; i++) {
-            int button_y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING) + 90 - scroll_position; // Add space for title
-            
-            // Skip buttons that are completely outside the visible area
-            if (button_y + BUTTON_HEIGHT < 0 || button_y > actual_height) {
-                continue;
-            }
-            
-            // Determine button state
-            ButtonState button_state = BUTTON_NORMAL;
-            if (gestures_get_state() != GESTURE_NONE && 
-                gestures_get_button() == i && 
-                gestures_get_page() == page_index &&
-                pages_get_current() == page_index) {
-                button_state = BUTTON_PRESSED;
-            }
-            
-            render_button((int)(BUTTON_PADDING + offset_x), button_y, BUTTON_WIDTH, BUTTON_HEIGHT,
-                         page->button_texts[i], page->button_colors[i], button_state);
-        }
-        
-        // Now set clip rect for the fixed API data area on the right side
-        SDL_Rect api_area_rect = {
-            BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING + (int)offset_x, 0,
-            actual_width - (BUTTON_PADDING + BUTTON_WIDTH + BUTTON_PADDING),
-            actual_height
-        };
-        SDL_RenderSetClipRect(renderer, &api_area_rect);
-        
-        // Render API data in the blank area on the right side (fixed, not scrolling)
-        // Position it to the right of the buttons with proper padding
-        int api_data_x = BUTTON_PADDING + BUTTON_WIDTH + 20 + (int)offset_x;
-        render_api_data(renderer, api_data_x, 150);
-        
-    }
-    
-    // Clear clipping rectangle
-    SDL_RenderSetClipRect(renderer, NULL);
-}
-
-// Get the button at a specific position - exact same implementation as original
-int get_button_at_position(int x, int y, int scroll_offset) {
-    int current_page = pages_get_current();
-    
-    // Check which page we're on
-    if (current_page == 0) {
-        // Page 1 has just one centered button
-        int button_x = (actual_width - BUTTON_WIDTH) / 2;
-        int button_y = 200;
-        int button_height = BUTTON_HEIGHT / 2;
-        
-        if (x >= button_x && x < button_x + BUTTON_WIDTH &&
-            y >= button_y && y < button_y + button_height) {
-            return 0;
-        }
-    }
-    else if (current_page == 1) {
-        // Page 2 has multiple buttons with scrolling
-        
-        // Adjust y for scroll position
-        int adjusted_y = y + scroll_offset;
-        
-        // Check if x is within button width
-        if (x < BUTTON_PADDING || x >= BUTTON_PADDING + BUTTON_WIDTH) {
-            return -1;
-        }
-        
-        // Calculate which button is at this y position
-        Page* page = pages_get(current_page);
-        for (int i = 0; i < page->button_count; i++) {
-            int button_y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING);
-            if (adjusted_y >= button_y && adjusted_y < button_y + BUTTON_HEIGHT) {
-                return i;
-            }
-        }
-    }
-    
-    return -1;
-}
-
-// Handle a button click - now just mirrors to widget system
-void handle_click(int button_index) {
-    int gesture_page = gestures_get_page();
-    log_event("BUTTON_CLICK", "button=%d page=%d", button_index, gesture_page);
-    
-    // Mirror button press to widget integration layer
-    // The widget system handles all button logic through event handlers
-    if (widget_integration) {
-        Page* page = pages_get(gesture_page);
-        const char* button_text = (page && button_index < page->button_count) ? 
-                                page->button_texts[button_index] : NULL;
-        widget_integration_mirror_button_press(widget_integration, button_index, button_text);
-    }
-    
-    // All button logic has been migrated to widget event handlers
-    // The actions are handled through:
-    // - widget_button_click_handler() in widget_integration.c
-    // - State changes sync back via widget_integration_sync_state_to_globals()
 }
 
 
@@ -1132,10 +745,6 @@ static void on_system_page_transition(const char* event_name, const void* data, 
     } *page_event = (void*)data;
     
     log_debug("System page transition event: %d -> %d", page_event->from_page, page_event->to_page);
-    
-    // Trigger the old page system transition
-    // TODO(Phase7): Remove when old page system is fully retired
-    pages_transition_to(page_event->to_page);
 }
 
 // Event handler for API refresh requests

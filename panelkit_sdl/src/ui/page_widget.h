@@ -2,7 +2,6 @@
 #define PAGE_WIDGET_H
 
 #include "widget.h"
-#include "pages.h"
 
 // Page widget - base class for all pages in the application
 typedef struct PageWidget {
