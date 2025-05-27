@@ -107,7 +107,15 @@ bool widget_manager_add_root(WidgetManager* manager, Widget* root, const char* n
     strncpy(root->id, name, sizeof(root->id) - 1);
     
     // Connect systems
-    widget_connect_systems(root, manager->event_system, manager->state_store);
+    PkError err = widget_connect_systems(root, manager->event_system, manager->state_store);
+    if (err != PK_OK) {
+        log_error("Failed to connect systems for root widget '%s': %s",
+                  name, pk_error_string(err));
+        pk_set_last_error_with_context(err,
+                                       "Failed to connect systems for root widget '%s'",
+                                       name);
+        return false;
+    }
     
     manager->roots[manager->root_count++] = root;
     
@@ -305,12 +313,30 @@ void widget_manager_update(WidgetManager* manager) {
     widget_update(manager->active_root, delta_time);
 }
 
-void widget_manager_render(WidgetManager* manager) {
-    if (!manager || !manager->active_root || !manager->renderer) {
-        return;
+PkError widget_manager_render(WidgetManager* manager) {
+    PK_CHECK_ERROR_WITH_CONTEXT(manager != NULL, PK_ERROR_NULL_PARAM,
+                               "manager is NULL in widget_manager_render");
+    
+    if (!manager->active_root) {
+        // No active root is not an error - just nothing to render
+        return PK_OK;
     }
     
-    widget_render(manager->active_root, manager->renderer);
+    if (!manager->renderer) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "renderer is NULL in widget_manager_render");
+        return PK_ERROR_NULL_PARAM;
+    }
+    
+    PkError err = widget_render(manager->active_root, manager->renderer);
+    if (err != PK_OK) {
+        pk_set_last_error_with_context(err,
+                                       "Failed to render active root '%s'",
+                                       manager->active_root->id);
+        return err;
+    }
+    
+    return PK_OK;
 }
 
 Widget* widget_manager_find_widget(WidgetManager* manager, const char* id) {

@@ -9,7 +9,7 @@
 #include "core/error.h"
 
 // Forward declarations for virtual functions
-static void button_widget_render(Widget* widget, SDL_Renderer* renderer);
+static PkError button_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void button_widget_handle_event(Widget* widget, const SDL_Event* event);
 static void button_widget_destroy(Widget* widget);
 
@@ -192,11 +192,12 @@ void button_widget_click(ButtonWidget* button) {
     }
 }
 
-static void button_widget_render(Widget* widget, SDL_Renderer* renderer) {
+static PkError button_widget_render(Widget* widget, SDL_Renderer* renderer) {
     ButtonWidget* button = (ButtonWidget*)widget;
-    if (!button || !renderer) {
-        return;
-    }
+    PK_CHECK_ERROR_WITH_CONTEXT(button != NULL, PK_ERROR_NULL_PARAM,
+                               "button is NULL in button_widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in button_widget_render");
     
     log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d color (%d,%d,%d) children=%zu", 
               button->base.id, widget->bounds.x, widget->bounds.y, 
@@ -226,21 +227,36 @@ static void button_widget_render(Widget* widget, SDL_Renderer* renderer) {
     }
     
     // Call base render for background and border
-    widget_default_render(widget, renderer);
+    PkError err = widget_default_render(widget, renderer);
+    if (err != PK_OK) {
+        return err;
+    }
     
     // Base render will handle drawing children (text widgets, etc)
     
     // Draw focus indicator
     if (widget_has_state(widget, WIDGET_STATE_FOCUSED)) {
-        SDL_SetRenderDrawColor(renderer, 0, 120, 255, 255);
+        if (SDL_SetRenderDrawColor(renderer, 0, 120, 255, 255) < 0) {
+            pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                           "Failed to set focus color: %s",
+                                           SDL_GetError());
+            return PK_ERROR_RENDER_FAILED;
+        }
         SDL_Rect focus_rect = {
             widget->bounds.x - 2,
             widget->bounds.y - 2,
             widget->bounds.w + 4,
             widget->bounds.h + 4
         };
-        SDL_RenderDrawRect(renderer, &focus_rect);
+        if (SDL_RenderDrawRect(renderer, &focus_rect) < 0) {
+            pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                           "Failed to draw focus rect: %s",
+                                           SDL_GetError());
+            return PK_ERROR_RENDER_FAILED;
+        }
     }
+    
+    return PK_OK;
 }
 
 static void button_widget_handle_event(Widget* widget, const SDL_Event* event) {

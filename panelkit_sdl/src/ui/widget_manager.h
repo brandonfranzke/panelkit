@@ -121,9 +121,10 @@ void widget_manager_update(WidgetManager* manager);
  * Render the active root widget and its children.
  * 
  * @param manager Widget manager
+ * @return PK_OK on success, error code on failure
  * @note Only renders if active root is set
  */
-void widget_manager_render(WidgetManager* manager);
+PkError widget_manager_render(WidgetManager* manager);
 
 /* Widget finding */
 

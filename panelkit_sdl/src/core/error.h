@@ -54,6 +54,9 @@ typedef enum {
     PK_ERROR_EVENT_QUEUE_FULL = -60,
     PK_ERROR_EVENT_NOT_FOUND = -61,
     PK_ERROR_EVENT_HANDLER_FAILED = -62,
+    
+    /* Rendering errors */
+    PK_ERROR_RENDER_FAILED = -70,
 } PkError;
 
 /**
@@ -182,6 +185,18 @@ const char* pk_get_last_error_context(void);
         if (!(condition)) { \
             pk_set_last_error_with_context(error, fmt, ##__VA_ARGS__); \
             return false; \
+        } \
+    } while(0)
+
+/**
+ * Check condition and return error with context
+ * Usage: PK_CHECK_ERROR_WITH_CONTEXT(ptr != NULL, PK_ERROR_NULL_PARAM, "widget is NULL");
+ */
+#define PK_CHECK_ERROR_WITH_CONTEXT(condition, error, fmt, ...) \
+    do { \
+        if (!(condition)) { \
+            pk_set_last_error_with_context(error, fmt, ##__VA_ARGS__); \
+            return error; \
         } \
     } while(0)
 

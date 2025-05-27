@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "../core/error.h"
 
 // Forward declarations
 typedef struct EventSystem EventSystem;
@@ -35,7 +36,7 @@ typedef enum {
 typedef void (*widget_event_handler)(Widget* widget, const SDL_Event* event);
 typedef void (*widget_data_handler)(Widget* widget, const char* event_name,
                                    const void* data, size_t data_size);
-typedef void (*widget_render_func)(Widget* widget, SDL_Renderer* renderer);
+typedef PkError (*widget_render_func)(Widget* widget, SDL_Renderer* renderer);
 typedef void (*widget_update_func)(Widget* widget, double delta_time);
 typedef void (*widget_destroy_func)(Widget* widget);
 
@@ -176,7 +177,16 @@ bool widget_unsubscribe_event(Widget* widget, const char* event_name);
  * @param store State store (can be NULL)
  * @note Recursively connects all children
  */
-void widget_connect_systems(Widget* widget, EventSystem* events, StateStore* store);
+/**
+ * Connect widget to event and state systems.
+ * 
+ * @param widget Widget to connect (required)
+ * @param events Event system (can be NULL)
+ * @param store State store (can be NULL)
+ * @return PK_OK on success, error code on failure
+ * @note Propagates to all children recursively
+ */
+PkError widget_connect_systems(Widget* widget, EventSystem* events, StateStore* store);
 
 /* Widget state management */
 
@@ -289,7 +299,15 @@ void widget_update_child_bounds(Widget* parent);
  * @param renderer SDL renderer to draw to
  * @note Skips hidden widgets and their children
  */
-void widget_render(Widget* widget, SDL_Renderer* renderer);
+/**
+ * Render widget and its children recursively.
+ * 
+ * @param widget Widget to render (required)
+ * @param renderer SDL renderer to use (required)
+ * @return PK_OK on success, error code on failure
+ * @note Performs layout if needed before rendering
+ */
+PkError widget_render(Widget* widget, SDL_Renderer* renderer);
 
 /**
  * Mark widget as needing redraw.
@@ -350,7 +368,7 @@ void widget_update(Widget* widget, double delta_time);
  * @param renderer SDL renderer
  * @note Draws background, border, and children
  */
-void widget_default_render(Widget* widget, SDL_Renderer* renderer);
+PkError widget_default_render(Widget* widget, SDL_Renderer* renderer);
 
 /**
  * Default event handling implementation.

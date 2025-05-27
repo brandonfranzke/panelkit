@@ -5,7 +5,7 @@
 
 // Forward declarations
 static void time_widget_update(Widget* widget, double delta_time);
-static void time_widget_render(Widget* widget, SDL_Renderer* renderer);
+static PkError time_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void time_widget_destroy(Widget* widget);
 
 Widget* time_widget_create(const char* id, const char* format, TTF_Font* font) {
@@ -92,8 +92,11 @@ static void time_widget_update(Widget* widget, double delta_time) {
     }
 }
 
-static void time_widget_render(Widget* widget, SDL_Renderer* renderer) {
-    if (!widget || !renderer) return;
+static PkError time_widget_render(Widget* widget, SDL_Renderer* renderer) {
+    PK_CHECK_ERROR_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                               "widget is NULL in time_widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in time_widget_render");
     TimeWidget* time_widget = (TimeWidget*)widget;
     
     // Position text widget
@@ -104,9 +107,14 @@ static void time_widget_render(Widget* widget, SDL_Renderer* renderer) {
     // Render children (text widget)
     for (size_t i = 0; i < widget->child_count; i++) {
         if (widget->children[i] && widget->children[i]->render) {
-            widget->children[i]->render(widget->children[i], renderer);
+            PkError err = widget->children[i]->render(widget->children[i], renderer);
+            if (err != PK_OK) {
+                return err;
+            }
         }
     }
+    
+    return PK_OK;
 }
 
 static void time_widget_destroy(Widget* widget) {

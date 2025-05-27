@@ -3,7 +3,7 @@
 #include <string.h>
 
 // Forward declarations
-static void text_widget_render(Widget* widget, SDL_Renderer* renderer);
+static PkError text_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void text_widget_destroy(Widget* widget);
 static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* renderer);
 
@@ -108,14 +108,17 @@ static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* re
     text_widget->needs_update = false;
 }
 
-static void text_widget_render(Widget* widget, SDL_Renderer* renderer) {
-    if (!widget || !renderer) return;
+static PkError text_widget_render(Widget* widget, SDL_Renderer* renderer) {
+    PK_CHECK_ERROR_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                               "widget is NULL in text_widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in text_widget_render");
     TextWidget* text_widget = (TextWidget*)widget;
     
     // Update texture if needed
     text_widget_update_texture(text_widget, renderer);
     
-    if (!text_widget->texture) return;
+    if (!text_widget->texture) return PK_OK;  // No text to render
     
     // Calculate destination rectangle based on alignment
     SDL_Rect dest = widget->bounds;
@@ -137,7 +140,14 @@ static void text_widget_render(Widget* widget, SDL_Renderer* renderer) {
     dest.w = text_widget->texture_width;
     dest.h = text_widget->texture_height;
     
-    SDL_RenderCopy(renderer, text_widget->texture, NULL, &dest);
+    if (SDL_RenderCopy(renderer, text_widget->texture, NULL, &dest) < 0) {
+        pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                       "SDL_RenderCopy failed for text widget '%s': %s",
+                                       widget->id, SDL_GetError());
+        return PK_ERROR_RENDER_FAILED;
+    }
+    
+    return PK_OK;
 }
 
 static void text_widget_destroy(Widget* widget) {

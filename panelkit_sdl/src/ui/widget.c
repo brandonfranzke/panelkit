@@ -306,10 +306,8 @@ bool widget_unsubscribe_event(Widget* widget, const char* event_name) {
     return false;
 }
 
-void widget_connect_systems(Widget* widget, EventSystem* events, StateStore* store) {
-    if (!widget) {
-        return;
-    }
+PkError widget_connect_systems(Widget* widget, EventSystem* events, StateStore* store) {
+    PK_CHECK_RETURN(widget != NULL, PK_ERROR_NULL_PARAM);
     
     // Unsubscribe from old system if changing
     if (widget->event_system && widget->event_system != events) {
@@ -325,15 +323,39 @@ void widget_connect_systems(Widget* widget, EventSystem* events, StateStore* sto
     // Resubscribe to new system
     if (events) {
         for (size_t i = 0; i < widget->event_count; i++) {
-            event_subscribe(events, widget->subscribed_events[i],
-                          widget_event_handler_callback, widget);
+            if (!event_subscribe(events, widget->subscribed_events[i],
+                               widget_event_handler_callback, widget)) {
+                // Try to recover by rolling back subscriptions
+                log_error("Failed to subscribe widget '%s' to event '%s'",
+                         widget->id, widget->subscribed_events[i]);
+                
+                // Unsubscribe what we've done so far
+                for (size_t j = 0; j < i; j++) {
+                    event_unsubscribe(events, widget->subscribed_events[j],
+                                    widget_event_handler_callback);
+                }
+                
+                // Clear the system references
+                widget->event_system = NULL;
+                widget->state_store = NULL;
+                
+                return pk_get_last_error();  // Propagate error from event_subscribe
+            }
         }
     }
     
     // Propagate to children
     for (size_t i = 0; i < widget->child_count; i++) {
-        widget_connect_systems(widget->children[i], events, store);
+        PkError err = widget_connect_systems(widget->children[i], events, store);
+        if (err != PK_OK) {
+            pk_set_last_error_with_context(err,
+                                          "Failed to connect child '%s' of parent '%s'",
+                                          widget->children[i]->id, widget->id);
+            return err;
+        }
     }
+    
+    return PK_OK;
 }
 
 void widget_set_state(Widget* widget, WidgetState state, bool enabled) {
@@ -498,21 +520,14 @@ void widget_update_child_bounds(Widget* parent) {
     }
 }
 
-void widget_render(Widget* widget, SDL_Renderer* renderer) {
-    if (!widget) {
-        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
-                                       "widget is NULL in widget_render");
-        return;
-    }
-    
-    if (!renderer) {
-        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
-                                       "renderer is NULL in widget_render");
-        return;
-    }
+PkError widget_render(Widget* widget, SDL_Renderer* renderer) {
+    PK_CHECK_ERROR_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                               "widget is NULL in widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in widget_render");
     
     if (!widget_is_visible(widget)) {
-        return;  // Not an error - widget is hidden
+        return PK_OK;  // Not an error - widget is hidden
     }
     
     // Perform layout if needed
@@ -522,16 +537,28 @@ void widget_render(Widget* widget, SDL_Renderer* renderer) {
     
     // Render this widget
     if (widget->render) {
-        widget->render(widget, renderer);
+        PkError err = widget->render(widget, renderer);
+        if (err != PK_OK) {
+            pk_set_last_error_with_context(err,
+                                           "Failed to render widget '%s' of type %d",
+                                           widget->id, widget->type);
+            return err;
+        }
     }
     
     // Render children
     for (size_t i = 0; i < widget->child_count; i++) {
-        widget_render(widget->children[i], renderer);
+        PkError err = widget_render(widget->children[i], renderer);
+        if (err != PK_OK) {
+            // Context already set by recursive call
+            return err;
+        }
     }
     
     // Clear dirty flag
     widget_set_state(widget, WIDGET_STATE_DIRTY, false);
+    
+    return PK_OK;
 }
 
 void widget_invalidate(Widget* widget) {
@@ -666,10 +693,11 @@ void widget_update(Widget* widget, double delta_time) {
 
 // Default implementations
 
-void widget_default_render(Widget* widget, SDL_Renderer* renderer) {
-    if (!widget || !renderer) {
-        return;
-    }
+PkError widget_default_render(Widget* widget, SDL_Renderer* renderer) {
+    PK_CHECK_ERROR_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                               "widget is NULL in widget_default_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in widget_default_render");
     
     log_debug("DEFAULT RENDER: %s at (%d,%d,%dx%d) bg(%d,%d,%d)", 
               widget->id, widget->bounds.x, widget->bounds.y,
@@ -677,20 +705,36 @@ void widget_default_render(Widget* widget, SDL_Renderer* renderer) {
               widget->background_color.r, widget->background_color.g, widget->background_color.b);
     
     // Draw background
-    SDL_SetRenderDrawColor(renderer, 
-                          widget->background_color.r,
-                          widget->background_color.g,
-                          widget->background_color.b,
-                          widget->background_color.a);
-    SDL_RenderFillRect(renderer, &widget->bounds);
+    if (SDL_SetRenderDrawColor(renderer, 
+                              widget->background_color.r,
+                              widget->background_color.g,
+                              widget->background_color.b,
+                              widget->background_color.a) < 0) {
+        pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                       "SDL_SetRenderDrawColor failed: %s",
+                                       SDL_GetError());
+        return PK_ERROR_RENDER_FAILED;
+    }
+    
+    if (SDL_RenderFillRect(renderer, &widget->bounds) < 0) {
+        pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                       "SDL_RenderFillRect failed for widget '%s': %s",
+                                       widget->id, SDL_GetError());
+        return PK_ERROR_RENDER_FAILED;
+    }
     
     // Draw border
     if (widget->border_width > 0) {
-        SDL_SetRenderDrawColor(renderer,
-                              widget->border_color.r,
-                              widget->border_color.g,
-                              widget->border_color.b,
-                              widget->border_color.a);
+        if (SDL_SetRenderDrawColor(renderer,
+                                  widget->border_color.r,
+                                  widget->border_color.g,
+                                  widget->border_color.b,
+                                  widget->border_color.a) < 0) {
+            pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                           "SDL_SetRenderDrawColor failed for border: %s",
+                                           SDL_GetError());
+            return PK_ERROR_RENDER_FAILED;
+        }
         
         for (int i = 0; i < widget->border_width; i++) {
             SDL_Rect border_rect = {
@@ -699,7 +743,12 @@ void widget_default_render(Widget* widget, SDL_Renderer* renderer) {
                 widget->bounds.w - i * 2,
                 widget->bounds.h - i * 2
             };
-            SDL_RenderDrawRect(renderer, &border_rect);
+            if (SDL_RenderDrawRect(renderer, &border_rect) < 0) {
+                pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                               "SDL_RenderDrawRect failed: %s",
+                                               SDL_GetError());
+                return PK_ERROR_RENDER_FAILED;
+            }
         }
     }
     
@@ -707,9 +756,15 @@ void widget_default_render(Widget* widget, SDL_Renderer* renderer) {
     for (size_t i = 0; i < widget->child_count; i++) {
         Widget* child = widget->children[i];
         if (child && child->render && !(child->state_flags & WIDGET_STATE_HIDDEN)) {
-            child->render(child, renderer);
+            PkError err = child->render(child, renderer);
+            if (err != PK_OK) {
+                // Context already set by child
+                return err;
+            }
         }
     }
+    
+    return PK_OK;
 }
 
 void widget_default_handle_event(Widget* widget, const SDL_Event* event) {

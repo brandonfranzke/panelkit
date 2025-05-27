@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 // Forward declarations
-static void data_display_widget_render(Widget* widget, SDL_Renderer* renderer);
+static PkError data_display_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void data_display_widget_destroy(Widget* widget);
 static void data_display_widget_layout(Widget* widget);
 
@@ -158,8 +158,11 @@ static void data_display_widget_layout(Widget* widget) {
     }
 }
 
-static void data_display_widget_render(Widget* widget, SDL_Renderer* renderer) {
-    if (!widget || !renderer) return;
+static PkError data_display_widget_render(Widget* widget, SDL_Renderer* renderer) {
+    PK_CHECK_ERROR_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                               "widget is NULL in data_display_widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in data_display_widget_render");
     
     // Layout children
     data_display_widget_layout(widget);
@@ -167,9 +170,14 @@ static void data_display_widget_render(Widget* widget, SDL_Renderer* renderer) {
     // Render all child text widgets
     for (size_t i = 0; i < widget->child_count; i++) {
         if (widget->children[i] && widget->children[i]->render) {
-            widget->children[i]->render(widget->children[i], renderer);
+            PkError err = widget->children[i]->render(widget->children[i], renderer);
+            if (err != PK_OK) {
+                return err;
+            }
         }
     }
+    
+    return PK_OK;
 }
 
 static void data_display_widget_destroy(Widget* widget) {

@@ -19,7 +19,7 @@
 
 // Forward declarations
 static void page_manager_update(Widget* widget, double delta_time);
-static void page_manager_render(Widget* widget, SDL_Renderer* renderer);
+static PkError page_manager_render(Widget* widget, SDL_Renderer* renderer);
 static void page_manager_handle_event(Widget* widget, const SDL_Event* event);
 static void page_manager_destroy(Widget* widget);
 
@@ -291,7 +291,11 @@ static void page_manager_update(Widget* widget, double delta_time) {
 }
 
 // Render function
-static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
+static PkError page_manager_render(Widget* widget, SDL_Renderer* renderer) {
+    PK_CHECK_ERROR_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                               "widget is NULL in page_manager_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in page_manager_render");
     PageManagerWidget* manager = (PageManagerWidget*)widget;
     
     log_debug("PAGE MANAGER RENDER: %d pages, current=%d, bounds=(%d,%d,%dx%d)", 
@@ -320,7 +324,11 @@ static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
                 if (page_right > viewport_left && page_x < viewport_right) {
                     log_debug("    Page %d is visible, calling render", i);
                     if (manager->pages[i]->render) {
-                        manager->pages[i]->render(manager->pages[i], renderer);
+                        PkError err = manager->pages[i]->render(manager->pages[i], renderer);
+                        if (err != PK_OK) {
+                            SDL_RenderSetClipRect(renderer, NULL);
+                            return err;
+                        }
                     }
                 } else {
                     log_debug("    Page %d NOT visible: page_x=%d, check failed", i, page_x);
@@ -357,7 +365,13 @@ static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, alpha);
             
             SDL_Rect indicator = {x, y, indicator_size, indicator_size};
-            SDL_RenderFillRect(renderer, &indicator);
+            if (SDL_RenderFillRect(renderer, &indicator) < 0) {
+                pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                               "Failed to draw page indicator: %s",
+                                               SDL_GetError());
+                SDL_RenderSetClipRect(renderer, NULL);
+                return PK_ERROR_RENDER_FAILED;
+            }
         }
         
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -365,6 +379,8 @@ static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
     
     // Clear clipping
     SDL_RenderSetClipRect(renderer, NULL);
+    
+    return PK_OK;
 }
 
 // Handle events

@@ -104,6 +104,10 @@ const char* pk_error_string(PkError error) {
         case PK_ERROR_EVENT_HANDLER_FAILED:
             return "Event handler failed";
             
+        /* Rendering errors */
+        case PK_ERROR_RENDER_FAILED:
+            return "Render operation failed";
+            
         default:
             return "Unknown error";
     }

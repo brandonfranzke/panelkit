@@ -5,7 +5,7 @@
 #include "core/logger.h"
 
 // Forward declarations for virtual functions
-static void page_widget_render(Widget* widget, SDL_Renderer* renderer);
+static PkError page_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void page_widget_handle_event(Widget* widget, const SDL_Event* event);
 static void page_widget_layout(Widget* widget);
 static void page_widget_destroy(Widget* widget);
@@ -236,11 +236,12 @@ Widget* page_widget_create_content_container(PageWidget* page) {
     return container;
 }
 
-static void page_widget_render(Widget* widget, SDL_Renderer* renderer) {
+static PkError page_widget_render(Widget* widget, SDL_Renderer* renderer) {
     PageWidget* page = (PageWidget*)widget;
-    if (!page || !renderer) {
-        return;
-    }
+    PK_CHECK_ERROR_WITH_CONTEXT(page != NULL, PK_ERROR_NULL_PARAM,
+                               "page widget is NULL in page_widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in page_widget_render");
     
     log_debug("PAGE RENDER: %s at (%d,%d) size %dx%d bg(%d,%d,%d) children=%zu", 
               widget->id, widget->bounds.x, widget->bounds.y,
@@ -254,7 +255,12 @@ static void page_widget_render(Widget* widget, SDL_Renderer* renderer) {
                           page->background_color.g,
                           page->background_color.b,
                           page->background_color.a);
-    SDL_RenderFillRect(renderer, &widget->bounds);
+    if (SDL_RenderFillRect(renderer, &widget->bounds) < 0) {
+        pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                       "Failed to fill page background: %s",
+                                       SDL_GetError());
+        return PK_ERROR_RENDER_FAILED;
+    }
     
     // Draw title bar
     SDL_Rect title_bar = {
@@ -308,7 +314,15 @@ static void page_widget_render(Widget* widget, SDL_Renderer* renderer) {
     
     // Render children
     for (size_t i = 0; i < widget->child_count; i++) {
-        widget_render(widget->children[i], renderer);
+        PkError err = widget_render(widget->children[i], renderer);
+        if (err != PK_OK) {
+            // Restore original positions before returning
+            for (size_t j = 0; j < widget->child_count; j++) {
+                widget->children[j]->bounds.y = saved_y[j];
+            }
+            SDL_RenderSetClipRect(renderer, NULL);
+            return err;
+        }
     }
     
     // Restore original positions
@@ -345,8 +359,15 @@ static void page_widget_render(Widget* widget, SDL_Renderer* renderer) {
         };
         
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 200);
-        SDL_RenderFillRect(renderer, &scroll_thumb);
+        if (SDL_RenderFillRect(renderer, &scroll_thumb) < 0) {
+            pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                           "Failed to draw scroll thumb: %s",
+                                           SDL_GetError());
+            return PK_ERROR_RENDER_FAILED;
+        }
     }
+    
+    return PK_OK;
 }
 
 static void page_widget_handle_event(Widget* widget, const SDL_Event* event) {

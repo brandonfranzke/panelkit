@@ -144,6 +144,41 @@ Started: 2024-12-30
 
 Due to scope, moving to Phase 2 with current foundation.
 
-## Phase 2: Error Propagation Patterns (TODO)
+## Phase 2: Error Propagation Patterns
+
+Started: 2024-12-30
+
+### Goals
+1. Implement error bubbling up call stacks
+2. Add PK_PROPAGATE_ERROR usage throughout
+3. Ensure errors don't get lost in wrapper functions
+4. Convert key void functions to return PkError
+
+### Functions to Convert to PkError Return
+- [x] widget_connect_systems() - Can fail on event subscription (DONE)
+- [x] widget_render() - Can fail on SDL operations (DONE)
+- [x] widget_manager_render() - Rendering can fail (DONE)
+- [ ] widget_handle_event() - Event handlers can fail
+- [ ] widget_update() - Update operations can fail
+- [ ] widget_manager_handle_event() - Event handling can fail
+- [ ] widget_manager_update() - Updates can fail
+
+### Completed in Phase 2
+1. **Added new error code**: PK_ERROR_RENDER_FAILED
+2. **Added new macro**: PK_CHECK_ERROR_WITH_CONTEXT for functions returning PkError
+3. **Converted render functions**:
+   - widget_render() and widget_default_render()
+   - widget_manager_render()
+   - All widget type render functions (button, text, time, weather, data_display, page, page_manager)
+4. **Updated all callers** to handle new error returns
+5. **Added SDL error checking** with context in all render operations
+
+### Error Propagation Patterns to Implement
+1. **Direct Propagation**: Simple pass-through of errors
+2. **Context Addition**: Add context before propagating
+3. **Error Translation**: Convert low-level to high-level errors
+4. **Fallback Handling**: Try alternatives before failing
+
+### Files to Update
 ## Phase 3: Recovery Strategies (TODO)
 ## Phase 4: User-Visible Error Handling (TODO)

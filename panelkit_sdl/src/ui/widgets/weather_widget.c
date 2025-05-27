@@ -9,7 +9,7 @@
 #include "core/logger.h"
 
 // Forward declarations for virtual functions
-static void weather_widget_render(Widget* widget, SDL_Renderer* renderer);
+static PkError weather_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void weather_widget_handle_event(Widget* widget, const SDL_Event* event);
 static void weather_widget_handle_data_event(Widget* widget, const char* event_name,
                                            const void* data, size_t data_size);
@@ -131,14 +131,18 @@ void weather_widget_request_update(WeatherWidget* widget) {
     log_debug("Weather widget requested update for '%s'", request.location);
 }
 
-static void weather_widget_render(Widget* widget, SDL_Renderer* renderer) {
+static PkError weather_widget_render(Widget* widget, SDL_Renderer* renderer) {
     WeatherWidget* weather = (WeatherWidget*)widget;
-    if (!weather || !renderer) {
-        return;
-    }
+    PK_CHECK_ERROR_WITH_CONTEXT(weather != NULL, PK_ERROR_NULL_PARAM,
+                               "weather widget is NULL in weather_widget_render");
+    PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL in weather_widget_render");
     
     // Call base render for background and border
-    widget_default_render(widget, renderer);
+    PkError err = widget_default_render(widget, renderer);
+    if (err != PK_OK) {
+        return err;
+    }
     
     // Draw content area
     SDL_Rect content = {
@@ -156,8 +160,13 @@ static void weather_widget_render(Widget* widget, SDL_Renderer* renderer) {
             content.y + content.h / 2 - 10,
             60, 20
         };
-        SDL_RenderDrawRect(renderer, &loading_rect);
-        return;
+        if (SDL_RenderDrawRect(renderer, &loading_rect) < 0) {
+            pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                           "Failed to draw loading rect: %s",
+                                           SDL_GetError());
+            return PK_ERROR_RENDER_FAILED;
+        }
+        return PK_OK;
     }
     
     // Draw weather data with simple rectangles to indicate content areas
@@ -239,7 +248,14 @@ static void weather_widget_render(Widget* widget, SDL_Renderer* renderer) {
         widget->bounds.y + 5,
         10, 10
     };
-    SDL_RenderFillRect(renderer, &update_indicator);
+    if (SDL_RenderFillRect(renderer, &update_indicator) < 0) {
+        pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                       "Failed to draw update indicator: %s",
+                                       SDL_GetError());
+        return PK_ERROR_RENDER_FAILED;
+    }
+    
+    return PK_OK;
 }
 
 static void weather_widget_handle_event(Widget* widget, const SDL_Event* event) {
