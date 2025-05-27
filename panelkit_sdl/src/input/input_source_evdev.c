@@ -43,7 +43,7 @@ typedef struct {
 } TouchPoint;
 
 /* Private implementation data */
-typedef struct {
+typedef struct EvdevData {
     /* Device handling */
     int fd;                          /* Device file descriptor */
     char device_path[256];           /* Device path */
