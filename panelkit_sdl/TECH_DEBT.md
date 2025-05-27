@@ -116,6 +116,88 @@
 
 ---
 
+## Previous Implementation Attempts (For Reference)
+
+### Button Color Syncing
+**Problem**: Buttons in widget mode were all gray instead of having their proper colors (blue, green, yellow, etc.)
+**Attempted Solution**: After creating shadow widgets, sync button colors from legacy Page data:
+```c
+// In app.c after widget_integration_create_shadow_widgets()
+for (int page = 0; page < 2; page++) {
+    Page* page_data = pages_get(page);
+    if (page_data) {
+        for (int i = 0; i < page_data->button_count; i++) {
+            // Sync button text
+            widget_integration_sync_button_state(widget_integration, page, i, 
+                                               page_data->button_texts[i], true);
+            
+            // Sync button colors
+            Widget* button_widget = widget_integration_get_button_widget(widget_integration, page, i);
+            if (button_widget && button_widget->type == WIDGET_TYPE_BUTTON) {
+                ButtonWidget* btn = (ButtonWidget*)button_widget;
+                SDL_Color color = page_data->button_colors[i];
+                button_widget_set_colors(btn, color, color, color, color);
+            }
+        }
+    }
+}
+```
+**Note**: This worked but is a band-aid. Better to pass colors during widget creation.
+
+### Button Layout Fix
+**Problem**: Buttons were laid out in a 3x3 grid instead of vertical stacking
+**Attempted Solution**: In widget_integration.c, change button positioning:
+```c
+// Instead of 3x3 grid:
+int row = i / 3;
+int col = i % 3;
+int button_width = integration->screen_width / 3 - 20;
+
+// Use vertical stacking:
+int BUTTON_WIDTH = integration->screen_width / 2;
+int BUTTON_HEIGHT = (integration->screen_height * 2) / 3;
+int BUTTON_PADDING = 20;
+int x = BUTTON_PADDING;
+int y = BUTTON_PADDING + i * (BUTTON_HEIGHT + BUTTON_PADDING) + 90;
+```
+**Note**: This matches legacy layout but hardcodes the layout pattern.
+
+### Page Visibility Fix
+**Problem**: Both pages were rendering at once (page overlap)
+**Attempted Solution**: Fix visibility check in page_manager_widget.c:
+```c
+// Old broken check:
+if (page_x + widget->bounds.w >= widget->bounds.x && 
+    page_x <= widget->bounds.x + widget->bounds.w)
+
+// Fixed check:
+int page_right = page_x + manager->pages[i]->bounds.w;
+int viewport_left = widget->bounds.x;
+int viewport_right = widget->bounds.x + widget->bounds.w;
+if (page_right > viewport_left && page_x < viewport_right)
+```
+**Note**: The original check was wrong - it would show page 1 even when completely off-screen.
+
+### PageWidget Usage
+**Problem**: Pages were using generic containers instead of PageWidget
+**Attempted Solution**: Change widget_integration.c to use PageWidget:
+```c
+// Instead of:
+Widget* page = widget_create(page_id, WIDGET_TYPE_CONTAINER);
+
+// Use:
+Widget* page = (Widget*)page_widget_create(page_id, page_title);
+```
+**Note**: PageWidget has built-in title and scroll support but still uses placeholder rendering.
+
+### Key Insights from Attempts
+1. **Text Rendering**: The fundamental issue is that widgets (buttons, pages) draw placeholder rectangles instead of actual text
+2. **Font Access**: Widgets use `extern TTF_Font*` which is poor design
+3. **Composition**: Time and data widgets successfully use text widgets as children - buttons should too
+4. **State Sync**: Too much manual syncing between legacy and widget systems
+
+---
+
 ## Priority Order for BREAKTHROUGH Development
 
 ### Phase 1: Make It Render Correctly (Before Testing)
