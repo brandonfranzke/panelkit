@@ -5,6 +5,7 @@
 
 #include "display_backend.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -89,6 +90,8 @@ static DisplayBackendType detect_best_backend(void) {
 DisplayBackend* display_backend_create(const DisplayConfig* config) {
     if (!config) {
         log_error("Display backend creation failed: NULL config");
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "display_backend_create: config is NULL");
         return NULL;
     }
     
@@ -103,6 +106,9 @@ DisplayBackend* display_backend_create(const DisplayConfig* config) {
     if (!display_backend_available(type)) {
         log_error("Display backend %s is not available on this platform",
                   display_backend_type_name(type));
+        pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+            "display_backend_create: Backend %s not available on this platform",
+            display_backend_type_name(type));
         return NULL;
     }
     
@@ -120,6 +126,8 @@ DisplayBackend* display_backend_create(const DisplayConfig* config) {
             
         default:
             log_error("Unknown display backend type: %d", type);
+            pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                "display_backend_create: Unknown backend type %d", type);
             return NULL;
     }
     
@@ -128,6 +136,8 @@ DisplayBackend* display_backend_create(const DisplayConfig* config) {
                  backend->name,
                  backend->actual_width,
                  backend->actual_height);
+    } else {
+        /* Error context already set by backend-specific create function */
     }
     
     return backend;

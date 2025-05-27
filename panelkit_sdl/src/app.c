@@ -12,6 +12,7 @@
 // Core includes
 #include "core/logger.h"
 #include "core/build_info.h"
+#include "core/error.h"
 #include "display/display_backend.h"
 #include "input/input_handler.h"
 #include "input/input_debug.h"

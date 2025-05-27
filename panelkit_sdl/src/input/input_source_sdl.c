@@ -9,6 +9,7 @@
 
 #include "input_handler.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 
 /* Private implementation data */
@@ -25,6 +26,8 @@ static bool sdl_initialize(InputSource* source, const InputConfig* config) {
     /* Check SDL video subsystem is initialized */
     if (!SDL_WasInit(SDL_INIT_VIDEO)) {
         log_error("SDL video subsystem not initialized");
+        pk_set_last_error_with_context(PK_ERROR_NOT_INITIALIZED,
+            "sdl_initialize: SDL video subsystem not initialized");
         return false;
     }
     
@@ -92,11 +95,17 @@ static void sdl_cleanup(InputSource* source) {
 InputSource* input_source_sdl_native_create(void) {
     InputSource* source = calloc(1, sizeof(InputSource));
     if (!source) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "input_source_sdl_native_create: Failed to allocate %zu bytes for source",
+            sizeof(InputSource));
         return NULL;
     }
     
     SDLNativeData* data = calloc(1, sizeof(SDLNativeData));
     if (!data) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "input_source_sdl_native_create: Failed to allocate %zu bytes for data",
+            sizeof(SDLNativeData));
         free(source);
         return NULL;
     }

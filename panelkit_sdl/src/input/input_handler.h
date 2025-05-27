@@ -49,6 +49,8 @@ typedef struct {
     const char* device_path;     /* For LINUX_EVDEV: specific device path (NULL for auto-detect) */
     bool auto_detect_devices;    /* Auto-detect input devices */
     bool enable_mouse_emulation; /* Emulate mouse from touch events */
+    int reconnect_attempts;      /* Number of reconnection attempts on device loss (0 = disabled) */
+    int reconnect_delay_ms;      /* Delay between reconnection attempts in milliseconds */
 } InputConfig;
 
 /* Forward declarations for implementation types */

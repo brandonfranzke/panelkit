@@ -5,6 +5,7 @@
 
 #include "display_backend.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -53,6 +54,9 @@ static bool sdl_backend_set_vsync(DisplayBackend* backend, bool enable) {
     (void)enable; /* Not used - vsync is set at creation time */
     
     if (!backend || !backend->renderer) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "sdl_backend_set_vsync: backend=%p, renderer=%p",
+            (void*)backend, backend ? (void*)backend->renderer : NULL);
         return false;
     }
     
@@ -64,12 +68,18 @@ static bool sdl_backend_set_vsync(DisplayBackend* backend, bool enable) {
 /* Set fullscreen */
 static bool sdl_backend_set_fullscreen(DisplayBackend* backend, bool enable) {
     if (!backend || !backend->window) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "sdl_backend_set_fullscreen: backend=%p, window=%p",
+            (void*)backend, backend ? (void*)backend->window : NULL);
         return false;
     }
     
     Uint32 flags = enable ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
     if (SDL_SetWindowFullscreen(backend->window, flags) != 0) {
         LOG_SDL_ERROR("Failed to set fullscreen");
+        pk_set_last_error_with_context(PK_ERROR_SDL,
+            "sdl_backend_set_fullscreen: SDL_SetWindowFullscreen failed: %s",
+            SDL_GetError());
         return false;
     }
     
@@ -83,6 +93,9 @@ DisplayBackend* display_backend_sdl_create(const DisplayConfig* config) {
     DisplayBackend* backend = calloc(1, sizeof(DisplayBackend));
     if (!backend) {
         log_error("Failed to allocate display backend");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "display_backend_sdl_create: Failed to allocate %zu bytes",
+            sizeof(DisplayBackend));
         return NULL;
     }
     
@@ -90,6 +103,9 @@ DisplayBackend* display_backend_sdl_create(const DisplayConfig* config) {
     SDLBackendImpl* impl = calloc(1, sizeof(SDLBackendImpl));
     if (!impl) {
         log_error("Failed to allocate SDL backend implementation");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "display_backend_sdl_create: Failed to allocate %zu bytes for impl",
+            sizeof(SDLBackendImpl));
         free(backend);
         return NULL;
     }
@@ -107,6 +123,8 @@ DisplayBackend* display_backend_sdl_create(const DisplayConfig* config) {
     if (!SDL_WasInit(SDL_INIT_VIDEO)) {
         if (SDL_Init(SDL_INIT_VIDEO) < 0) {
             LOG_SDL_ERROR("Failed to initialize SDL");
+            pk_set_last_error_with_context(PK_ERROR_SDL,
+                "display_backend_sdl_create: SDL_Init failed: %s", SDL_GetError());
             free(impl);
             free(backend);
             return NULL;
@@ -132,6 +150,9 @@ DisplayBackend* display_backend_sdl_create(const DisplayConfig* config) {
     
     if (!backend->window) {
         LOG_SDL_ERROR("Failed to create window");
+        pk_set_last_error_with_context(PK_ERROR_SDL,
+            "display_backend_sdl_create: SDL_CreateWindow failed (%dx%d): %s",
+            config->width, config->height, SDL_GetError());
         sdl_backend_cleanup(backend);
         free(backend);
         return NULL;
@@ -146,6 +167,9 @@ DisplayBackend* display_backend_sdl_create(const DisplayConfig* config) {
     backend->renderer = SDL_CreateRenderer(backend->window, -1, renderer_flags);
     if (!backend->renderer) {
         LOG_SDL_ERROR("Failed to create renderer");
+        pk_set_last_error_with_context(PK_ERROR_SDL,
+            "display_backend_sdl_create: SDL_CreateRenderer failed: %s",
+            SDL_GetError());
         sdl_backend_cleanup(backend);
         free(backend);
         return NULL;

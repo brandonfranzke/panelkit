@@ -57,6 +57,16 @@ typedef enum {
     
     /* Rendering errors */
     PK_ERROR_RENDER_FAILED = -70,
+    
+    /* Input system errors */
+    PK_ERROR_INPUT_SOURCE_FAILED = -80,
+    PK_ERROR_INPUT_DEVICE_NOT_FOUND = -81,
+    PK_ERROR_INPUT_INIT_FAILED = -82,
+    
+    /* Display system errors */
+    PK_ERROR_DISPLAY_INIT_FAILED = -90,
+    PK_ERROR_DISPLAY_MODE_FAILED = -91,
+    PK_ERROR_DISPLAY_DISCONNECTED = -92,
 } PkError;
 
 /**

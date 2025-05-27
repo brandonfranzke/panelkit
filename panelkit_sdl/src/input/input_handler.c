@@ -8,6 +8,7 @@
 
 #include "input_handler.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -19,12 +20,16 @@ static pthread_mutex_t event_mutex = PTHREAD_MUTEX_INITIALIZER;
 InputHandler* input_handler_create(const InputConfig* config) {
     if (!config) {
         log_error("Input handler creation failed: NULL config");
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM, 
+            "input_handler_create: config is NULL");
         return NULL;
     }
     
     InputHandler* handler = calloc(1, sizeof(InputHandler));
     if (!handler) {
         log_error("Failed to allocate input handler");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "input_handler_create: Failed to allocate %zu bytes", sizeof(InputHandler));
         return NULL;
     }
     
@@ -53,12 +58,16 @@ InputHandler* input_handler_create(const InputConfig* config) {
             
         default:
             log_error("Unknown input source type: %d", config->source_type);
+            pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                "input_handler_create: Unknown source type %d", config->source_type);
             free(handler);
             return NULL;
     }
     
     if (!handler->source) {
         log_error("Failed to create input source");
+        pk_set_last_error_with_context(PK_ERROR_INPUT_SOURCE_FAILED,
+            "input_handler_create: Failed to create source type %d", config->source_type);
         free(handler);
         return NULL;
     }
@@ -66,6 +75,9 @@ InputHandler* input_handler_create(const InputConfig* config) {
     /* Initialize the source */
     if (!handler->source->initialize(handler->source, config)) {
         log_error("Failed to initialize input source");
+        pk_set_last_error_with_context(PK_ERROR_INPUT_INIT_FAILED,
+            "input_handler_create: Source '%s' initialization failed", 
+            handler->source->name ? handler->source->name : "unknown");
         handler->source->cleanup(handler->source);
         free(handler->source);
         free(handler);
@@ -79,6 +91,9 @@ InputHandler* input_handler_create(const InputConfig* config) {
 /* Start input processing */
 bool input_handler_start(InputHandler* handler) {
     if (!handler || !handler->source) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "input_handler_start: handler=%p, source=%p", 
+            (void*)handler, handler ? (void*)handler->source : NULL);
         return false;
     }
     
@@ -90,6 +105,9 @@ bool input_handler_start(InputHandler* handler) {
     /* Start the input source */
     if (!handler->source->start(handler->source, handler)) {
         log_error("Failed to start input source");
+        pk_set_last_error_with_context(PK_ERROR_INPUT_SOURCE_FAILED,
+            "input_handler_start: Source '%s' failed to start",
+            handler->source->name ? handler->source->name : "unknown");
         return false;
     }
     
@@ -116,6 +134,9 @@ void input_handler_stop(InputHandler* handler) {
 /* Get input capabilities */
 bool input_handler_get_capabilities(InputHandler* handler, InputCapabilities* caps) {
     if (!handler || !handler->source || !caps) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "input_handler_get_capabilities: handler=%p, source=%p, caps=%p",
+            (void*)handler, handler ? (void*)handler->source : NULL, (void*)caps);
         return false;
     }
     
@@ -134,6 +155,9 @@ const struct InputHandler_stats* input_handler_get_stats(InputHandler* handler) 
 /* Push SDL event (thread-safe) */
 bool input_handler_push_event(InputHandler* handler, SDL_Event* event) {
     if (!handler || !event) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "input_handler_push_event: handler=%p, event=%p",
+            (void*)handler, (void*)event);
         return false;
     }
     
@@ -144,6 +168,8 @@ bool input_handler_push_event(InputHandler* handler, SDL_Event* event) {
     
     if (result < 0) {
         log_error("Failed to push SDL event: %s", SDL_GetError());
+        pk_set_last_error_with_context(PK_ERROR_SDL,
+            "input_handler_push_event: SDL_PushEvent failed: %s", SDL_GetError());
         return false;
     }
     

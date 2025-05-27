@@ -7,6 +7,8 @@
  */
 
 #include "input_handler.h"
+#include "../core/error.h"
+#include "../core/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -206,6 +208,8 @@ static bool mock_initialize(InputSource* source, const InputConfig* config) {
     MockData* data = calloc(1, sizeof(MockData));
     if (!data) {
         SDL_LogError(SDL_LOG_CATEGORY_INPUT, "Failed to allocate mock data");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "mock_initialize: Failed to allocate %zu bytes", sizeof(MockData));
         return false;
     }
     
@@ -217,11 +221,16 @@ static bool mock_initialize(InputSource* source, const InputConfig* config) {
     data->queue_capacity = 100;
     data->event_queue = malloc(sizeof(SDL_Event) * data->queue_capacity);
     if (!data->event_queue) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "mock_initialize: Failed to allocate event queue (%zu bytes)",
+            sizeof(SDL_Event) * data->queue_capacity);
         free(data);
         return false;
     }
     
     if (pthread_mutex_init(&data->queue_mutex, NULL) != 0) {
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "mock_initialize: pthread_mutex_init failed");
         free(data->event_queue);
         free(data);
         return false;
@@ -328,7 +337,12 @@ void input_mock_configure_pattern(InputSource* source, int delay_ms, int duratio
 /* Create mock input source */
 InputSource* input_source_mock_create(void) {
     InputSource* source = calloc(1, sizeof(InputSource));
-    if (!source) return NULL;
+    if (!source) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "input_source_mock_create: Failed to allocate %zu bytes",
+            sizeof(InputSource));
+        return NULL;
+    }
     
     source->type = INPUT_SOURCE_MOCK;
     source->initialize = mock_initialize;

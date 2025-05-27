@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 // Forward declarations for virtual functions
 static PkError page_widget_render(Widget* widget, SDL_Renderer* renderer);
@@ -14,6 +15,8 @@ PageWidget* page_widget_create(const char* id, const char* title) {
     PageWidget* page = calloc(1, sizeof(PageWidget));
     if (!page) {
         log_error("Failed to allocate page widget");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "page_widget_create: Failed to allocate %zu bytes", sizeof(PageWidget));
         return NULL;
     }
     
@@ -32,6 +35,9 @@ PageWidget* page_widget_create(const char* id, const char* title) {
     base->child_capacity = 4;
     base->children = calloc(base->child_capacity, sizeof(Widget*));
     if (!base->children) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "page_widget_create: Failed to allocate children array (%zu bytes)",
+            base->child_capacity * sizeof(Widget*));
         free(page);
         return NULL;
     }
@@ -39,6 +45,9 @@ PageWidget* page_widget_create(const char* id, const char* title) {
     base->event_capacity = 4;
     base->subscribed_events = calloc(base->event_capacity, sizeof(char*));
     if (!base->subscribed_events) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "page_widget_create: Failed to allocate event array (%zu bytes)",
+            base->event_capacity * sizeof(char*));
         free(base->children);
         free(page);
         return NULL;
@@ -64,6 +73,8 @@ PageWidget* page_widget_create(const char* id, const char* title) {
 
 void page_widget_set_title(PageWidget* page, const char* title) {
     if (!page || !title) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "page_widget_set_title: page=%p, title=%p", (void*)page, (void*)title);
         return;
     }
     
@@ -73,6 +84,8 @@ void page_widget_set_title(PageWidget* page, const char* title) {
 
 void page_widget_set_colors(PageWidget* page, SDL_Color background, SDL_Color title_color) {
     if (!page) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "page_widget_set_colors: page is NULL");
         return;
     }
     
@@ -84,6 +97,8 @@ void page_widget_set_colors(PageWidget* page, SDL_Color background, SDL_Color ti
 
 void page_widget_scroll(PageWidget* page, int delta) {
     if (!page) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "page_widget_scroll: page is NULL");
         return;
     }
     

@@ -10,6 +10,7 @@
 
 #include "display_backend.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 
 #ifdef __linux__
 
@@ -152,6 +153,9 @@ static int setup_drm_display(SDLDRMBackendImpl* impl) {
     
     if (impl->drm_fd < 0) {
         LOG_ERRNO("Failed to open any DRM device");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "setup_drm_display: Could not open /dev/dri/card0 or card1: %s",
+            strerror(errno));
         return -1;
     }
     
@@ -159,6 +163,8 @@ static int setup_drm_display(SDLDRMBackendImpl* impl) {
     drmModeRes* res = drmModeGetResources(impl->drm_fd);
     if (!res) {
         log_error("Failed to get DRM resources");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "setup_drm_display: drmModeGetResources failed");
         return -1;
     }
     
@@ -179,6 +185,9 @@ static int setup_drm_display(SDLDRMBackendImpl* impl) {
     
     if (!impl->connector) {
         log_error("No connected display found");
+        pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+            "setup_drm_display: No connected display found among %d connectors",
+            res->count_connectors);
         drmModeFreeResources(res);
         return -1;
     }
@@ -292,6 +301,9 @@ DisplayBackend* display_backend_sdl_drm_create(const DisplayConfig* config) {
     DisplayBackend* backend = calloc(1, sizeof(DisplayBackend));
     if (!backend) {
         log_error("Failed to allocate display backend");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "display_backend_sdl_drm_create: Failed to allocate %zu bytes",
+            sizeof(DisplayBackend));
         return NULL;
     }
     
@@ -299,6 +311,9 @@ DisplayBackend* display_backend_sdl_drm_create(const DisplayConfig* config) {
     SDLDRMBackendImpl* impl = calloc(1, sizeof(SDLDRMBackendImpl));
     if (!impl) {
         log_error("Failed to allocate SDL+DRM backend implementation");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "display_backend_sdl_drm_create: Failed to allocate %zu bytes for impl",
+            sizeof(SDLDRMBackendImpl));
         free(backend);
         return NULL;
     }
@@ -312,6 +327,7 @@ DisplayBackend* display_backend_sdl_drm_create(const DisplayConfig* config) {
     
     /* Setup DRM first to get actual display resolution */
     if (setup_drm_display(impl) < 0) {
+        /* Error context already set by setup_drm_display */
         free(impl);
         free(backend);
         return NULL;

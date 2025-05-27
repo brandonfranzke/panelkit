@@ -9,6 +9,7 @@
 
 #include "input_handler.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -96,16 +97,21 @@ static bool evdev_initialize(InputSource* source, const InputConfig* config) {
         /* Auto-detect touch device */
         if (!find_touch_device(data->device_path, sizeof(data->device_path))) {
             log_error("No touch device found");
+            pk_set_last_error_with_context(PK_ERROR_INPUT_DEVICE_NOT_FOUND,
+                "evdev_initialize: No touch device found in /dev/input/");
             return false;
         }
         log_info("Auto-detected touch device: %s", data->device_path);
     } else {
         log_error("No device path specified and auto-detect disabled");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_CONFIG,
+            "evdev_initialize: No device path and auto_detect=false");
         return false;
     }
     
     /* Open the device */
     if (!open_device(data, data->device_path)) {
+        /* Error context already set by open_device */
         return false;
     }
     
@@ -125,6 +131,8 @@ static bool evdev_start(InputSource* source, InputHandler* handler) {
     /* Create reading thread */
     if (pthread_create(&data->read_thread, NULL, evdev_read_thread, source) != 0) {
         log_error("Failed to create evdev read thread: %s", strerror(errno));
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "evdev_start: pthread_create failed: %s", strerror(errno));
         data->thread_running = false;
         return false;
     }
@@ -203,6 +211,17 @@ static void* evdev_read_thread(void* arg) {
                 continue;
             } else if (errno == ENODEV) {
                 log_error("Input device disconnected");
+                pk_set_last_error_with_context(PK_ERROR_INPUT_DEVICE_NOT_FOUND,
+                    "evdev_read_thread: Device %s disconnected", data->device_path);
+                
+                /* Notify handler of device disconnection */
+                if (data->handler) {
+                    SDL_Event event;
+                    SDL_zero(event);
+                    event.type = SDL_USEREVENT;
+                    event.user.code = 0x1001; /* Custom code for device disconnect */
+                    input_handler_push_event(data->handler, &event);
+                }
                 break;
             } else {
                 log_error("Error reading input device: %s", strerror(errno));
@@ -486,6 +505,8 @@ static bool open_device(EvdevData* data, const char* path) {
     data->fd = open(path, O_RDONLY | O_NONBLOCK);
     if (data->fd < 0) {
         log_error("Failed to open input device %s: %s", path, strerror(errno));
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "open_device: Failed to open %s: %s", path, strerror(errno));
         return false;
     }
     
@@ -498,6 +519,8 @@ static bool open_device(EvdevData* data, const char* path) {
     if (ioctl(data->fd, EVIOCGABS(ABS_MT_POSITION_X), &data->abs_x) < 0 ||
         ioctl(data->fd, EVIOCGABS(ABS_MT_POSITION_Y), &data->abs_y) < 0) {
         log_error("Failed to get touch axis info");
+        pk_set_last_error_with_context(PK_ERROR_INPUT_DEVICE_NOT_FOUND,
+            "open_device: Device %s does not support multitouch", path);
         close(data->fd);
         data->fd = -1;
         return false;
@@ -528,11 +551,17 @@ static void close_device(EvdevData* data) {
 InputSource* input_source_linux_evdev_create(void) {
     InputSource* source = calloc(1, sizeof(InputSource));
     if (!source) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "input_source_linux_evdev_create: Failed to allocate %zu bytes for source",
+            sizeof(InputSource));
         return NULL;
     }
     
     EvdevData* data = calloc(1, sizeof(EvdevData));
     if (!data) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "input_source_linux_evdev_create: Failed to allocate %zu bytes for data",
+            sizeof(EvdevData));
         free(source);
         return NULL;
     }
