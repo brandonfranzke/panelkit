@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/memory_patterns.h"  // Memory ownership patterns
 
 // Forward declarations for virtual functions
 static void button_widget_render(Widget* widget, SDL_Renderer* renderer);
@@ -102,6 +103,17 @@ void button_widget_set_click_callback(ButtonWidget* button,
     button->user_data = user_data;
 }
 
+/**
+ * Set event to publish when button is clicked
+ * @param button Button widget (borrows reference)
+ * @param event_name Event name to publish (copies string)
+ * @param data Event data to publish (copies data)
+ * @param data_size Size of event data
+ * 
+ * Memory: Pattern 3 - Callee Owns Copy
+ * The button makes copies of both event_name and data, which it
+ * owns and will free in button_widget_destroy()
+ */
 void button_widget_set_publish_event(ButtonWidget* button,
                                    const char* event_name,
                                    void* data,
@@ -121,7 +133,7 @@ void button_widget_set_publish_event(ButtonWidget* button,
     }
     
     if (event_name) {
-        button->publish_event = strdup(event_name);
+        button->publish_event = PK_STRDUP(event_name);
         
         if (data && data_size > 0) {
             button->publish_data = malloc(data_size);
@@ -264,19 +276,20 @@ static void button_widget_handle_event(Widget* widget, const SDL_Event* event) {
     }
 }
 
+/**
+ * Destroy button widget and free owned memory
+ * Memory: Pattern 1 - Parent Owns Child
+ * Frees the event name and data that were copied in set_publish_event
+ */
 static void button_widget_destroy(Widget* widget) {
     ButtonWidget* button = (ButtonWidget*)widget;
     if (!button) {
         return;
     }
     
-    // Free event data
-    if (button->publish_event) {
-        free(button->publish_event);
-    }
-    if (button->publish_data) {
-        free(button->publish_data);
-    }
+    // Free owned event data (Pattern 3 - we own the copies)
+    PK_FREE(button->publish_event);
+    PK_FREE(button->publish_data);
     
-    // Base cleanup handles the rest
+    // Base cleanup handles the rest (children, subscriptions, etc.)
 }

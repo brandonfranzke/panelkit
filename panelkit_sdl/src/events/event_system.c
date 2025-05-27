@@ -16,6 +16,7 @@ typedef struct {
     char event_name[MAX_EVENT_NAME_LENGTH];
     event_handler_func handler;
     void* context;
+    bool owns_context;  // True if context should be freed on unsubscribe
 } Subscription;
 
 // Event data for deferred/queued events (future enhancement)
@@ -75,7 +76,12 @@ void event_system_destroy(EventSystem* system) {
     
     pthread_rwlock_wrlock(&system->lock);
     
-    // No need to free individual subscriptions - they don't own any memory
+    // Free any owned contexts (from typed event adapters)
+    for (size_t i = 0; i < system->num_subscriptions; i++) {
+        if (system->subscriptions[i].owns_context && system->subscriptions[i].context) {
+            free(system->subscriptions[i].context);
+        }
+    }
     free(system->subscriptions);
     
     pthread_rwlock_unlock(&system->lock);
@@ -86,10 +92,12 @@ void event_system_destroy(EventSystem* system) {
     free(system);
 }
 
-bool event_subscribe(EventSystem* system, 
-                     const char* event_name,
-                     event_handler_func handler, 
-                     void* context) {
+// Internal function that allows specifying context ownership
+static bool event_subscribe_internal(EventSystem* system, 
+                                   const char* event_name,
+                                   event_handler_func handler, 
+                                   void* context,
+                                   bool owns_context) {
     if (!system || !event_name || !handler || 
         strlen(event_name) >= MAX_EVENT_NAME_LENGTH) {
         log_error("Invalid parameters for event subscription");
@@ -118,14 +126,24 @@ bool event_subscribe(EventSystem* system,
     sub->event_name[MAX_EVENT_NAME_LENGTH - 1] = '\0';
     sub->handler = handler;
     sub->context = context;
+    sub->owns_context = owns_context;
     
     system->num_subscriptions++;
     
     pthread_rwlock_unlock(&system->lock);
     
-    log_debug("Subscribed handler %p to event '%s' (total subs: %zu)", 
-              (void*)handler, event_name, system->num_subscriptions);
+    log_debug("Subscribed handler %p to event '%s' (total subs: %zu, owns_context: %s)", 
+              (void*)handler, event_name, system->num_subscriptions,
+              owns_context ? "true" : "false");
     return true;
+}
+
+bool event_subscribe(EventSystem* system, 
+                     const char* event_name,
+                     event_handler_func handler, 
+                     void* context) {
+    // Regular subscriptions don't own their context (Pattern 4: Borrowed Reference)
+    return event_subscribe_internal(system, event_name, handler, context, false);
 }
 
 bool event_unsubscribe(EventSystem* system, 
@@ -141,6 +159,11 @@ bool event_unsubscribe(EventSystem* system,
     for (size_t i = 0; i < system->num_subscriptions; i++) {
         Subscription* sub = &system->subscriptions[i];
         if (strcmp(sub->event_name, event_name) == 0 && sub->handler == handler) {
+            // Free owned context if needed (Pattern 1: Parent Owns Child)
+            if (sub->owns_context && sub->context) {
+                free(sub->context);
+            }
+            
             // Move last subscription to this position
             if (i < system->num_subscriptions - 1) {
                 system->subscriptions[i] = 
@@ -177,6 +200,11 @@ bool event_unsubscribe_all(EventSystem* system, const char* event_name) {
             }
             write_idx++;
         } else {
+            // Free owned context if needed (Pattern 1: Parent Owns Child)
+            if (system->subscriptions[read_idx].owns_context && 
+                system->subscriptions[read_idx].context) {
+                free(system->subscriptions[read_idx].context);
+            }
             removed++;
         }
     }
@@ -317,7 +345,8 @@ bool event_system_has_subscribers(EventSystem* system, const char* event_name) {
         if (!adapter) return false; \
         adapter->typed_handler = handler; \
         adapter->context = context; \
-        return event_subscribe(system, event_name, name##_adapter, adapter); \
+        /* Adapter is owned by event system (Pattern 1: Parent Owns Child) */ \
+        return event_subscribe_internal(system, event_name, name##_adapter, adapter, true); \
     }
 
 // Button Pressed Event
@@ -344,7 +373,8 @@ bool event_subscribe_button_pressed(EventSystem* system, button_pressed_handler 
     if (!adapter) return false;
     adapter->typed_handler = handler;
     adapter->context = context;
-    return event_subscribe(system, "ui.button_pressed", button_pressed_adapter, adapter);
+    /* Adapter is owned by event system (Pattern 1: Parent Owns Child) */
+    return event_subscribe_internal(system, "ui.button_pressed", button_pressed_adapter, adapter, true);
 }
 
 bool event_unsubscribe_button_pressed(EventSystem* system, button_pressed_handler handler) {
@@ -374,7 +404,8 @@ bool event_subscribe_page_changed(EventSystem* system, page_changed_handler hand
     if (!adapter) return false;
     adapter->typed_handler = handler;
     adapter->context = context;
-    return event_subscribe(system, "ui.page_changed", page_changed_adapter, adapter);
+    /* Adapter is owned by event system (Pattern 1: Parent Owns Child) */
+    return event_subscribe_internal(system, "ui.page_changed", page_changed_adapter, adapter, true);
 }
 
 // Page Transition Event (simple int parameter)
@@ -401,7 +432,8 @@ bool event_subscribe_page_transition(EventSystem* system, page_transition_handle
     if (!adapter) return false;
     adapter->typed_handler = handler;
     adapter->context = context;
-    return event_subscribe(system, "app.page_transition", page_transition_adapter, adapter);
+    /* Adapter is owned by event system (Pattern 1: Parent Owns Child) */
+    return event_subscribe_internal(system, "app.page_transition", page_transition_adapter, adapter, true);
 }
 
 // API Refresh Requested Event
@@ -428,7 +460,8 @@ bool event_subscribe_api_refresh_requested(EventSystem* system, api_refresh_requ
     if (!adapter) return false;
     adapter->typed_handler = handler;
     adapter->context = context;
-    return event_subscribe(system, "api.refresh_requested", api_refresh_requested_adapter, adapter);
+    /* Adapter is owned by event system (Pattern 1: Parent Owns Child) */
+    return event_subscribe_internal(system, "api.refresh_requested", api_refresh_requested_adapter, adapter, true);
 }
 
 // API State Changed Event

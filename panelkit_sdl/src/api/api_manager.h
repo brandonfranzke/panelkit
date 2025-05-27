@@ -39,7 +39,7 @@ typedef enum {
 
 // Configuration
 typedef struct {
-    const char* base_url;       // Base URL for API
+    const char* base_url;       // Base URL for API (borrowed reference - must remain valid)
     int timeout_seconds;        // Request timeout
     int retry_count;            // Number of retries
     int retry_delay_ms;         // Delay between retries
@@ -67,8 +67,25 @@ bool api_manager_fetch_user_async(ApiManager* manager);
 
 // State queries
 ApiState api_manager_get_state(ApiManager* manager);
+
+/**
+ * Get current user data
+ * @param manager API manager instance
+ * @return Pointer to internal user data (borrowed reference, do not free)
+ * @note The returned pointer is only valid until the next API call
+ * @note Thread safety: Data may change if auto-refresh is enabled
+ */
 const UserData* api_manager_get_user_data(ApiManager* manager);
+
 ApiError api_manager_get_last_error(ApiManager* manager);
+
+/**
+ * Get error message string
+ * @param manager API manager instance  
+ * @return Pointer to internal error buffer (borrowed reference, do not free)
+ * @note The returned pointer is only valid until the next API call
+ * @note Not thread-safe for concurrent access
+ */
 const char* api_manager_get_error_message(ApiManager* manager);
 
 // Control functions
