@@ -212,7 +212,7 @@ static void widget_page_transition_handler(const char* event_name, const void* d
         page_manager_transition_to(integration->page_manager, target_page);
     }
     
-    // Widget mode only - no need to publish legacy events
+    // Update completed - log the transition
     log_debug("Page transition request: -> %d", target_page);
 }
 
@@ -244,7 +244,6 @@ void widget_integration_page_changed_callback(int from_page, int to_page, void* 
     
     log_debug("Page manager widget changed page: %d -> %d", from_page, to_page);
     
-    // Only mirror to legacy system if NOT in widget render mode
-    // Always use widget mode - update state store
+    // Update state store with new page
     state_store_set(integration->state_store, "app", "current_page", &to_page, sizeof(int));
 }

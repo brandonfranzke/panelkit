@@ -1,24 +1,5 @@
 # Widget System Technical Debt
 
-## Recently Completed ✅
-
-1. **Legacy System Removal** (Completed today)
-   - Removed ~1,375 lines of legacy UI code
-   - Eliminated dual rendering paths
-   - Widget system now standalone
-
-2. **Global Font Dependencies** (Issue #2 - Completed today)
-   - Removed all `extern TTF_Font*` variables
-   - Fonts now passed through widget_integration_set_fonts()
-   - Widget factory and widgets receive fonts properly
-
-3. **Widget Integration Monolith** (Completed today)
-   - Split 1053-line file into 4 focused modules:
-     - widget_integration_core.c (160 lines)
-     - widget_integration_state.c (230 lines)
-     - widget_integration_events.c (240 lines)
-     - widget_integration_widgets.c (440 lines)
-
 ## Active Issues
 
 ### Architecture & Design
