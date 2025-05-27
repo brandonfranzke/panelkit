@@ -2,6 +2,7 @@
 add_library(panelkit_core STATIC
     logger.c
     build_info.c
+    error.c
 )
 
 # Find zlog

@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 #define MAX_EVENT_NAME_LENGTH 128
 #define INITIAL_SUBSCRIPTIONS_CAPACITY 32
@@ -98,9 +99,15 @@ static bool event_subscribe_internal(EventSystem* system,
                                    event_handler_func handler, 
                                    void* context,
                                    bool owns_context) {
-    if (!system || !event_name || !handler || 
-        strlen(event_name) >= MAX_EVENT_NAME_LENGTH) {
+    if (!system || !event_name || !handler) {
         log_error("Invalid parameters for event subscription");
+        pk_set_last_error(PK_ERROR_NULL_PARAM);
+        return false;
+    }
+    
+    if (strlen(event_name) >= MAX_EVENT_NAME_LENGTH) {
+        log_error("Event name too long: %s", event_name);
+        pk_set_last_error(PK_ERROR_INVALID_PARAM);
         return false;
     }
     
@@ -114,6 +121,7 @@ static bool event_subscribe_internal(EventSystem* system,
         if (!new_subs) {
             log_error("Failed to expand subscriptions array");
             pthread_rwlock_unlock(&system->lock);
+            pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
             return false;
         }
         system->subscriptions = new_subs;

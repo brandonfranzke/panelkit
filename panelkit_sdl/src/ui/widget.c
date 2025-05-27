@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 #define INITIAL_CHILD_CAPACITY 4
 #define INITIAL_EVENT_CAPACITY 4
@@ -24,9 +25,12 @@ static void widget_event_handler_callback(const char* event_name,
 }
 
 Widget* widget_create(const char* id, WidgetType type) {
+    PK_CHECK_NULL(id != NULL, PK_ERROR_NULL_PARAM);
+    
     Widget* widget = calloc(1, sizeof(Widget));
     if (!widget) {
         log_error("Failed to allocate widget");
+        pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     
@@ -39,6 +43,7 @@ Widget* widget_create(const char* id, WidgetType type) {
     widget->children = calloc(widget->child_capacity, sizeof(Widget*));
     if (!widget->children) {
         free(widget);
+        pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     
@@ -47,6 +52,7 @@ Widget* widget_create(const char* id, WidgetType type) {
     if (!widget->subscribed_events) {
         free(widget->children);
         free(widget);
+        pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     
@@ -106,9 +112,7 @@ void widget_destroy(Widget* widget) {
 }
 
 bool widget_add_child(Widget* parent, Widget* child) {
-    if (!parent || !child) {
-        return false;
-    }
+    PK_CHECK_FALSE(parent != NULL && child != NULL, PK_ERROR_NULL_PARAM);
     
     // Remove from current parent if any
     if (child->parent) {
@@ -122,6 +126,7 @@ bool widget_add_child(Widget* parent, Widget* child) {
                                        new_capacity * sizeof(Widget*));
         if (!new_children) {
             log_error("Failed to grow children array");
+            pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
             return false;
         }
         parent->children = new_children;

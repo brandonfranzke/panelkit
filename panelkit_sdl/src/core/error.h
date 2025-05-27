@@ -1,0 +1,129 @@
+#ifndef PK_ERROR_H
+#define PK_ERROR_H
+
+/**
+ * PanelKit Error Handling System
+ * 
+ * This module provides consistent error handling across the codebase.
+ * 
+ * Design principles:
+ * - Zero is success (PK_OK = 0)
+ * - Negative values for errors (future expansion)
+ * - Functions return error codes directly when possible
+ * - NULL/false returns can use pk_get_last_error() for details
+ * - Thread-safe error context via thread-local storage
+ */
+
+/* Error codes for PanelKit operations */
+typedef enum {
+    /* Success */
+    PK_OK = 0,
+    
+    /* Parameter errors */
+    PK_ERROR_NULL_PARAM = -1,
+    PK_ERROR_INVALID_PARAM = -2,
+    
+    /* Resource errors */
+    PK_ERROR_OUT_OF_MEMORY = -10,
+    PK_ERROR_RESOURCE_LIMIT = -11,
+    PK_ERROR_NOT_FOUND = -12,
+    PK_ERROR_ALREADY_EXISTS = -13,
+    
+    /* State errors */
+    PK_ERROR_INVALID_STATE = -20,
+    PK_ERROR_NOT_INITIALIZED = -21,
+    PK_ERROR_ALREADY_INITIALIZED = -22,
+    
+    /* External errors */
+    PK_ERROR_SDL = -30,          /* SDL library error */
+    PK_ERROR_SYSTEM = -31,       /* System call failed */
+    PK_ERROR_NETWORK = -32,      /* Network/API error */
+    PK_ERROR_TIMEOUT = -33,      /* Operation timed out */
+    
+    /* Data errors */
+    PK_ERROR_PARSE = -40,        /* Parse error (JSON, YAML, etc) */
+    PK_ERROR_INVALID_DATA = -41, /* Data validation failed */
+    PK_ERROR_INVALID_CONFIG = -42,/* Configuration error */
+    
+    /* Widget-specific errors */
+    PK_ERROR_WIDGET_NOT_FOUND = -50,
+    PK_ERROR_WIDGET_TREE_FULL = -51,
+    PK_ERROR_WIDGET_INVALID_TYPE = -52,
+    
+    /* Event system errors */
+    PK_ERROR_EVENT_QUEUE_FULL = -60,
+    PK_ERROR_EVENT_NOT_FOUND = -61,
+    PK_ERROR_EVENT_HANDLER_FAILED = -62,
+} PkError;
+
+/**
+ * Get human-readable error string
+ * @param error Error code
+ * @return Static string describing the error (do not free)
+ */
+const char* pk_error_string(PkError error);
+
+/**
+ * Get last error for current thread
+ * @return Last error code set in this thread
+ * 
+ * This is useful when a function returns NULL/false but you need
+ * more details about why it failed.
+ */
+PkError pk_get_last_error(void);
+
+/**
+ * Set last error for current thread
+ * @param error Error code to set
+ * 
+ * This should be called by functions before returning NULL/false
+ * to provide additional error context.
+ */
+void pk_set_last_error(PkError error);
+
+/**
+ * Clear last error for current thread
+ * 
+ * Call this to reset error state before operations that might fail.
+ */
+void pk_clear_last_error(void);
+
+/* Convenience macros for common patterns */
+
+/**
+ * Return on error with logging
+ * Usage: PK_CHECK_RETURN(widget != NULL, PK_ERROR_NULL_PARAM);
+ */
+#define PK_CHECK_RETURN(condition, error) \
+    do { \
+        if (!(condition)) { \
+            pk_set_last_error(error); \
+            return error; \
+        } \
+    } while(0)
+
+/**
+ * Return NULL on error with logging
+ * Usage: PK_CHECK_NULL(size > 0, PK_ERROR_INVALID_PARAM);
+ */
+#define PK_CHECK_NULL(condition, error) \
+    do { \
+        if (!(condition)) { \
+            pk_set_last_error(error); \
+            return NULL; \
+        } \
+    } while(0)
+
+/**
+ * Return false on error with logging
+ * Usage: PK_CHECK_FALSE(ptr != NULL, PK_ERROR_NULL_PARAM);
+ */
+#define PK_CHECK_FALSE(condition, error) \
+    do { \
+        if (!(condition)) { \
+            pk_set_last_error(error); \
+            return false; \
+        } \
+    } while(0)
+
+#endif /* PK_ERROR_H */

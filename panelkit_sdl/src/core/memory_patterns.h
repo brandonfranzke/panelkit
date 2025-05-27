@@ -190,4 +190,57 @@
  *    RIGHT: PK_FREE(obj);               // can't use - it's NULL
  */
 
+/* ============================================================================
+ * ERROR HANDLING PATTERNS
+ * ============================================================================
+ * Consistent error handling patterns used throughout PanelKit.
+ * 
+ * Pattern 1: Functions Returning Pointers
+ * - Return NULL on error
+ * - Call pk_set_last_error() before returning NULL
+ * - Caller can use pk_get_last_error() for details
+ * Example:
+ *   Widget* widget = widget_create("button", WIDGET_BUTTON);
+ *   if (!widget) {
+ *       PkError err = pk_get_last_error();
+ *       log_error("Failed to create widget: %s", pk_error_string(err));
+ *   }
+ * 
+ * Pattern 2: Functions Returning bool
+ * - Return false on error, true on success
+ * - Call pk_set_last_error() before returning false
+ * Example:
+ *   if (!widget_add_child(parent, child)) {
+ *       PkError err = pk_get_last_error();
+ *       // Handle error
+ *   }
+ * 
+ * Pattern 3: Void Functions (Setters)
+ * - Check parameters and return early if invalid
+ * - No error reporting for simple setters
+ * - Log errors for operations that might fail
+ * Example:
+ *   void widget_set_visible(Widget* widget, bool visible) {
+ *       if (!widget) return;  // Silent fail is OK for setters
+ *       widget->visible = visible;
+ *   }
+ * 
+ * Pattern 4: Functions Returning Error Codes
+ * - Return PkError directly
+ * - PK_OK (0) for success, negative for errors
+ * - No need to call pk_set_last_error()
+ * Example:
+ *   PkError config_load(const char* path) {
+ *       if (!path) return PK_ERROR_NULL_PARAM;
+ *       // ... load config ...
+ *       return PK_OK;
+ *   }
+ * 
+ * Pattern 5: Async Operations with Callbacks
+ * - Pass error code to callback
+ * - Include error in callback signature
+ * Example:
+ *   typedef void (*async_callback)(PkError error, void* result, void* context);
+ */
+
 #endif // MEMORY_PATTERNS_H
