@@ -15,13 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-// Simple logging macros for integration layer
-#ifndef log_info
-#define log_info(fmt, ...) printf("[WIDGET_INTEGRATION] " fmt "\n", ##__VA_ARGS__)
-#define log_error(fmt, ...) fprintf(stderr, "[WIDGET_INTEGRATION_ERROR] " fmt "\n", ##__VA_ARGS__)
-#define log_debug(fmt, ...) printf("[WIDGET_INTEGRATION_DEBUG] " fmt "\n", ##__VA_ARGS__)
-#endif
+#include "core/logger.h"
 
 void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     if (!integration || !integration->widget_manager || integration->shadow_widgets_created) {

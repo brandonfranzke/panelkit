@@ -5,13 +5,7 @@
 #include <pthread.h>
 #include <assert.h>
 #include <time.h>
-
-// Simple logging macros for standalone compilation
-#ifndef log_info
-#define log_info(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
-#define log_error(fmt, ...) fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
-#define log_debug(fmt, ...) printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
-#endif
+#include "core/logger.h"
 
 #define MAX_COMPOUND_KEY_LENGTH 192  // "type_name:id"
 #define INITIAL_STORE_CAPACITY 64

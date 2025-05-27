@@ -4,13 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-// Simple logging macros
-#ifndef log_info
-#define log_info(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
-#define log_error(fmt, ...) fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
-#define log_debug(fmt, ...) printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
-#endif
+#include "core/logger.h"
 
 #define INITIAL_ROOT_CAPACITY 8
 
