@@ -2,6 +2,7 @@
 #include "state_store.h"
 #include "../events/event_system.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,6 +24,7 @@ static void bridge_event_handler(const char* event_name,
     BridgeContext* bridge = (BridgeContext*)context;
     if (!bridge || !bridge->store) {
         log_error("Invalid bridge context in event handler");
+        // Can't use pk_set_last_error here as we're in event handler callback
         return;
     }
     
@@ -32,6 +34,12 @@ static void bridge_event_handler(const char* event_name,
     
     if (bridge->config.use_event_as_type) {
         // Use full event name as type
+        size_t event_len = strlen(event_name);
+        if (event_len >= sizeof(type_name)) {
+            log_error("Event name too long for state storage: '%s' (%zu chars, max %zu)",
+                     event_name, event_len, sizeof(type_name) - 1);
+            return;
+        }
         strncpy(type_name, event_name, sizeof(type_name) - 1);
         type_name[sizeof(type_name) - 1] = '\0';
         
@@ -62,19 +70,22 @@ static void bridge_event_handler(const char* event_name,
     
     // Store the data
     if (!state_store_set(bridge->store, type_name, id, data, data_size)) {
-        log_error("Failed to store event data for '%s'", event_name);
+        log_error("Failed to store event data for '%s' (type='%s', id='%s', size=%zu)",
+                 event_name, type_name, id, data_size);
+        // Continue processing - non-fatal error
     } else {
         log_debug("Cached event '%s' as '%s:%s' (%zu bytes)", 
                  event_name, type_name, id, data_size);
     }
 }
 
-bool state_event_bridge_init(StateStore* store, 
-                            EventSystem* events,
-                            const StateEventBridgeConfig* config) {
+PkError state_event_bridge_init(StateStore* store, 
+                               EventSystem* events,
+                               const StateEventBridgeConfig* config) {
     if (!store || !events) {
-        log_error("Invalid parameters for state-event bridge init");
-        return false;
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "state_event_bridge_init: store=%p, events=%p", store, events);
+        return PK_ERROR_NULL_PARAM;
     }
     
     // Clean up any existing bridge
@@ -85,8 +96,10 @@ bool state_event_bridge_init(StateStore* store,
     // Create bridge context
     g_bridge_context = malloc(sizeof(BridgeContext));
     if (!g_bridge_context) {
-        log_error("Failed to allocate bridge context");
-        return false;
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+            "state_event_bridge_init: Failed to allocate bridge context (%zu bytes)",
+            sizeof(BridgeContext));
+        return PK_ERROR_OUT_OF_MEMORY;
     }
     
     g_bridge_context->store = store;
@@ -104,7 +117,7 @@ bool state_event_bridge_init(StateStore* store,
              g_bridge_context->config.auto_cache_all ? "yes" : "no",
              g_bridge_context->config.use_event_as_type ? "yes" : "no");
     
-    return true;
+    return PK_OK;
 }
 
 void state_event_bridge_cleanup(StateStore* store, EventSystem* events) {
@@ -120,14 +133,24 @@ void state_event_bridge_cleanup(StateStore* store, EventSystem* events) {
     log_info("State-event bridge cleaned up");
 }
 
-void state_event_bridge_make_key(char* buffer, size_t buffer_size,
-                                const char* event_name, const char* id) {
+PkError state_event_bridge_make_key(char* buffer, size_t buffer_size,
+                                   const char* event_name, const char* id) {
     if (!buffer || !event_name || !id) {
-        return;
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "state_event_bridge_make_key: buffer=%p, event_name=%p, id=%p",
+            buffer, event_name, id);
+        return PK_ERROR_NULL_PARAM;
     }
     
     // Convert event name to state type (replace dots with underscores)
     char type_name[128];
+    size_t event_len = strlen(event_name);
+    if (event_len >= sizeof(type_name)) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+            "state_event_bridge_make_key: Event name too long '%s' (%zu chars, max %zu)",
+            event_name, event_len, sizeof(type_name) - 1);
+        return PK_ERROR_INVALID_PARAM;
+    }
     strncpy(type_name, event_name, sizeof(type_name) - 1);
     type_name[sizeof(type_name) - 1] = '\0';
     
@@ -136,7 +159,15 @@ void state_event_bridge_make_key(char* buffer, size_t buffer_size,
     }
     
     // Create compound key
-    snprintf(buffer, buffer_size, "%s:%s", type_name, id);
+    int result = snprintf(buffer, buffer_size, "%s:%s", type_name, id);
+    if (result < 0 || (size_t)result >= buffer_size) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+            "state_event_bridge_make_key: Buffer too small for key '%s:%s' (need %d, have %zu)",
+            type_name, id, result, buffer_size);
+        return PK_ERROR_INVALID_PARAM;
+    }
+    
+    return PK_OK;
 }
 
 StateEventBridgeConfig state_event_bridge_default_config(void) {
@@ -150,17 +181,34 @@ StateEventBridgeConfig state_event_bridge_default_config(void) {
 }
 
 // Helper function to subscribe to specific events
-bool state_event_bridge_subscribe(EventSystem* events, const char* event_name) {
-    if (!g_bridge_context || !events || !event_name) {
-        log_error("Cannot subscribe: bridge not initialized");
-        return false;
+PkError state_event_bridge_subscribe(EventSystem* events, const char* event_name) {
+    if (!g_bridge_context) {
+        pk_set_last_error_with_context(PK_ERROR_NOT_INITIALIZED,
+            "state_event_bridge_subscribe: Bridge not initialized");
+        return PK_ERROR_NOT_INITIALIZED;
+    }
+    if (!events || !event_name) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+            "state_event_bridge_subscribe: events=%p, event_name=%p",
+            events, event_name);
+        return PK_ERROR_NULL_PARAM;
     }
     
     bool success = event_subscribe(events, event_name, 
                                   bridge_event_handler, g_bridge_context);
-    if (success) {
-        log_info("State bridge subscribed to event '%s'", event_name);
+    if (!success) {
+        PkError last_error = pk_get_last_error();
+        if (last_error != PK_OK) {
+            // Event system set a specific error
+            return last_error;
+        }
+        // Generic subscription failure
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+            "state_event_bridge_subscribe: Failed to subscribe to event '%s'",
+            event_name);
+        return PK_ERROR_SYSTEM;
     }
     
-    return success;
+    log_info("State bridge subscribed to event '%s'", event_name);
+    return PK_OK;
 }

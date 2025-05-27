@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include "../core/error.h"
 
 // Forward declarations
 typedef struct StateStore StateStore;
@@ -18,19 +19,25 @@ typedef struct {
 
 // Initialize the bridge between state store and event system
 // This makes the state store listen to all events and cache based on config
-bool state_event_bridge_init(StateStore* store, 
-                            EventSystem* events,
-                            const StateEventBridgeConfig* config);
+// Returns PK_OK on success, error code on failure
+PkError state_event_bridge_init(StateStore* store, 
+                               EventSystem* events,
+                               const StateEventBridgeConfig* config);
 
 // Cleanup bridge (unsubscribes from events)
 void state_event_bridge_cleanup(StateStore* store, EventSystem* events);
 
 // Utility function to convert event names to state store keys
 // Example: "weather.temperature" with id "91007" -> "weather_temperature:91007"
-void state_event_bridge_make_key(char* buffer, size_t buffer_size,
-                                const char* event_name, const char* id);
+// Returns PK_OK on success, PK_ERROR_INVALID_PARAM if name would be truncated
+PkError state_event_bridge_make_key(char* buffer, size_t buffer_size,
+                                   const char* event_name, const char* id);
 
 // Default configuration
 StateEventBridgeConfig state_event_bridge_default_config(void);
+
+// Subscribe to a specific event for bridging
+// Returns PK_OK on success, error code on failure
+PkError state_event_bridge_subscribe(EventSystem* events, const char* event_name);
 
 #endif // STATE_EVENT_BRIDGE_H
