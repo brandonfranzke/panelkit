@@ -130,65 +130,133 @@ struct InputHandler {
     } stats;
 };
 
-/* Create input handler with configuration
- * @param config Input configuration
- * @return Handler instance or NULL on failure
+/**
+ * Create input handler with configuration.
+ * 
+ * @param config Input configuration (required)
+ * @return New handler or NULL on error (caller owns)
+ * @note Handler must be started before processing input
  */
 InputHandler* input_handler_create(const InputConfig* config);
 
-/* Start input processing
- * @param handler Input handler instance
- * @return true on success, false on failure
+/**
+ * Start input processing.
+ * 
+ * @param handler Input handler (required)
+ * @return true on success, false on error
+ * @note May spawn background threads for input sources
  */
 bool input_handler_start(InputHandler* handler);
 
-/* Stop input processing
- * @param handler Input handler instance
+/**
+ * Stop input processing.
+ * 
+ * @param handler Input handler (required)
+ * @note Stops all background threads and sources
  */
 void input_handler_stop(InputHandler* handler);
 
-/* Get input capabilities
- * @param handler Input handler instance
- * @param caps Output capabilities structure
+/**
+ * Get input device capabilities.
+ * 
+ * @param handler Input handler (required)
+ * @param caps Receives capabilities (required)
  * @return true if capabilities retrieved, false otherwise
  */
 bool input_handler_get_capabilities(InputHandler* handler, InputCapabilities* caps);
 
-/* Get input statistics
- * @param handler Input handler instance
- * @return Pointer to statistics (read-only)
+/**
+ * Get input processing statistics.
+ * 
+ * @param handler Input handler (required)
+ * @return Read-only statistics pointer (never NULL)
+ * @note Statistics are owned by handler - do not free
  */
 const struct InputHandler_stats* input_handler_get_stats(InputHandler* handler);
 
-/* Push SDL event (for input sources to deliver events)
- * Thread-safe - can be called from input source threads
- * @param handler Input handler instance
- * @param event SDL event to push
- * @return true if event was pushed, false if queue full
+/**
+ * Push SDL event from input source.
+ * 
+ * @param handler Input handler (required)
+ * @param event SDL event to deliver (required)
+ * @return true if pushed, false if queue full
+ * @note Thread-safe - can be called from source threads
  */
 bool input_handler_push_event(InputHandler* handler, SDL_Event* event);
 
-/* Cleanup and destroy handler
- * @param handler Input handler instance
+/**
+ * Destroy input handler.
+ * 
+ * @param handler Handler to destroy (can be NULL)
+ * @note Stops processing before destruction
  */
 void input_handler_destroy(InputHandler* handler);
 
-/* Factory functions for built-in input sources */
+// Factory functions for built-in input sources
+
+/**
+ * Create SDL native input source.
+ * 
+ * @return New source or NULL on error (caller owns)
+ * @note Uses SDL's built-in event system
+ */
 InputSource* input_source_sdl_native_create(void);
+
+/**
+ * Create Linux evdev input source.
+ * 
+ * @return New source or NULL on error (caller owns)
+ * @note Reads directly from /dev/input/event* devices
+ */
 InputSource* input_source_linux_evdev_create(void);
+
+/**
+ * Create mock input source for testing.
+ * 
+ * @return New source or NULL on error (caller owns)
+ * @note Generates synthetic input events
+ */
 InputSource* input_source_mock_create(void);
 
-/* Mock input source control API */
+// Mock input source control API
+
+/**
+ * Queue a single event in mock source.
+ * 
+ * @param source Mock input source (required)
+ * @param event Event to queue (required, copied)
+ */
 void input_mock_queue_event(InputSource* source, SDL_Event* event);
+
+/**
+ * Start generating a pattern in mock source.
+ * 
+ * @param source Mock input source (required)
+ * @param pattern Pattern type (MOCK_PATTERN_*)
+ */
 void input_mock_start_pattern(InputSource* source, int pattern);
+
+/**
+ * Stop pattern generation in mock source.
+ * 
+ * @param source Mock input source (required)
+ */
 void input_mock_stop_pattern(InputSource* source);
+
+/**
+ * Configure pattern timing in mock source.
+ * 
+ * @param source Mock input source (required)
+ * @param delay_ms Delay between events in milliseconds
+ * @param duration_ms Total pattern duration in milliseconds
+ */
 void input_mock_configure_pattern(InputSource* source, int delay_ms, int duration_ms);
 
-/* Mock pattern types */
-#define MOCK_PATTERN_NONE   0
-#define MOCK_PATTERN_TAP    1
-#define MOCK_PATTERN_SWIPE  2
-#define MOCK_PATTERN_PINCH  3
-#define MOCK_PATTERN_CIRCLE 4
+/** Mock pattern types */
+#define MOCK_PATTERN_NONE   0  /**< No pattern */
+#define MOCK_PATTERN_TAP    1  /**< Tap gestures */
+#define MOCK_PATTERN_SWIPE  2  /**< Swipe gestures */
+#define MOCK_PATTERN_PINCH  3  /**< Pinch gestures */
+#define MOCK_PATTERN_CIRCLE 4  /**< Circular gestures */
 
 #endif /* PANELKIT_INPUT_HANDLER_H */

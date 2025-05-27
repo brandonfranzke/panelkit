@@ -14,11 +14,32 @@ typedef struct TimeWidget {
     bool show_seconds;
 } TimeWidget;
 
-// Create a new time widget
+/**
+ * Create a new time display widget.
+ * 
+ * @param id Unique identifier for the widget
+ * @param format strftime format string (e.g., "%H:%M:%S")
+ * @param font Font to use for time display (borrowed reference)
+ * @return New time widget or NULL on error (caller owns)
+ * @note Widget automatically updates every second
+ */
 Widget* time_widget_create(const char* id, const char* format, TTF_Font* font);
 
-// Time widget specific functions
+/**
+ * Set the time display format.
+ * 
+ * @param widget Time widget to update
+ * @param format New strftime format string (copied)
+ */
 void time_widget_set_format(Widget* widget, const char* format);
+
+/**
+ * Enable or disable seconds display.
+ * 
+ * @param widget Time widget to update
+ * @param show_seconds True to update every second, false for every minute
+ * @note Affects update frequency and battery usage
+ */
 void time_widget_set_show_seconds(Widget* widget, bool show_seconds);
 
 #endif // TIME_WIDGET_H

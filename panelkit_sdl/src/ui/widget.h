@@ -87,52 +87,294 @@ struct Widget {
     void (*measure)(Widget* widget, int* width, int* height);
 };
 
-// Widget lifecycle functions
+/* Widget lifecycle functions */
+
+/**
+ * Create a new widget with the specified ID and type.
+ * 
+ * @param id Unique identifier for the widget (required, copied internally)
+ * @param type Widget type from WidgetType enum
+ * @return New widget or NULL on error (caller owns)
+ * @note Call pk_get_last_error() on NULL return for error details
+ */
 Widget* widget_create(const char* id, WidgetType type);
+
+/**
+ * Destroy a widget and all its children recursively.
+ * 
+ * @param widget Widget to destroy (can be NULL)
+ * @note Unsubscribes from all events and disconnects from systems
+ */
 void widget_destroy(Widget* widget);
 
-// Widget hierarchy management
+/* Widget hierarchy management */
+
+/**
+ * Add a child widget to a parent widget.
+ * 
+ * @param parent Parent widget to add child to
+ * @param child Child widget to add (removed from previous parent if any)
+ * @return true on success, false on error
+ * @note Parent takes ownership of child
+ */
 bool widget_add_child(Widget* parent, Widget* child);
+
+/**
+ * Remove a child widget from its parent.
+ * 
+ * @param parent Parent widget to remove child from
+ * @param child Child widget to remove
+ * @return true if child was removed, false if not found
+ * @note Caller becomes responsible for the removed child
+ */
 bool widget_remove_child(Widget* parent, Widget* child);
+
+/**
+ * Find a direct child widget by ID.
+ * 
+ * @param parent Parent widget to search in
+ * @param id ID of child to find
+ * @return Child widget or NULL if not found (borrowed reference)
+ */
 Widget* widget_find_child(Widget* parent, const char* id);
+
+/**
+ * Find a descendant widget by ID (recursive search).
+ * 
+ * @param root Root widget to start search from
+ * @param id ID of widget to find
+ * @return Found widget or NULL if not found (borrowed reference)
+ */
 Widget* widget_find_descendant(Widget* root, const char* id);
 
-// Event subscription management
+/* Event subscription management */
+
+/**
+ * Subscribe a widget to receive a specific event type.
+ * 
+ * @param widget Widget to subscribe
+ * @param event_name Name of event to subscribe to
+ * @return true on success, false on error
+ * @note Widget must be connected to an event system first
+ */
 bool widget_subscribe_event(Widget* widget, const char* event_name);
+
+/**
+ * Unsubscribe a widget from a specific event type.
+ * 
+ * @param widget Widget to unsubscribe
+ * @param event_name Name of event to unsubscribe from
+ * @return true if unsubscribed, false if not found
+ */
 bool widget_unsubscribe_event(Widget* widget, const char* event_name);
+
+/**
+ * Connect a widget to event system and state store.
+ * 
+ * @param widget Widget to connect
+ * @param events Event system (can be NULL)
+ * @param store State store (can be NULL)
+ * @note Recursively connects all children
+ */
 void widget_connect_systems(Widget* widget, EventSystem* events, StateStore* store);
 
-// Widget state management
+/* Widget state management */
+
+/**
+ * Set or clear a widget state flag.
+ * 
+ * @param widget Widget to modify
+ * @param state State flag to set/clear
+ * @param enabled true to set, false to clear
+ */
 void widget_set_state(Widget* widget, WidgetState state, bool enabled);
+
+/**
+ * Check if a widget has a specific state flag set.
+ * 
+ * @param widget Widget to check
+ * @param state State flag to check
+ * @return true if state is set, false otherwise
+ */
 bool widget_has_state(Widget* widget, WidgetState state);
+
+/**
+ * Set widget visibility.
+ * 
+ * @param widget Widget to show/hide
+ * @param visible true to show, false to hide
+ * @note Hidden widgets don't receive events or render
+ */
 void widget_set_visible(Widget* widget, bool visible);
+
+/**
+ * Check if widget is visible.
+ * 
+ * @param widget Widget to check
+ * @return true if visible, false if hidden or NULL
+ */
 bool widget_is_visible(Widget* widget);
+
+/**
+ * Enable or disable a widget.
+ * 
+ * @param widget Widget to enable/disable
+ * @param enabled true to enable, false to disable
+ * @note Disabled widgets don't receive input events
+ */
 void widget_set_enabled(Widget* widget, bool enabled);
+
+/**
+ * Check if widget is enabled.
+ * 
+ * @param widget Widget to check
+ * @return true if enabled, false if disabled or NULL
+ */
 bool widget_is_enabled(Widget* widget);
 
-// Layout and positioning
+/* Layout and positioning */
+
+/**
+ * Set absolute widget bounds.
+ * 
+ * @param widget Widget to position
+ * @param x X coordinate in pixels
+ * @param y Y coordinate in pixels
+ * @param width Widget width in pixels
+ * @param height Widget height in pixels
+ */
 void widget_set_bounds(Widget* widget, int x, int y, int width, int height);
+
+/**
+ * Set widget bounds relative to parent.
+ * 
+ * @param widget Widget to position
+ * @param x X offset from parent's content area
+ * @param y Y offset from parent's content area
+ * @param width Widget width in pixels
+ * @param height Widget height in pixels
+ */
 void widget_set_relative_bounds(Widget* widget, int x, int y, int width, int height);
+
+/**
+ * Mark widget as needing layout recalculation.
+ * 
+ * @param widget Widget that needs layout
+ * @note Propagates up to root widget
+ */
 void widget_invalidate_layout(Widget* widget);
+
+/**
+ * Perform layout calculation for widget and children.
+ * 
+ * @param widget Widget to layout
+ * @note Calls widget's layout function if set
+ */
 void widget_perform_layout(Widget* widget);
+
+/**
+ * Update bounds of all child widgets.
+ * 
+ * @param parent Parent widget whose children need positioning
+ * @note Called automatically during layout
+ */
 void widget_update_child_bounds(Widget* parent);
 
-// Rendering
+/* Rendering */
+
+/**
+ * Render widget and all visible children.
+ * 
+ * @param widget Widget to render
+ * @param renderer SDL renderer to draw to
+ * @note Skips hidden widgets and their children
+ */
 void widget_render(Widget* widget, SDL_Renderer* renderer);
+
+/**
+ * Mark widget as needing redraw.
+ * 
+ * @param widget Widget that needs redrawing
+ * @note Currently triggers full screen redraw
+ */
 void widget_invalidate(Widget* widget);
 
-// Event handling
+/* Event handling */
+
+/**
+ * Handle SDL event for widget and children.
+ * 
+ * @param widget Widget to handle event
+ * @param event SDL event to process
+ * @note Events propagate from children to parents
+ */
 void widget_handle_event(Widget* widget, const SDL_Event* event);
+
+/**
+ * Check if point is within widget bounds.
+ * 
+ * @param widget Widget to test
+ * @param x X coordinate to test
+ * @param y Y coordinate to test
+ * @return true if point is inside widget bounds
+ */
 bool widget_contains_point(Widget* widget, int x, int y);
+
+/**
+ * Find the deepest widget containing a point.
+ * 
+ * @param root Root widget to start search
+ * @param x X coordinate to test
+ * @param y Y coordinate to test
+ * @return Deepest widget at point or NULL (borrowed reference)
+ */
 Widget* widget_hit_test(Widget* root, int x, int y);
 
-// Update
+/* Update */
+
+/**
+ * Update widget state based on elapsed time.
+ * 
+ * @param widget Widget to update
+ * @param delta_time Time elapsed since last update in seconds
+ * @note Recursively updates all children
+ */
 void widget_update(Widget* widget, double delta_time);
 
-// Default implementations for virtual functions
+/* Default implementations for virtual functions */
+
+/**
+ * Default rendering implementation.
+ * 
+ * @param widget Widget to render
+ * @param renderer SDL renderer
+ * @note Draws background, border, and children
+ */
 void widget_default_render(Widget* widget, SDL_Renderer* renderer);
+
+/**
+ * Default event handling implementation.
+ * 
+ * @param widget Widget handling event
+ * @param event SDL event to handle
+ * @note Handles basic mouse events and state changes
+ */
 void widget_default_handle_event(Widget* widget, const SDL_Event* event);
+
+/**
+ * Default layout implementation.
+ * 
+ * @param widget Widget to layout
+ * @note Simple vertical stacking of children
+ */
 void widget_default_layout(Widget* widget);
+
+/**
+ * Default destroy implementation.
+ * 
+ * @param widget Widget being destroyed
+ * @note Base cleanup handled by widget_destroy
+ */
 void widget_default_destroy(Widget* widget);
 
 // Type-safe casting macros

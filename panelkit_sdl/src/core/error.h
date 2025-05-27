@@ -57,34 +57,37 @@ typedef enum {
 } PkError;
 
 /**
- * Get human-readable error string
- * @param error Error code
- * @return Static string describing the error (do not free)
+ * Get human-readable error string.
+ * 
+ * @param error Error code from PkError enum
+ * @return Static string describing the error (never NULL)
+ * @note Do not free the returned string
  */
 const char* pk_error_string(PkError error);
 
 /**
- * Get last error for current thread
- * @return Last error code set in this thread
+ * Get last error for current thread.
  * 
- * This is useful when a function returns NULL/false but you need
- * more details about why it failed.
+ * @return Last error code set in this thread
+ * @note Useful when function returns NULL/false without error code
+ * @note Thread-local - each thread has independent error state
  */
 PkError pk_get_last_error(void);
 
 /**
- * Set last error for current thread
- * @param error Error code to set
+ * Set last error for current thread.
  * 
- * This should be called by functions before returning NULL/false
- * to provide additional error context.
+ * @param error Error code to set
+ * @note Call before returning NULL/false to provide error context
+ * @note Thread-local - only affects current thread
  */
 void pk_set_last_error(PkError error);
 
 /**
- * Clear last error for current thread
+ * Clear last error for current thread.
  * 
- * Call this to reset error state before operations that might fail.
+ * @note Resets error state to PK_OK
+ * @note Call before operations that might fail to ensure clean state
  */
 void pk_clear_last_error(void);
 

@@ -13,31 +13,40 @@
 #include "core/sdl_includes.h"
 #include <stdbool.h>
 
-/* Forward declaration */
+/** Opaque display backend handle */
 typedef struct DisplayBackend DisplayBackend;
 
-/* Display backend types */
+/**
+ * Display backend implementation types.
+ * Determines rendering and display strategy.
+ */
 typedef enum {
-    DISPLAY_BACKEND_SDL,        /* Standard SDL with window manager */
-    DISPLAY_BACKEND_SDL_DRM,    /* SDL + Direct DRM for embedded */
-    DISPLAY_BACKEND_AUTO        /* Auto-detect best backend */
+    DISPLAY_BACKEND_SDL,        /**< Standard SDL with window manager */
+    DISPLAY_BACKEND_SDL_DRM,    /**< SDL + Direct DRM for embedded */
+    DISPLAY_BACKEND_AUTO        /**< Auto-detect best backend */
 } DisplayBackendType;
 
-/* Display configuration */
+/**
+ * Display backend configuration.
+ * Initial settings for display creation.
+ */
 typedef struct {
-    int width;
-    int height;
-    const char* title;
-    DisplayBackendType backend_type;
-    bool fullscreen;
-    bool vsync;
+    int width;                      /**< Requested width in pixels */
+    int height;                     /**< Requested height in pixels */
+    const char* title;              /**< Window title (if windowed) */
+    DisplayBackendType backend_type; /**< Backend implementation to use */
+    bool fullscreen;                /**< Start in fullscreen mode */
+    bool vsync;                     /**< Enable vertical sync */
 } DisplayConfig;
 
 /* Forward declarations for implementation types */
 struct SDLBackendImpl;
 struct SDLDRMBackendImpl;
 
-/* Display backend interface */
+/**
+ * Display backend interface.
+ * Provides unified API over different display technologies.
+ */
 struct DisplayBackend {
     /* Backend type identifier */
     DisplayBackendType type;
@@ -70,34 +79,45 @@ struct DisplayBackend {
     bool (*set_fullscreen)(DisplayBackend* backend, bool enable);
 };
 
-/* Initialize display backend with configuration
- * @param config Display configuration
- * @return Backend instance or NULL on failure
+/**
+ * Create a display backend with configuration.
+ * 
+ * @param config Display configuration (required)
+ * @return New backend or NULL on error (caller owns)
+ * @note Backend type AUTO will probe available backends
  */
 DisplayBackend* display_backend_create(const DisplayConfig* config);
 
-/* Present the current frame
- * @param backend Display backend instance
+/**
+ * Present the current frame to display.
  * 
- * This should be called after SDL_RenderPresent() to ensure
- * the frame is actually displayed on hardware.
+ * @param backend Display backend (required)
+ * @note Call after SDL_RenderPresent() to ensure hardware sync
  */
 void display_backend_present(DisplayBackend* backend);
 
-/* Cleanup and destroy backend
- * @param backend Display backend instance
+/**
+ * Destroy a display backend.
+ * 
+ * @param backend Backend to destroy (can be NULL)
+ * @note Cleans up all backend resources
  */
 void display_backend_destroy(DisplayBackend* backend);
 
-/* Get backend type name for logging
- * @param type Backend type
- * @return String representation of backend type
+/**
+ * Get human-readable name for backend type.
+ * 
+ * @param type Backend type enum value
+ * @return Static string name (never NULL)
  */
 const char* display_backend_type_name(DisplayBackendType type);
 
-/* Check if a backend type is available
+/**
+ * Check if a backend type is available on this system.
+ * 
  * @param type Backend type to check
- * @return true if backend is available
+ * @return true if backend can be used, false otherwise
+ * @note SDL backend is always available
  */
 bool display_backend_available(DisplayBackendType type);
 
