@@ -795,13 +795,19 @@ static void widget_integration_page_changed_callback(int from_page, int to_page,
     
     log_debug("Page manager widget changed page: %d -> %d", from_page, to_page);
     
-    // Mirror to existing page system
-    if (pages_get_current() != to_page) {
-        pages_transition_to(to_page);
+    // Only mirror to legacy system if NOT in widget render mode
+    if (!getenv("WIDGET_RENDER")) {
+        // Mirror to existing page system
+        if (pages_get_current() != to_page) {
+            pages_transition_to(to_page);
+        }
+        
+        // Publish page change event
+        widget_integration_mirror_page_change(integration, from_page, to_page);
+    } else {
+        // In widget mode, just update state store
+        state_store_set(integration->state_store, "app", "current_page", &to_page, sizeof(int));
     }
-    
-    // Publish page change event
-    widget_integration_mirror_page_change(integration, from_page, to_page);
 }
 
 // Handle page transition requests from widget system
@@ -820,17 +826,21 @@ static void widget_page_transition_handler(const char* event_name, const void* d
         page_manager_transition_to(integration->page_manager, target_page);
     }
     
-    // Publish system-wide page change event for old system to handle
-    // TODO(Phase7): Remove when old page system is retired
-    struct {
-        int from_page;
-        int to_page;
-    } page_event = {
-        page_manager_get_current_page(integration->page_manager),
-        target_page
-    };
-    event_publish(integration->event_system, "system.page_transition", &page_event, sizeof(page_event));
-    log_debug("Published system.page_transition event: %d -> %d", page_event.from_page, page_event.to_page);
+    // Only publish legacy events if NOT in widget render mode
+    if (!getenv("WIDGET_RENDER")) {
+        // Publish system-wide page change event for old system to handle
+        struct {
+            int from_page;
+            int to_page;
+        } page_event = {
+            page_manager_get_current_page(integration->page_manager),
+            target_page
+        };
+        event_publish(integration->event_system, "system.page_transition", &page_event, sizeof(page_event));
+        log_debug("Published system.page_transition event: %d -> %d", page_event.from_page, page_event.to_page);
+    } else {
+        log_debug("Widget mode: Skipping legacy page transition event");
+    }
 }
 
 // Handle API refresh requests from widget system  
@@ -840,17 +850,18 @@ static void widget_api_refresh_handler(const char* event_name, const void* data,
     
     log_debug("Widget API refresh handler: publishing system event");
     
-    // Publish system-wide event that app.c can subscribe to
+    // In widget mode, we could handle API refresh directly
+    // For now, still publish the event as API manager is shared between modes
     struct {
         uint32_t timestamp;
         char source[32];
-    } api_event = {
-        SDL_GetTicks(),
-        "widget_system"
-    };
+    } api_event;
+    
+    api_event.timestamp = SDL_GetTicks();
+    strcpy(api_event.source, getenv("WIDGET_RENDER") ? "widget_system" : "legacy_system");
     
     event_publish(integration->event_system, "system.api_refresh", &api_event, sizeof(api_event));
-    log_debug("Published system.api_refresh event");
+    log_debug("Published system.api_refresh event from %s", api_event.source);
 }
 
 // Sync state from widget store back to global variables (for gradual migration)
