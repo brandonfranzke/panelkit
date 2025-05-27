@@ -45,12 +45,16 @@ EventSystem* event_system_create(void) {
     EventSystem* system = calloc(1, sizeof(EventSystem));
     if (!system) {
         log_error("Failed to allocate event system");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate EventSystem struct");
         return NULL;
     }
     
     // Initialize rwlock
     if (pthread_rwlock_init(&system->lock, NULL) != 0) {
         log_error("Failed to initialize event system lock");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+                                       "pthread_rwlock_init failed");
         free(system);
         return NULL;
     }
@@ -59,6 +63,9 @@ EventSystem* event_system_create(void) {
     system->subscriptions = calloc(INITIAL_SUBSCRIPTIONS_CAPACITY, sizeof(Subscription));
     if (!system->subscriptions) {
         log_error("Failed to allocate subscriptions array");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate %zu subscriptions",
+                                       INITIAL_SUBSCRIPTIONS_CAPACITY);
         pthread_rwlock_destroy(&system->lock);
         free(system);
         return NULL;
@@ -157,9 +164,12 @@ bool event_subscribe(EventSystem* system,
 bool event_unsubscribe(EventSystem* system, 
                        const char* event_name,
                        event_handler_func handler) {
-    if (!system || !event_name || !handler) {
-        return false;
-    }
+    PK_CHECK_FALSE_WITH_CONTEXT(system != NULL, PK_ERROR_NULL_PARAM,
+                                "system is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(event_name != NULL, PK_ERROR_NULL_PARAM,
+                                "event_name is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(handler != NULL, PK_ERROR_NULL_PARAM,
+                                "handler is NULL");
     
     pthread_rwlock_wrlock(&system->lock);
     
@@ -187,6 +197,9 @@ bool event_unsubscribe(EventSystem* system,
     }
     
     pthread_rwlock_unlock(&system->lock);
+    pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+                                   "Handler %p not subscribed to event '%s'",
+                                   (void*)handler, event_name);
     return false;
 }
 

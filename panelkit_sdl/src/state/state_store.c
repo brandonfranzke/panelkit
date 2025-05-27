@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <time.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 #define MAX_COMPOUND_KEY_LENGTH 192  // "type_name:id"
 #define INITIAL_STORE_CAPACITY 64
@@ -82,12 +83,16 @@ StateStore* state_store_create(void) {
     StateStore* store = calloc(1, sizeof(StateStore));
     if (!store) {
         log_error("Failed to allocate state store");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate StateStore struct");
         return NULL;
     }
     
     // Initialize pthread rwlock
     if (pthread_rwlock_init(&store->lock, NULL) != 0) {
         log_error("Failed to initialize state store lock");
+        pk_set_last_error_with_context(PK_ERROR_SYSTEM,
+                                       "pthread_rwlock_init failed for state store");
         free(store);
         return NULL;
     }
@@ -96,6 +101,9 @@ StateStore* state_store_create(void) {
     store->type_configs = calloc(INITIAL_TYPE_CAPACITY, sizeof(TypeConfigEntry));
     if (!store->type_configs) {
         log_error("Failed to allocate type configs array");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate %zu type configs",
+                                       INITIAL_TYPE_CAPACITY);
         pthread_rwlock_destroy(&store->lock);
         free(store);
         return NULL;

@@ -2,6 +2,7 @@
 #include "api_client.h"
 #include "../json/json_parser.h"
 #include "../core/logger.h"
+#include "../core/error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -40,9 +41,16 @@ static void handle_api_response(ApiResponse* response, void* user_data);
 static bool parse_user_data(const char* json_data, UserData* user_data);
 
 ApiManager* api_manager_create(const ApiManagerConfig* config) {
+    PK_CHECK_NULL_WITH_CONTEXT(config != NULL, PK_ERROR_NULL_PARAM,
+                               "config is NULL");
+    PK_CHECK_NULL_WITH_CONTEXT(config->base_url != NULL, PK_ERROR_NULL_PARAM,
+                               "config->base_url is NULL");
+    
     ApiManager* manager = calloc(1, sizeof(ApiManager));
     if (!manager) {
         log_error("Failed to allocate API manager");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate ApiManager struct");
         return NULL;
     }
     

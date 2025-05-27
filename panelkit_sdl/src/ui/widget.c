@@ -147,7 +147,15 @@ bool widget_add_child(Widget* parent, Widget* child) {
 }
 
 bool widget_remove_child(Widget* parent, Widget* child) {
-    if (!parent || !child || child->parent != parent) {
+    PK_CHECK_FALSE_WITH_CONTEXT(parent != NULL, PK_ERROR_NULL_PARAM, 
+                                "parent is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(child != NULL, PK_ERROR_NULL_PARAM,
+                                "child is NULL");
+    
+    if (child->parent != parent) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "child '%s' is not a child of parent '%s'",
+                                       child->id, parent->id);
         return false;
     }
     
@@ -166,13 +174,17 @@ bool widget_remove_child(Widget* parent, Widget* child) {
         }
     }
     
+    pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+                                   "child '%s' not found in parent '%s'",
+                                   child->id, parent->id);
     return false;
 }
 
 Widget* widget_find_child(Widget* parent, const char* id) {
-    if (!parent || !id) {
-        return NULL;
-    }
+    PK_CHECK_NULL_WITH_CONTEXT(parent != NULL, PK_ERROR_NULL_PARAM,
+                               "parent is NULL");
+    PK_CHECK_NULL_WITH_CONTEXT(id != NULL, PK_ERROR_NULL_PARAM,
+                               "id is NULL");
     
     for (size_t i = 0; i < parent->child_count; i++) {
         if (strcmp(parent->children[i]->id, id) == 0) {
@@ -180,13 +192,15 @@ Widget* widget_find_child(Widget* parent, const char* id) {
         }
     }
     
+    // Not an error - widget simply not found
     return NULL;
 }
 
 Widget* widget_find_descendant(Widget* root, const char* id) {
-    if (!root || !id) {
-        return NULL;
-    }
+    PK_CHECK_NULL_WITH_CONTEXT(root != NULL, PK_ERROR_NULL_PARAM,
+                               "root is NULL");
+    PK_CHECK_NULL_WITH_CONTEXT(id != NULL, PK_ERROR_NULL_PARAM,
+                               "id is NULL");
     
     if (strcmp(root->id, id) == 0) {
         return root;
@@ -199,18 +213,20 @@ Widget* widget_find_descendant(Widget* root, const char* id) {
         }
     }
     
+    // Not an error - widget simply not found
     return NULL;
 }
 
 bool widget_subscribe_event(Widget* widget, const char* event_name) {
-    if (!widget || !event_name) {
-        return false;
-    }
+    PK_CHECK_FALSE_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                                "widget is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(event_name != NULL, PK_ERROR_NULL_PARAM,
+                                "event_name is NULL");
     
     // Check if already subscribed
     for (size_t i = 0; i < widget->event_count; i++) {
         if (strcmp(widget->subscribed_events[i], event_name) == 0) {
-            return true;  // Already subscribed
+            return true;  // Already subscribed - not an error
         }
     }
     
@@ -220,7 +236,10 @@ bool widget_subscribe_event(Widget* widget, const char* event_name) {
         char** new_events = realloc(widget->subscribed_events,
                                    new_capacity * sizeof(char*));
         if (!new_events) {
-            log_error("Failed to grow events array");
+            log_error("Failed to grow events array for widget '%s'", widget->id);
+            pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                           "Failed to resize events array from %zu to %zu",
+                                           widget->event_capacity, new_capacity);
             return false;
         }
         widget->subscribed_events = new_events;
@@ -230,6 +249,9 @@ bool widget_subscribe_event(Widget* widget, const char* event_name) {
     // Store event name
     widget->subscribed_events[widget->event_count] = strdup(event_name);
     if (!widget->subscribed_events[widget->event_count]) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to duplicate event name '%s'",
+                                       event_name);
         return false;
     }
     widget->event_count++;
@@ -241,6 +263,9 @@ bool widget_subscribe_event(Widget* widget, const char* event_name) {
         if (!success) {
             // Rollback
             free(widget->subscribed_events[--widget->event_count]);
+            pk_set_last_error_with_context(PK_ERROR_EVENT_NOT_FOUND,
+                                           "Failed to subscribe widget '%s' to event '%s'",
+                                           widget->id, event_name);
             return false;
         }
     }
@@ -250,9 +275,10 @@ bool widget_subscribe_event(Widget* widget, const char* event_name) {
 }
 
 bool widget_unsubscribe_event(Widget* widget, const char* event_name) {
-    if (!widget || !event_name) {
-        return false;
-    }
+    PK_CHECK_FALSE_WITH_CONTEXT(widget != NULL, PK_ERROR_NULL_PARAM,
+                                "widget is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(event_name != NULL, PK_ERROR_NULL_PARAM,
+                                "event_name is NULL");
     
     for (size_t i = 0; i < widget->event_count; i++) {
         if (strcmp(widget->subscribed_events[i], event_name) == 0) {
@@ -274,6 +300,9 @@ bool widget_unsubscribe_event(Widget* widget, const char* event_name) {
         }
     }
     
+    pk_set_last_error_with_context(PK_ERROR_NOT_FOUND,
+                                   "Widget '%s' not subscribed to event '%s'",
+                                   widget->id, event_name);
     return false;
 }
 
@@ -309,6 +338,8 @@ void widget_connect_systems(Widget* widget, EventSystem* events, StateStore* sto
 
 void widget_set_state(Widget* widget, WidgetState state, bool enabled) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_set_state");
         return;
     }
     
@@ -347,6 +378,15 @@ bool widget_is_enabled(Widget* widget) {
 
 void widget_set_bounds(Widget* widget, int x, int y, int width, int height) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_set_bounds");
+        return;
+    }
+    
+    if (width < 0 || height < 0) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "Invalid bounds: width=%d, height=%d",
+                                       width, height);
         return;
     }
     
@@ -370,6 +410,15 @@ void widget_set_bounds(Widget* widget, int x, int y, int width, int height) {
 
 void widget_set_relative_bounds(Widget* widget, int x, int y, int width, int height) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_set_relative_bounds");
+        return;
+    }
+    
+    if (width < 0 || height < 0) {
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "Invalid relative bounds: width=%d, height=%d",
+                                       width, height);
         return;
     }
     
@@ -393,6 +442,8 @@ void widget_set_relative_bounds(Widget* widget, int x, int y, int width, int hei
 
 void widget_invalidate_layout(Widget* widget) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_invalidate_layout");
         return;
     }
     
@@ -401,8 +452,14 @@ void widget_invalidate_layout(Widget* widget) {
 }
 
 void widget_perform_layout(Widget* widget) {
-    if (!widget || !widget->needs_layout) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_perform_layout");
         return;
+    }
+    
+    if (!widget->needs_layout) {
+        return;  // Not an error - no layout needed
     }
     
     if (widget->layout) {
@@ -419,6 +476,8 @@ void widget_perform_layout(Widget* widget) {
 
 void widget_update_child_bounds(Widget* parent) {
     if (!parent) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "parent is NULL in widget_update_child_bounds");
         return;
     }
     
@@ -440,8 +499,20 @@ void widget_update_child_bounds(Widget* parent) {
 }
 
 void widget_render(Widget* widget, SDL_Renderer* renderer) {
-    if (!widget || !renderer || !widget_is_visible(widget)) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_render");
         return;
+    }
+    
+    if (!renderer) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "renderer is NULL in widget_render");
+        return;
+    }
+    
+    if (!widget_is_visible(widget)) {
+        return;  // Not an error - widget is hidden
     }
     
     // Perform layout if needed
@@ -465,6 +536,8 @@ void widget_render(Widget* widget, SDL_Renderer* renderer) {
 
 void widget_invalidate(Widget* widget) {
     if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_invalidate");
         return;
     }
     
@@ -477,8 +550,20 @@ void widget_invalidate(Widget* widget) {
 }
 
 void widget_handle_event(Widget* widget, const SDL_Event* event) {
-    if (!widget || !event || !widget_is_enabled(widget)) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_handle_event");
         return;
+    }
+    
+    if (!event) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "event is NULL in widget_handle_event");
+        return;
+    }
+    
+    if (!widget_is_enabled(widget)) {
+        return;  // Not an error - widget is disabled
     }
     
     // Debug logging for button events
@@ -513,8 +598,14 @@ bool widget_contains_point(Widget* widget, int x, int y) {
 }
 
 Widget* widget_hit_test(Widget* root, int x, int y) {
-    if (!root || !widget_is_visible(root)) {
+    if (!root) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "root is NULL in widget_hit_test");
         return NULL;
+    }
+    
+    if (!widget_is_visible(root)) {
+        return NULL;  // Not an error - widget is hidden
     }
     
     // First check if this widget contains the point
@@ -552,8 +643,14 @@ Widget* widget_hit_test(Widget* root, int x, int y) {
 }
 
 void widget_update(Widget* widget, double delta_time) {
-    if (!widget || !widget_is_enabled(widget)) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_update");
         return;
+    }
+    
+    if (!widget_is_enabled(widget)) {
+        return;  // Not an error - widget is disabled
     }
     
     // Update this widget

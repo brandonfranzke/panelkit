@@ -91,6 +91,26 @@ void pk_set_last_error(PkError error);
  */
 void pk_clear_last_error(void);
 
+/**
+ * Set last error with context information.
+ * 
+ * @param error Error code to set
+ * @param fmt Printf-style format string for context
+ * @param ... Format arguments
+ * @note Context helps debugging (e.g., "Widget ID: button1")
+ * @note Thread-local - only affects current thread
+ */
+void pk_set_last_error_with_context(PkError error, const char* fmt, ...);
+
+/**
+ * Get last error context string.
+ * 
+ * @return Context string or empty string if none (never NULL)
+ * @note Thread-local - returns context for current thread
+ * @note String remains valid until next error is set
+ */
+const char* pk_get_last_error_context(void);
+
 /* Convenience macros for common patterns */
 
 /**
@@ -125,6 +145,42 @@ void pk_clear_last_error(void);
     do { \
         if (!(condition)) { \
             pk_set_last_error(error); \
+            return false; \
+        } \
+    } while(0)
+
+/**
+ * Propagate error if not PK_OK
+ * Usage: PK_PROPAGATE_ERROR(some_function());
+ */
+#define PK_PROPAGATE_ERROR(err) \
+    do { \
+        PkError _err = (err); \
+        if (_err != PK_OK) { \
+            return _err; \
+        } \
+    } while(0)
+
+/**
+ * Check condition and set error with context
+ * Usage: PK_CHECK_NULL_WITH_CONTEXT(widget, PK_ERROR_NULL_PARAM, "widget_id=%s", id);
+ */
+#define PK_CHECK_NULL_WITH_CONTEXT(condition, error, fmt, ...) \
+    do { \
+        if (!(condition)) { \
+            pk_set_last_error_with_context(error, fmt, ##__VA_ARGS__); \
+            return NULL; \
+        } \
+    } while(0)
+
+/**
+ * Check condition and return false with context
+ * Usage: PK_CHECK_FALSE_WITH_CONTEXT(ptr, PK_ERROR_NULL_PARAM, "function=%s", __func__);
+ */
+#define PK_CHECK_FALSE_WITH_CONTEXT(condition, error, fmt, ...) \
+    do { \
+        if (!(condition)) { \
+            pk_set_last_error_with_context(error, fmt, ##__VA_ARGS__); \
             return false; \
         } \
     } while(0)

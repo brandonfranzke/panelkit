@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/logger.h"
+#include "core/error.h"
 
 #define INITIAL_ROOT_CAPACITY 8
 
@@ -17,9 +18,14 @@ typedef struct {
 WidgetManager* widget_manager_create(SDL_Renderer* renderer,
                                    EventSystem* event_system,
                                    StateStore* state_store) {
+    PK_CHECK_NULL_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
+                               "renderer is NULL");
+    
     WidgetManager* manager = calloc(1, sizeof(WidgetManager));
     if (!manager) {
         log_error("Failed to allocate widget manager");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate WidgetManager struct");
         return NULL;
     }
     
@@ -30,6 +36,9 @@ WidgetManager* widget_manager_create(SDL_Renderer* renderer,
     manager->root_capacity = INITIAL_ROOT_CAPACITY;
     manager->roots = calloc(manager->root_capacity, sizeof(Widget*));
     if (!manager->roots) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate roots array with capacity %zu",
+                                       manager->root_capacity);
         free(manager);
         return NULL;
     }
@@ -61,14 +70,20 @@ void widget_manager_destroy(WidgetManager* manager) {
 }
 
 bool widget_manager_add_root(WidgetManager* manager, Widget* root, const char* name) {
-    if (!manager || !root || !name) {
-        return false;
-    }
+    PK_CHECK_FALSE_WITH_CONTEXT(manager != NULL, PK_ERROR_NULL_PARAM,
+                                "manager is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(root != NULL, PK_ERROR_NULL_PARAM,
+                                "root widget is NULL");
+    PK_CHECK_FALSE_WITH_CONTEXT(name != NULL, PK_ERROR_NULL_PARAM,
+                                "name is NULL");
     
     // Check if name already exists
     for (size_t i = 0; i < manager->root_count; i++) {
         if (strcmp(manager->roots[i]->id, name) == 0) {
             log_error("Root with name '%s' already exists", name);
+            pk_set_last_error_with_context(PK_ERROR_ALREADY_EXISTS,
+                                           "Root widget with name '%s' already exists",
+                                           name);
             return false;
         }
     }
@@ -79,6 +94,9 @@ bool widget_manager_add_root(WidgetManager* manager, Widget* root, const char* n
         Widget** new_roots = realloc(manager->roots, new_capacity * sizeof(Widget*));
         if (!new_roots) {
             log_error("Failed to grow roots array");
+            pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                           "Failed to grow roots array from %zu to %zu",
+                                           manager->root_capacity, new_capacity);
             return false;
         }
         manager->roots = new_roots;

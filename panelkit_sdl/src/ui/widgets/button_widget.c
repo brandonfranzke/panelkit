@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "core/logger.h"
 #include "core/memory_patterns.h"  // Memory ownership patterns
+#include "core/error.h"
 
 // Forward declarations for virtual functions
 static void button_widget_render(Widget* widget, SDL_Renderer* renderer);
@@ -13,9 +14,15 @@ static void button_widget_handle_event(Widget* widget, const SDL_Event* event);
 static void button_widget_destroy(Widget* widget);
 
 ButtonWidget* button_widget_create(const char* id) {
+    PK_CHECK_NULL_WITH_CONTEXT(id != NULL, PK_ERROR_NULL_PARAM,
+                               "id is NULL in button_widget_create");
+    
     ButtonWidget* button = calloc(1, sizeof(ButtonWidget));
     if (!button) {
         log_error("Failed to allocate button widget");
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate ButtonWidget for '%s'",
+                                       id);
         return NULL;
     }
     
@@ -33,6 +40,9 @@ ButtonWidget* button_widget_create(const char* id) {
     base->child_capacity = 2;  // Typically text, but could be icon + text
     base->children = calloc(base->child_capacity, sizeof(Widget*));
     if (!base->children) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate children array for button '%s'",
+                                       id);
         free(button);
         return NULL;
     }
@@ -40,6 +50,10 @@ ButtonWidget* button_widget_create(const char* id) {
     base->event_capacity = 2;
     base->subscribed_events = calloc(base->event_capacity, sizeof(char*));
     if (!base->subscribed_events) {
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate events array for button '%s'",
+                                       id);
+        free(base->children);
         free(button);
         return NULL;
     }

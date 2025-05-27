@@ -1,13 +1,42 @@
 #include "error.h"
 #include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
 
-/* Thread-local storage for last error */
+/* Thread-local error information */
+typedef struct {
+    PkError error;
+    char context[256];
+} ErrorInfo;
+
+/* Thread-local storage for error info */
 static pthread_key_t error_key;
 static pthread_once_t error_key_once = PTHREAD_ONCE_INIT;
 
+/* Cleanup function for thread-local storage */
+static void free_error_info(void* ptr) {
+    free(ptr);
+}
+
 /* Initialize thread-local storage key */
 static void init_error_key(void) {
-    pthread_key_create(&error_key, NULL);
+    pthread_key_create(&error_key, free_error_info);
+}
+
+/* Get or create thread-local error info */
+static ErrorInfo* get_error_info(void) {
+    pthread_once(&error_key_once, init_error_key);
+    
+    ErrorInfo* info = pthread_getspecific(error_key);
+    if (info == NULL) {
+        info = calloc(1, sizeof(ErrorInfo));
+        if (info != NULL) {
+            pthread_setspecific(error_key, info);
+        }
+    }
+    return info;
 }
 
 /* Get error string for error code */
@@ -82,23 +111,47 @@ const char* pk_error_string(PkError error) {
 
 /* Get last error for current thread */
 PkError pk_get_last_error(void) {
-    pthread_once(&error_key_once, init_error_key);
-    
-    void* error_ptr = pthread_getspecific(error_key);
-    if (error_ptr == NULL) {
-        return PK_OK;
-    }
-    
-    return (PkError)(intptr_t)error_ptr;
+    ErrorInfo* info = get_error_info();
+    return info ? info->error : PK_OK;
 }
 
 /* Set last error for current thread */
 void pk_set_last_error(PkError error) {
-    pthread_once(&error_key_once, init_error_key);
-    pthread_setspecific(error_key, (void*)(intptr_t)error);
+    ErrorInfo* info = get_error_info();
+    if (info) {
+        info->error = error;
+        info->context[0] = '\0';  // Clear context
+    }
+}
+
+/* Set last error with context */
+void pk_set_last_error_with_context(PkError error, const char* fmt, ...) {
+    ErrorInfo* info = get_error_info();
+    if (info) {
+        info->error = error;
+        
+        if (fmt) {
+            va_list args;
+            va_start(args, fmt);
+            vsnprintf(info->context, sizeof(info->context), fmt, args);
+            va_end(args);
+        } else {
+            info->context[0] = '\0';
+        }
+    }
+}
+
+/* Get last error context */
+const char* pk_get_last_error_context(void) {
+    ErrorInfo* info = get_error_info();
+    return info ? info->context : "";
 }
 
 /* Clear last error for current thread */
 void pk_clear_last_error(void) {
-    pk_set_last_error(PK_OK);
+    ErrorInfo* info = get_error_info();
+    if (info) {
+        info->error = PK_OK;
+        info->context[0] = '\0';
+    }
 }
