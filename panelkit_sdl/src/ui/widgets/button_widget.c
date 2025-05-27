@@ -16,7 +16,7 @@ static void button_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void button_widget_handle_event(Widget* widget, const SDL_Event* event);
 static void button_widget_destroy(Widget* widget);
 
-ButtonWidget* button_widget_create(const char* id, const char* label) {
+ButtonWidget* button_widget_create(const char* id) {
     ButtonWidget* button = calloc(1, sizeof(ButtonWidget));
     if (!button) {
         log_error("Failed to allocate button widget");
@@ -33,9 +33,13 @@ ButtonWidget* button_widget_create(const char* id, const char* label) {
     base->handle_event = button_widget_handle_event;
     base->destroy = button_widget_destroy;
     
-    // Initialize widget arrays (required by base widget)
-    base->child_capacity = 0;  // Button has no children
-    base->children = NULL;
+    // Initialize widget arrays - buttons can now have children
+    base->child_capacity = 2;  // Typically text, but could be icon + text
+    base->children = calloc(base->child_capacity, sizeof(Widget*));
+    if (!base->children) {
+        free(button);
+        return NULL;
+    }
     
     base->event_capacity = 2;
     base->subscribed_events = calloc(base->event_capacity, sizeof(char*));
@@ -49,7 +53,6 @@ ButtonWidget* button_widget_create(const char* id, const char* label) {
     button->hover_color = (SDL_Color){120, 120, 120, 255};
     button->pressed_color = (SDL_Color){80, 80, 80, 255};
     button->disabled_color = (SDL_Color){180, 180, 180, 255};
-    button->text_color = (SDL_Color){255, 255, 255, 255};
     
     base->background_color = button->normal_color;
     base->border_color = (SDL_Color){50, 50, 50, 255};
@@ -60,20 +63,8 @@ ButtonWidget* button_widget_create(const char* id, const char* label) {
     base->bounds.w = 120;
     base->bounds.h = 40;
     
-    // Set label
-    strncpy(button->label, label, sizeof(button->label) - 1);
-    
-    log_info("Created button widget '%s' with label '%s'", id, label);
+    log_info("Created button widget '%s'", id);
     return button;
-}
-
-void button_widget_set_label(ButtonWidget* button, const char* label) {
-    if (!button || !label) {
-        return;
-    }
-    
-    strncpy(button->label, label, sizeof(button->label) - 1);
-    widget_invalidate(&button->base);
 }
 
 void button_widget_set_colors(ButtonWidget* button,
@@ -103,15 +94,6 @@ void button_widget_set_colors(ButtonWidget* button,
     }
     
     widget_invalidate(base);
-}
-
-void button_widget_set_text_color(ButtonWidget* button, SDL_Color color) {
-    if (!button) {
-        return;
-    }
-    
-    button->text_color = color;
-    widget_invalidate(&button->base);
 }
 
 void button_widget_set_click_callback(ButtonWidget* button,
@@ -204,37 +186,7 @@ static void button_widget_render(Widget* widget, SDL_Renderer* renderer) {
     // Call base render for background and border
     widget_default_render(widget, renderer);
     
-    // Draw label indicator (centered rectangle)
-    if (strlen(button->label) > 0) {
-        SDL_Rect label_rect = {
-            widget->bounds.x + widget->padding,
-            widget->bounds.y + widget->bounds.h / 2 - 10,
-            widget->bounds.w - widget->padding * 2,
-            20
-        };
-        
-        // Use text color for label indicator
-        SDL_SetRenderDrawColor(renderer,
-                             button->text_color.r,
-                             button->text_color.g,
-                             button->text_color.b,
-                             button->text_color.a);
-        SDL_RenderDrawRect(renderer, &label_rect);
-        
-        // Draw simple text length indicator
-        int text_width = (int)(strlen(button->label) * 6);  // Rough estimate
-        if (text_width > label_rect.w - 4) {
-            text_width = label_rect.w - 4;
-        }
-        
-        SDL_Rect text_indicator = {
-            label_rect.x + (label_rect.w - text_width) / 2,
-            label_rect.y + 2,
-            text_width,
-            label_rect.h - 4
-        };
-        SDL_RenderDrawRect(renderer, &text_indicator);
-    }
+    // Base render will handle drawing children (text widgets, etc)
     
     // Draw focus indicator
     if (widget_has_state(widget, WIDGET_STATE_FOCUSED)) {

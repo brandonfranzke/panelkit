@@ -130,10 +130,8 @@ Widget* widget_factory_create_widget(WidgetFactory* factory,
 // Built-in widget creators
 
 Widget* widget_factory_create_button(const char* id, void* params) {
-    ButtonParams* button_params = (ButtonParams*)params;
-    const char* label = button_params ? button_params->label : "Button";
-    
-    ButtonWidget* button = button_widget_create(id, label);
+    // Create empty button - label will be added as child widget
+    ButtonWidget* button = button_widget_create(id);
     return button ? &button->base : NULL;
 }
 

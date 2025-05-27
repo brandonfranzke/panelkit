@@ -9,19 +9,15 @@ typedef struct ButtonWidget ButtonWidget;
 // Button click callback
 typedef void (*button_click_callback)(ButtonWidget* button, void* user_data);
 
-// Button widget - interactive button with label and click handling
+// Button widget - interactive container that handles click events
 typedef struct ButtonWidget {
     Widget base;  // Must be first member for casting
     
-    // Button properties
-    char label[256];
-    
-    // Appearance
+    // Appearance (background colors for different states)
     SDL_Color normal_color;
     SDL_Color hover_color;
     SDL_Color pressed_color;
     SDL_Color disabled_color;
-    SDL_Color text_color;
     
     // Callback
     button_click_callback on_click;
@@ -33,17 +29,15 @@ typedef struct ButtonWidget {
     size_t publish_data_size;
 } ButtonWidget;
 
-// Constructor
-ButtonWidget* button_widget_create(const char* id, const char* label);
+// Constructor - creates an empty button container
+ButtonWidget* button_widget_create(const char* id);
 
 // Configuration
-void button_widget_set_label(ButtonWidget* button, const char* label);
 void button_widget_set_colors(ButtonWidget* button,
                             SDL_Color normal,
                             SDL_Color hover,
                             SDL_Color pressed,
                             SDL_Color disabled);
-void button_widget_set_text_color(ButtonWidget* button, SDL_Color color);
 
 // Click handling
 void button_widget_set_click_callback(ButtonWidget* button,

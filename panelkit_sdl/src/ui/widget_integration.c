@@ -18,6 +18,11 @@
 #include <string.h>
 #include <SDL2/SDL.h>
 
+// External font references from main app
+extern TTF_Font* font;
+extern TTF_Font* large_font;
+extern TTF_Font* small_font;
+
 // Simple logging macros for integration layer
 #ifndef log_info
 #define log_info(fmt, ...) printf("[WIDGET_INTEGRATION] " fmt "\n", ##__VA_ARGS__)
@@ -355,14 +360,28 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
     
     // Page 0 button
     if (integration->page_widgets[0]) {
-        ButtonParams params = {"Change Color"};
         Widget* button = widget_factory_create_widget(integration->widget_factory,
-                                                    "button", "page0_button0", &params);
+                                                    "button", "page0_button0", NULL);
         if (button) {
             widget_set_relative_bounds(button, 20, 100, 200, 50);
+            
+            // Create text widget as child of button
+            Widget* label = (Widget*)text_widget_create("page0_button0_text", "Change Color", font);
+            if (label) {
+                // Text fills button area minus padding
+                int padding = button->padding;
+                widget_set_bounds(label, 
+                    button->bounds.x + padding,
+                    button->bounds.y + padding,
+                    button->bounds.w - padding * 2,
+                    button->bounds.h - padding * 2);
+                text_widget_set_alignment(label, TEXT_ALIGN_CENTER);
+                widget_add_child(button, label);
+            }
+            
             widget_add_child(integration->page_widgets[0], button);
             integration->button_widgets[0][0] = button;
-            log_debug("Created shadow button widget: page0_button0");
+            log_debug("Created shadow button widget: page0_button0 with text");
         }
     }
     
@@ -378,9 +397,8 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                 char button_id[32];
                 snprintf(button_id, sizeof(button_id), "page1_button%d", i);
                 
-                ButtonParams params = {button_labels[i]};
                 Widget* button = widget_factory_create_widget(integration->widget_factory,
-                                                            "button", button_id, &params);
+                                                            "button", button_id, NULL);
                 if (button) {
                     // Calculate position based on 3x3 grid
                     int row = i / 3;
@@ -391,9 +409,26 @@ void widget_integration_create_shadow_widgets(WidgetIntegration* integration) {
                     int y = row * (button_height + 10) + 10;
                     
                     widget_set_relative_bounds(button, x, y, button_width, button_height);
+                    
+                    // Create text widget as child of button
+                    char text_id[64];
+                    snprintf(text_id, sizeof(text_id), "%s_text", button_id);
+                    Widget* label = (Widget*)text_widget_create(text_id, button_labels[i], font);
+                    if (label) {
+                        // Text fills button area minus padding
+                        int padding = button->padding;
+                        widget_set_bounds(label,
+                            button->bounds.x + padding,
+                            button->bounds.y + padding,
+                            button->bounds.w - padding * 2,
+                            button->bounds.h - padding * 2);
+                        text_widget_set_alignment(label, TEXT_ALIGN_CENTER);
+                        widget_add_child(button, label);
+                    }
+                    
                     widget_add_child(integration->page_widgets[1], button);
                     integration->button_widgets[1][i] = button;
-                    log_debug("Created shadow button widget: %s", button_id);
+                    log_debug("Created shadow button widget: %s with text", button_id);
                 }
             }
         }
@@ -422,11 +457,16 @@ void widget_integration_sync_button_state(WidgetIntegration* integration,
     
     Widget* button = integration->button_widgets[page][button_index];
     if (button && button->type == WIDGET_TYPE_BUTTON) {
-        ButtonWidget* btn = (ButtonWidget*)button;
-        
-        // Update button text if provided
-        if (text) {
-            button_widget_set_label(btn, text);
+        // Update button text if provided by updating the text widget child
+        if (text && button->child_count > 0) {
+            // Find the text widget child (should be the first child)
+            for (size_t i = 0; i < button->child_count; i++) {
+                Widget* child = button->children[i];
+                if (child && child->type == WIDGET_TYPE_LABEL) {
+                    text_widget_set_text(child, text);
+                    break;
+                }
+            }
         }
         
         // Update enabled state
@@ -807,10 +847,7 @@ void widget_integration_sync_state_to_globals(WidgetIntegration* integration,
 static void widget_integration_populate_page_widgets(WidgetIntegration* integration) {
     if (!integration || !integration->renderer) return;
     
-    // Get fonts from the app (temporarily using extern)
-    extern TTF_Font* font;
-    extern TTF_Font* large_font;
-    extern TTF_Font* small_font;
+    // Use fonts from the app
     
     // Populate Page 0 (Welcome page)
     if (integration->page_widgets[0]) {
