@@ -21,7 +21,10 @@ PanelKit is a touch-optimized UI application framework designed for embedded Lin
 
 ### Development & Operations
 - [Building & Deployment](DEPLOYMENT.md) - Build process, cross-compilation, and deployment
-- [Technical Debt](TECH_DEBT.md) - Known issues and improvement opportunities
+
+### Living Documents
+- [Tracking](tracking/) - TODOs, technical debt, and work-in-progress items
+- [Planning](planning/) - Future plans, proposals, and architectural ideas
 
 ## Quick Start
 
