@@ -30,6 +30,7 @@
 // Widget integration layer (runs parallel to existing UI)
 #include "ui/widget_integration.h"
 #include "ui/widget.h"
+#include "ui/widget_manager.h"
 
 // Embedded font data
 #include "embedded_font.h"
@@ -545,6 +546,10 @@ int main(int argc, char* argv[]) {
                 int touch_x = (int)(e.tfinger.x * actual_width);
                 int touch_y = (int)(e.tfinger.y * actual_height);
                 handle_touch_up(touch_x, touch_y, "touch");
+                // Mirror to widget integration layer
+                if (widget_integration) {
+                    widget_integration_mirror_touch_event(widget_integration, touch_x, touch_y, false);
+                }
             }
             else if (e.type == SDL_FINGERMOTION) {
                 int touch_x = (int)(e.tfinger.x * actual_width);
@@ -561,9 +566,18 @@ int main(int argc, char* argv[]) {
             }
             else if (e.type == SDL_MOUSEBUTTONUP) {
                 handle_touch_up(e.button.x, e.button.y, "mouse");
+                // Mirror to widget integration layer
+                if (widget_integration) {
+                    widget_integration_mirror_touch_event(widget_integration, e.button.x, e.button.y, false);
+                }
             }
             else if (e.type == SDL_MOUSEMOTION && (e.motion.state & SDL_BUTTON_LMASK)) {
                 handle_touch_motion(e.motion.x, e.motion.y, "mouse");
+            }
+            
+            // Forward SDL events to widget manager for WIDGET_RENDER mode
+            if (widget_integration && widget_integration->widget_manager && getenv("WIDGET_RENDER") != NULL) {
+                widget_manager_handle_event(widget_integration->widget_manager, &e);
             }
         }
         

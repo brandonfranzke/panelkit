@@ -302,10 +302,13 @@ static void page_manager_render(Widget* widget, SDL_Renderer* renderer) {
                       manager->pages[i]->render);
             
             if (!(manager->pages[i]->state_flags & WIDGET_STATE_HIDDEN)) {
-                // Check if page is visible
+                // Check if page is visible (any part of it is within the viewport)
                 int page_x = manager->pages[i]->bounds.x;
-                if (page_x + widget->bounds.w >= widget->bounds.x && 
-                    page_x <= widget->bounds.x + widget->bounds.w) {
+                int page_right = page_x + manager->pages[i]->bounds.w;
+                int viewport_left = widget->bounds.x;
+                int viewport_right = widget->bounds.x + widget->bounds.w;
+                
+                if (page_right > viewport_left && page_x < viewport_right) {
                     log_debug("    Page %d is visible, calling render", i);
                     if (manager->pages[i]->render) {
                         manager->pages[i]->render(manager->pages[i], renderer);
