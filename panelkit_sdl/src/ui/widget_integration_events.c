@@ -2,6 +2,7 @@
 #include "widget_integration_internal.h"
 #include "../state/state_store.h"
 #include "../events/event_system.h"
+#include "../events/event_system_typed.h"
 #include "../events/event_types.h"
 #include "widgets/page_manager_widget.h"
 #include "../core/sdl_includes.h"
@@ -11,9 +12,9 @@
 #include "core/logger.h"
 
 // Forward declarations for static event handlers
-static void widget_button_click_handler(const char* event_name, const void* data, size_t data_size, void* context);
-static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context);
-static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context);
+static void widget_button_click_handler(const ButtonEventData* data, void* context);
+static void widget_page_transition_handler(int target_page, void* context);
+static void widget_api_refresh_handler(uint32_t timestamp, void* context);
 
 void widget_integration_mirror_touch_event(WidgetIntegration* integration, 
                                           int x, int y, bool is_down) {
@@ -24,10 +25,13 @@ void widget_integration_mirror_touch_event(WidgetIntegration* integration,
     // Mirror touch events to widget event system
     TouchEventData touch_data = {x, y, is_down, SDL_GetTicks()};
     
-    const char* event_name = is_down ? "input.touch_down" : "input.touch_up";
-    event_publish(integration->event_system, event_name, &touch_data, sizeof(touch_data));
-    
-    log_debug("Mirrored touch event: %s at (%d, %d)", event_name, x, y);
+    if (is_down) {
+        event_publish_touch_down(integration->event_system, &touch_data);
+        log_debug("Mirrored touch event: touch_down at (%d, %d)", x, y);
+    } else {
+        event_publish_touch_up(integration->event_system, &touch_data);
+        log_debug("Mirrored touch event: touch_up at (%d, %d)", x, y);
+    }
 }
 
 void widget_integration_mirror_button_press(WidgetIntegration* integration,
@@ -53,7 +57,7 @@ void widget_integration_mirror_button_press(WidgetIntegration* integration,
         strncpy(button_data.button_text, button_text, sizeof(button_data.button_text) - 1);
     }
     
-    event_publish(integration->event_system, "ui.button_pressed", &button_data, sizeof(button_data));
+    event_publish_button_pressed(integration->event_system, &button_data);
     
     log_debug("Mirrored button press: page=%d index=%d text='%s'", current_page, button_index, button_text ? button_text : "");
 }
@@ -70,7 +74,7 @@ void widget_integration_mirror_page_change(WidgetIntegration* integration,
     // Mirror page change to widget event system
     PageChangeEventData page_data = {from_page, to_page, SDL_GetTicks()};
     
-    event_publish(integration->event_system, "ui.page_changed", &page_data, sizeof(page_data));
+    event_publish_page_changed(integration->event_system, &page_data);
     
     log_debug("Mirrored page change: %d -> %d", from_page, to_page);
 }
@@ -80,28 +84,26 @@ void widget_integration_enable_button_handling(WidgetIntegration* integration) {
     if (!integration || !integration->event_system) return;
     
     // Subscribe to button press events
-    event_subscribe(integration->event_system, "ui.button_pressed", 
-                   widget_button_click_handler, integration);
+    event_subscribe_button_pressed(integration->event_system, 
+                                  widget_button_click_handler, integration);
     
     // Subscribe to page transition events
-    event_subscribe(integration->event_system, "app.page_transition", 
-                   widget_page_transition_handler, integration);
+    event_subscribe_page_transition(integration->event_system, 
+                                   widget_page_transition_handler, integration);
     
     // Subscribe to API refresh events
-    event_subscribe(integration->event_system, "api.refresh_requested", 
-                   widget_api_refresh_handler, integration);
+    event_subscribe_api_refresh_requested(integration->event_system, 
+                                         widget_api_refresh_handler, integration);
     
     log_debug("Enabled widget-based button handling with event subscriptions");
 }
 
 // Widget-based button click handler
-static void widget_button_click_handler(const char* event_name, const void* data, size_t data_size, void* context) {
+static void widget_button_click_handler(const ButtonEventData* button_data, void* context) {
     WidgetIntegration* integration = (WidgetIntegration*)context;
-    if (!integration || !data || data_size < sizeof(ButtonEventData)) {
+    if (!integration || !button_data) {
         return;
     }
-    
-    const ButtonEventData* button_data = (const ButtonEventData*)data;
     
     log_debug("Widget button click handler: page=%d button=%d text='%s'",
              button_data->page, button_data->button_index, button_data->button_text);
@@ -111,7 +113,7 @@ static void widget_button_click_handler(const char* event_name, const void* data
         switch (button_data->button_index) {
             case 0: { // "Change Color" button - should transition to page 1
                 int target_page = 1;
-                event_publish(integration->event_system, "app.page_transition", &target_page, sizeof(int));
+                event_publish_page_transition(integration->event_system, target_page);
                 log_debug("Widget handler: Page transition to %d requested via event system", target_page);
                 break;
             }
@@ -152,14 +154,14 @@ static void widget_button_click_handler(const char* event_name, const void* data
             }
             case 3: { // Go to Page 1 button
                 int target_page = 0;
-                event_publish(integration->event_system, "app.page_transition", &target_page, sizeof(int));
+                event_publish_page_transition(integration->event_system, target_page);
                 log_debug("Widget handler: Page transition to %d requested via event system", target_page);
                 break;
             }
             case 4: { // Refresh API data button
                 // Trigger API refresh via event
                 uint32_t timestamp = SDL_GetTicks();
-                event_publish(integration->event_system, "api.refresh_requested", &timestamp, sizeof(uint32_t));
+                event_publish_api_refresh_requested(integration->event_system, timestamp);
                 log_debug("Widget handler: API refresh requested via event system");
                 break;
             }
@@ -174,11 +176,9 @@ static void widget_button_click_handler(const char* event_name, const void* data
 }
 
 // Handle page transition requests from widget system
-static void widget_page_transition_handler(const char* event_name, const void* data, size_t data_size, void* context) {
+static void widget_page_transition_handler(int target_page, void* context) {
     WidgetIntegration* integration = (WidgetIntegration*)context;
-    if (!data || data_size < sizeof(int) || !integration) return;
-    
-    int target_page = *(int*)data;
+    if (!integration) return;
     log_debug("Widget page transition handler: transitioning to page %d", target_page);
     
     // Update state store with new page
@@ -194,7 +194,7 @@ static void widget_page_transition_handler(const char* event_name, const void* d
 }
 
 // Handle API refresh requests from widget system  
-static void widget_api_refresh_handler(const char* event_name, const void* data, size_t data_size, void* context) {
+static void widget_api_refresh_handler(uint32_t timestamp, void* context) {
     WidgetIntegration* integration = (WidgetIntegration*)context;
     if (!integration || !integration->event_system) return;
     
@@ -207,7 +207,7 @@ static void widget_api_refresh_handler(const char* event_name, const void* data,
     api_event.timestamp = SDL_GetTicks();
     strcpy(api_event.source, "widget_system");
     
-    event_publish(integration->event_system, "system.api_refresh", &api_event, sizeof(api_event));
+    event_publish_api_refresh(integration->event_system, &api_event);
     log_debug("Published system.api_refresh event from %s", api_event.source);
 }
 

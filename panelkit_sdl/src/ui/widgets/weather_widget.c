@@ -1,5 +1,6 @@
 #include "weather_widget.h"
 #include "../../events/event_system.h"
+#include "../../events/event_system_typed.h"
 #include "../../state/state_store.h"
 #include <SDL_ttf.h>
 #include <stdlib.h>
@@ -125,8 +126,7 @@ void weather_widget_request_update(WeatherWidget* widget) {
     strncpy(request.location, widget->current_weather.location,
             sizeof(request.location) - 1);
     
-    event_publish(widget->base.event_system, "weather.request",
-                 &request, sizeof(request));
+    event_publish_weather_request(widget->base.event_system, request.location);
     
     log_debug("Weather widget requested update for '%s'", request.location);
 }

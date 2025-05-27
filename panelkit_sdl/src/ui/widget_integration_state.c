@@ -1,6 +1,9 @@
 #include "widget_integration.h"
 #include "widget_integration_internal.h"
 #include "../state/state_store.h"
+#include "../events/event_system.h"
+#include "../events/event_system_typed.h"
+#include "../events/event_types.h"
 #include "../core/sdl_includes.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -153,7 +156,7 @@ void widget_integration_mirror_user_data(WidgetIntegration* integration,
     
     // Also publish as event if events are enabled
     if (integration->events_enabled) {
-        event_publish(integration->event_system, "api.user_data_updated", user_data, data_size);
+        event_publish_api_user_data_updated(integration->event_system, user_data, data_size);
     }
     
     log_debug("Mirrored user data (%zu bytes) to widget state", data_size);
@@ -171,15 +174,12 @@ void widget_integration_mirror_api_state(WidgetIntegration* integration,
     
     // Also publish as event if events are enabled
     if (integration->events_enabled) {
-        struct {
-            char state_name[64];
-            char value[256];
-        } state_data = {{0}, {0}};
+        ApiStateChangeData state_data = {{0}, {0}};
         
         strncpy(state_data.state_name, state_name, sizeof(state_data.state_name) - 1);
         strncpy(state_data.value, value, sizeof(state_data.value) - 1);
         
-        event_publish(integration->event_system, "api.state_changed", &state_data, sizeof(state_data));
+        event_publish_api_state_changed(integration->event_system, &state_data);
     }
     
     log_debug("Mirrored API state: %s = %s", state_name, value);
