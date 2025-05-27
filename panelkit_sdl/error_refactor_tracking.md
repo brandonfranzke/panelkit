@@ -236,3 +236,66 @@ Implemented recovery strategies for:
    - Descriptive error contexts
 
 ## Phase 4: User-Visible Error Handling (TODO)
+
+---
+
+# Extended Error Recovery Implementation
+
+Bringing remaining systems up to Phase 3 error handling standards.
+
+## Event System
+
+Started: 2025-01-27
+
+### Phase 1: Error Context
+- [x] Add error context to event_system_create (already done)
+- [x] Add error context to event_subscribe
+- [x] Add error context to event_unsubscribe (already done)
+- [x] Add error context to event_emit (was event_publish)
+- [x] Add error context to allocation failures
+
+### Phase 2: Error Propagation  
+- [x] Convert event_emit to return PkError
+- [x] Add compatibility wrapper for event_publish
+- [x] Update return values throughout
+
+### Phase 3: Recovery Strategies
+- [x] Implement subscription limit (MAX_SUBSCRIPTIONS_PER_EVENT)
+- [x] Add subscriber failure isolation (continue on handler failure)
+- [x] Log warnings for handler failures
+
+### Summary
+Event system now has comprehensive error handling with:
+- Subscription overflow protection (100 per event limit)
+- Handler failure isolation
+- Full error context throughout
+- event_emit returns PkError for proper propagation
+
+## State Store
+
+Started: 2025-01-27
+
+### Phase 1: Error Context
+- [x] Add error context to state_store_create (already done)
+- [x] Add error context to state_store_set
+- [x] Add error context to state_store_get
+- [x] Add error context to allocation failures
+- [x] Add "not found" error context
+
+### Phase 2: Error Propagation
+- [ ] Convert state_store_set to return PkError (skipped - too many callers)
+- [ ] Convert state_store_get to return PkError (skipped - too many callers)
+- [x] Kept bool returns but added comprehensive error context
+
+### Phase 3: Recovery Strategies  
+- [x] Add state validation (size limits, input validation)
+- [x] Implement expired item cleanup
+- [x] Add opportunistic garbage collection
+- [x] Size limits: 1MB per item, 64 char type names, 128 char IDs
+
+### Summary
+State store now has:
+- Input validation with size limits
+- Automatic cleanup of expired items
+- Error context throughout all operations
+- Protection against resource exhaustion

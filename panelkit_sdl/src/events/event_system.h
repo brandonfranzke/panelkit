@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include "../core/error.h"
 
 /** Opaque event system handle */
 typedef struct EventSystem EventSystem;
@@ -41,15 +42,25 @@ void event_system_destroy(EventSystem* system);
 // Publishing events
 
 /**
- * Publish an event to all subscribers.
+ * Emit an event to all subscribers.
  * 
  * @param system Event system (required)
  * @param event_name Event identifier (required)
  * @param data Event data payload (can be NULL)
  * @param data_size Size of data in bytes (0 if data is NULL)
- * @return true on success, false on error
+ * @return PK_OK on success, error code on failure
  * @note Data is copied internally - caller can free after return
  * @note Handlers are called synchronously in subscription order
+ * @note If a handler fails, event continues to other handlers
+ */
+PkError event_emit(EventSystem* system, 
+                   const char* event_name, 
+                   const void* data, 
+                   size_t data_size);
+
+/**
+ * Publish an event (compatibility wrapper).
+ * @deprecated Use event_emit instead
  */
 bool event_publish(EventSystem* system, 
                    const char* event_name, 

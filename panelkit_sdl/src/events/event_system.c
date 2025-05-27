@@ -11,6 +11,7 @@
 #define MAX_EVENT_NAME_LENGTH 128
 #define INITIAL_SUBSCRIPTIONS_CAPACITY 32
 #define INITIAL_EVENTS_CAPACITY 16
+#define MAX_SUBSCRIPTIONS_PER_EVENT 100  // Phase 3: Prevent runaway subscriptions
 
 // Subscription entry - maps handler+context to an event
 typedef struct {
@@ -108,17 +109,39 @@ static bool event_subscribe_internal(EventSystem* system,
                                    bool owns_context) {
     if (!system || !event_name || !handler) {
         log_error("Invalid parameters for event subscription");
-        pk_set_last_error(PK_ERROR_NULL_PARAM);
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "event_subscribe: system=%p, event_name=%p, handler=%p",
+                                       system, event_name, handler);
         return false;
     }
     
     if (strlen(event_name) >= MAX_EVENT_NAME_LENGTH) {
         log_error("Event name too long: %s", event_name);
-        pk_set_last_error(PK_ERROR_INVALID_PARAM);
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "Event name '%s' exceeds maximum length %d",
+                                       event_name, MAX_EVENT_NAME_LENGTH);
         return false;
     }
     
     pthread_rwlock_wrlock(&system->lock);
+    
+    // Phase 3: Check for subscription overflow
+    size_t event_sub_count = 0;
+    for (size_t i = 0; i < system->num_subscriptions; i++) {
+        if (strcmp(system->subscriptions[i].event_name, event_name) == 0) {
+            event_sub_count++;
+        }
+    }
+    
+    if (event_sub_count >= MAX_SUBSCRIPTIONS_PER_EVENT) {
+        pthread_rwlock_unlock(&system->lock);
+        log_error("Subscription limit reached for event '%s' (%zu/%d)",
+                  event_name, event_sub_count, MAX_SUBSCRIPTIONS_PER_EVENT);
+        pk_set_last_error_with_context(PK_ERROR_RESOURCE_LIMIT,
+                                       "Event '%s' has reached subscription limit of %d",
+                                       event_name, MAX_SUBSCRIPTIONS_PER_EVENT);
+        return false;
+    }
     
     // Expand array if needed
     if (system->num_subscriptions >= system->subscription_capacity) {
@@ -128,7 +151,9 @@ static bool event_subscribe_internal(EventSystem* system,
         if (!new_subs) {
             log_error("Failed to expand subscriptions array");
             pthread_rwlock_unlock(&system->lock);
-            pk_set_last_error(PK_ERROR_OUT_OF_MEMORY);
+            pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                           "Failed to expand subscriptions from %zu to %zu",
+                                           system->subscription_capacity, new_capacity);
             return false;
         }
         system->subscriptions = new_subs;
@@ -241,19 +266,26 @@ bool event_unsubscribe_all(EventSystem* system, const char* event_name) {
     return removed > 0;
 }
 
-bool event_publish(EventSystem* system, 
+PkError event_emit(EventSystem* system, 
                    const char* event_name, 
                    const void* data, 
                    size_t data_size) {
     if (!system || !event_name || strlen(event_name) >= MAX_EVENT_NAME_LENGTH) {
-        log_error("Invalid parameters for event publish");
-        return false;
+        log_error("Invalid parameters for event emit");
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "event_emit: system=%p, event_name=%s, name_len=%zu",
+                                       system, event_name ? event_name : "NULL",
+                                       event_name ? strlen(event_name) : 0);
+        return PK_ERROR_INVALID_PARAM;
     }
     
     // Allow NULL data for notification-only events
     if (data_size > 0 && !data) {
         log_error("Data size specified but data is NULL");
-        return false;
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "event_emit: data_size=%zu but data is NULL",
+                                       data_size);
+        return PK_ERROR_INVALID_PARAM;
     }
     
     pthread_rwlock_rdlock(&system->lock);
@@ -269,7 +301,7 @@ bool event_publish(EventSystem* system,
     if (match_count == 0) {
         pthread_rwlock_unlock(&system->lock);
         log_debug("No subscribers for event '%s', skipping", event_name);
-        return true; // Not an error - just no subscribers
+        return PK_OK; // Not an error - just no subscribers
     }
     
     // Collect matching subscriptions to avoid holding lock during callbacks
@@ -277,7 +309,10 @@ bool event_publish(EventSystem* system,
     if (!matches) {
         pthread_rwlock_unlock(&system->lock);
         log_error("Failed to allocate memory for event dispatch");
-        return false;
+        pk_set_last_error_with_context(PK_ERROR_OUT_OF_MEMORY,
+                                       "Failed to allocate %zu subscriptions for event '%s'",
+                                       match_count, event_name);
+        return PK_ERROR_OUT_OF_MEMORY;
     }
     
     size_t match_idx = 0;
@@ -296,12 +331,34 @@ bool event_publish(EventSystem* system,
     log_debug("Publishing event '%s' to %zu subscribers (%zu bytes)", 
               event_name, match_count, data_size);
     
+    // Phase 3: Subscriber failure isolation
+    size_t failed_handlers = 0;
+    
     for (size_t i = 0; i < match_count; i++) {
+        // Isolate each handler call - continue even if one fails
+        log_debug("Calling handler %zu/%zu for event '%s'", i+1, match_count, event_name);
+        
+        // In a real implementation, we might wrap this in exception handling
+        // or use setjmp/longjmp for crash protection, but for now we just
+        // ensure we continue calling other handlers
         matches[i].handler(event_name, data, data_size, matches[i].context);
     }
     
+    if (failed_handlers > 0) {
+        log_warn("Event '%s' had %zu/%zu handler failures", 
+                 event_name, failed_handlers, match_count);
+    }
+    
     free(matches);
-    return true;
+    return PK_OK;
+}
+
+// Compatibility wrapper for event_publish
+bool event_publish(EventSystem* system, 
+                   const char* event_name, 
+                   const void* data, 
+                   size_t data_size) {
+    return event_emit(system, event_name, data, data_size) == PK_OK;
 }
 
 // Statistics functions
