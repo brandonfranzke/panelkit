@@ -22,7 +22,7 @@ typedef enum {
 } PatternType;
 
 /* Private implementation data */
-typedef struct {
+typedef struct MockData {
     /* Parent handler for event delivery */
     InputHandler* handler;
     

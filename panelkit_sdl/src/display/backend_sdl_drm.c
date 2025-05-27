@@ -38,7 +38,7 @@ typedef struct {
 } DRMBuffer;
 
 /* SDL+DRM backend implementation data */
-typedef struct {
+typedef struct SDLDRMBackendImpl {
     /* DRM resources */
     int drm_fd;
     drmModeConnector* connector;

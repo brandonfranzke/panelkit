@@ -12,7 +12,7 @@
 #include <stdlib.h>
 
 /* Private implementation data */
-typedef struct {
+typedef struct SDLNativeData {
     InputHandler* handler;
     int num_touch_devices;
 } SDLNativeData;

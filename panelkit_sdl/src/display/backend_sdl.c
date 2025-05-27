@@ -9,7 +9,7 @@
 #include <string.h>
 
 /* Standard SDL backend implementation data */
-typedef struct {
+typedef struct SDLBackendImpl {
     /* SDL owns the window and renderer, we just reference them */
     bool owns_sdl_init;
 } SDLBackendImpl;
