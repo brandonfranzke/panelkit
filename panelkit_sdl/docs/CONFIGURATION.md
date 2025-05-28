@@ -103,12 +103,12 @@ ui:
     scroll_friction: 0.95
     button_press_scale: 0.95
   
-  layout:
-    button_padding: 20
-    header_height: 60
-    margin: 10
-    scroll_threshold: 10
-    swipe_threshold: 50
+  layout:                    # DEPRECATED - Being replaced by layout engine
+    button_padding: 20       # Use LayoutSpec padding instead
+    header_height: 60        # Use explicit widget sizing
+    margin: 10               # Use LayoutSpec gap/padding
+    scroll_threshold: 10     # Input handling, not layout
+    swipe_threshold: 50      # Input handling, not layout
 ```
 
 ### Logging

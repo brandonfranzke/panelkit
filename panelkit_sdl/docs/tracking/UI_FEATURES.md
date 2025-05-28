@@ -14,30 +14,32 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 
 ## In Progress
 
-### Testing Infrastructure
+### Testing Infrastructure ✅ COMPLETE
 - [x] Unity framework integration
 - [x] Test directory structure
 - [x] Test runner setup
 - [x] Makefile for tests
-- [x] First example test
+- [x] Comprehensive layout tests (25 tests passing)
 
-### Layout System Implementation
+### Layout System Implementation ✅ CORE COMPLETE
 - [x] Core layout data structures (LayoutRect, DisplayTransform)
 - [x] Layout utility functions (contains_point, intersect, to_pixels)
 - [x] Display transformation functions
-- [ ] Layout specification system
-- [ ] Layout calculation engine
-- [ ] Absolute positioning mode
-- [ ] Flexbox layout
+- [x] Layout specification system (union-based type safety)
+- [x] Layout calculation engine
+- [x] Absolute positioning mode
+- [x] Flexbox layout (row/column, justify, align, grow/shrink)
 - [ ] Grid layout
-- [ ] Layout invalidation system
+- [x] Widget layout adapter
 
-### Style System Implementation  
+### Style System Implementation 📋 DESIGNED
+- [x] Complete specification (docs/planning/UI_STYLE_SYSTEM.md)
+- [ ] Font manager implementation
+- [ ] Color utilities
+- [ ] Style core structures
 - [ ] Compile-time theme constants
-- [ ] Immutable style objects
-- [ ] Basic property support (colors, padding)
-- [ ] Style resolution hierarchy
-- [ ] State-based styles
+- [ ] State-based styles (hover, pressed, disabled)
+- [ ] Observer pattern for dynamic updates
 
 ## Feature Ideas
 
@@ -88,13 +90,15 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 3. Migrate existing UI to new system
 4. Remove `ui_init.c`
 
-### Design Patterns (2025-01-27)
-- **Type-safe unions** instead of void* for layout data
-- **Explicit ownership** - LayoutSpec owns child properties
-- **No global state** - Everything passed through context
+### Design Patterns (Updated 2025-01-28)
+- **Type-safe unions** instead of void* for layout data ✅
+- **Two-tier type system** - StyleBase/Style prevents infinite nesting ✅
+- **Explicit ownership** - Widgets own styles or reference templates ✅
+- **No global state** - Everything passed through context ✅
 - **Error patterns** - pk_set_last_error_with_context() + return error code
-- **Logging** - Use PK_LOG_* macros, never printf
+- **Logging** - Use log_debug/log_error functions (not PK_LOG_*)
 - **Memory** - Clear create/destroy lifecycle functions
+- **Manual updates** - Explicit style refresh over automatic cascading
 
 ## Testing Ideas
 
@@ -109,3 +113,17 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 - Button color changes not working (event propagation)
 - All UI positioning still hardcoded
 - No layout debugging tools yet
+
+## Code TODOs
+
+From layout implementation:
+- Grid layout implementation (layout_core.c:256)
+- Permille encoding for relative coordinates (temporary solution)
+- Font size ownership coordination between layout and style
+- Remove temporary ui_init.c after widget integration
+
+From style system design:
+- Embedded font generation script
+- Style animation support (future)
+- Hot reload capability (architecture supports but not implemented)
+- Style serialization (possible but not planned)

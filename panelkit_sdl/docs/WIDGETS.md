@@ -34,11 +34,16 @@ struct Widget {
     size_t child_count;            // Number of children
     size_t child_capacity;         // Allocated capacity
     
-    // Layout
+    // Layout (being replaced by layout engine)
     SDL_Rect bounds;               // Absolute screen position
     SDL_Rect relative_bounds;      // Position relative to parent
     int z_index;                   // Drawing order
     int padding;                   // Internal padding
+    
+    // Layout System Integration (new)
+    // float layout_font_size;     // From layout system
+    // Style* style;               // Visual appearance
+    // StyleBase* active_style;    // Resolved for current state
     
     // State
     uint32_t state_flags;          // Combination of WidgetState flags

@@ -106,23 +106,25 @@ typedef struct {
 
 **ALWAYS use PanelKit logging**:
 ```c
-// CORRECT
-PK_LOG_DEBUG("Layout calculation: width=%f, height=%f", width, height);
-PK_LOG_ERROR("Failed to allocate layout context");
+// CORRECT - actual PanelKit logging functions
+log_debug("Layout calculation: width=%f, height=%f", width, height);
+log_error("Failed to allocate layout context");
+log_warn("Low contrast ratio: %.2f", ratio);
+log_info("Created widget '%s'", widget->id);
 
 // NEVER
 printf("Debug: %s\n", message);      // WRONG
 fprintf(stderr, "Error: %s\n", msg);  // WRONG
 #ifdef DEBUG
-    printf(...);  // WRONG - use PK_LOG_DEBUG instead
+    printf(...);  // WRONG - use log_debug instead
 #endif
 ```
 
 **Log Levels**:
-- `PK_LOG_DEBUG` - Detailed debugging info
-- `PK_LOG_INFO` - Normal operational messages
-- `PK_LOG_WARN` - Warning conditions
-- `PK_LOG_ERROR` - Error conditions (use with error returns)
+- `log_debug` - Detailed debugging info
+- `log_info` - Normal operational messages  
+- `log_warn` - Warning conditions (continue operation)
+- `log_error` - Error conditions (use with error returns)
 
 ### 5. State Management
 
@@ -237,9 +239,22 @@ void test_module_specific_behavior(void) {
 - No obvious comments like `// Increment counter`
 - Document tricky algorithms or non-obvious decisions
 
+**Design documentation style** (for AI assistants):
+- Be direct and technical, not philosophical
+- Provide concrete technical reasons, not historical evolution
+- Focus on implementation requirements, not abstract concepts
+- Use actual project examples (8 buttons, smart devices)
+- State what to implement, then explain technical constraints
+
+**AVOID**:
+- "Field technicians shouldn't break things" - too abstract
+- "First I thought X, then Y" - skip the journey
+- CSS comparisons unless directly relevant
+- Philosophical discussions about software design
+
 ## Common Mistakes to Avoid
 
-1. **Using printf instead of PK_LOG_***
+1. **Using printf instead of log_debug/log_error**
 2. **Returning void function results as error codes**
 3. **Global variables for state management**
 4. **Not checking allocation failures**
@@ -249,8 +264,55 @@ void test_module_specific_behavior(void) {
 8. **Inconsistent ownership patterns**
 9. **No matching destroy for create functions**
 10. **Test state leaking between test cases**
+11. **Writing philosophical documentation instead of technical specs**
+12. **Automatic cascading when manual updates would be clearer**
 
 ## Specific Implementation Patterns
+
+### Type-Safe State Prevention Pattern
+
+When implementing systems with potential infinite nesting:
+```c
+// CORRECT - Two-tier type system prevents nesting
+typedef struct StyleBase {
+    SDL_Color background;
+    // NO state variant fields
+} StyleBase;
+
+typedef struct Style {
+    StyleBase base;
+    StyleBase* hover;    // Can only be StyleBase*
+    StyleBase* pressed;  // Compiler prevents Style*
+} Style;
+
+// WRONG - Allows infinite nesting
+typedef struct Style {
+    SDL_Color background;
+    struct Style* hover;  // hover->hover->hover possible
+} Style;
+```
+
+**Rationale**: Compile-time prevention is better than runtime validation
+
+### Manual Update Pattern
+
+When implementing dynamic systems:
+```c
+// PREFERRED - Explicit manual updates
+void style_update_all_buttons(SDL_Color new_color) {
+    for (int i = 0; i < button_count; i++) {
+        buttons[i]->style->foreground = new_color;
+    }
+    style_refresh_affected_widgets();  // Manual trigger
+}
+
+// AVOID - Automatic cascading updates
+void style_set_with_cascade(Style* style) {
+    // Complex automatic propagation
+}
+```
+
+**Rationale**: User prefers explicit control over automatic magic
 
 ### Creating a New Layout Type
 
@@ -288,6 +350,14 @@ The user values "strong engineering and design principles" above getting things 
 - Choose simple rules over complex validation
 - Choose clear ownership over shared state
 - Choose comprehensive tests over quick implementation
-- Ask for clarification if amiguous or uncertain
+- Ask for clarification if ambiguous or uncertain
+
+**Focus on real use cases**: The project has specific requirements like:
+- 8 different colored buttons
+- Weather displays with temperature-based colors
+- Smart device controls created dynamically
+- Manual style updates across widget groups
+
+Design systems to solve these actual problems, not theoretical ones.
 
 Remember: "My highest priority is adherence to strong engineering and design principles. That supersedes efforts to just 'get it done'"
