@@ -24,10 +24,12 @@
 // Configuration system
 #include "config/config_manager.h"
 
-// Widget integration layer (runs parallel to existing UI)
-#include "ui/widget_integration.h"
+// UI system
+#include "ui/ui_init.h"
 #include "ui/widget.h"
 #include "ui/widget_manager.h"
+#include "events/event_system.h"
+#include "state/state_store.h"
 
 // Embedded font data
 #include "embedded_font.h"
@@ -61,8 +63,7 @@ bool quit = false;
 SDL_Color bg_color = {33, 33, 33, 255}; // Default dark gray
 
 // Time display
-// TODO: Remove - now handled by widget state store
-bool show_time = true; // Whether to show time on the third button
+// Time display is now handled by UI system (g_show_time in ui_init.c)
 
 // Page 1 specific
 // TODO: Remove when layout/theme system is implemented - now handled by widget state
@@ -83,8 +84,10 @@ ApiManager* api_manager = NULL;
 // TODO: Remove - user data now stored in state store via widget integration
 UserData current_user_data = {0};
 
-// Widget integration layer (runs parallel to existing system)
-WidgetIntegration* widget_integration = NULL;
+// UI system components
+WidgetManager* widget_manager = NULL;
+EventSystem* event_system = NULL;
+StateStore* state_store = NULL;
 
 // Debug info
 bool show_debug = true;
@@ -458,34 +461,68 @@ int main(int argc, char* argv[]) {
     api_manager_set_error_callback(api_manager, on_api_error, NULL);
     api_manager_set_state_callback(api_manager, on_api_state_changed, NULL);
     
-    // Initialize widget integration layer (runs parallel to existing UI)
-    widget_integration = widget_integration_create(renderer);
-    if (!widget_integration) {
-        log_warn("Widget integration layer failed to initialize - continuing without it");
-    } else {
-        widget_integration_set_dimensions(widget_integration, actual_width, actual_height);
-        widget_integration_set_fonts(widget_integration, font, large_font, small_font);
-        
-        // Create shadow widgets that mirror existing UI structure
-        widget_integration_create_shadow_widgets(widget_integration);
-        
-        // Enable event mirroring to capture interactions
-        widget_integration_enable_events(widget_integration);
-        
-        // Enable widget-based button handling (parallel to existing system)
-        widget_integration_enable_button_handling(widget_integration);
-        
-        // Subscribe to system events from widget integration
-        EventSystem* event_system = widget_integration_get_event_system(widget_integration);
-        if (event_system) {
-            event_subscribe(event_system, "system.page_transition", on_system_page_transition, NULL);
-            event_subscribe(event_system, "system.api_refresh", on_system_api_refresh, NULL);
-            log_info("Subscribed to system events: page_transition, api_refresh");
-        }
-        
-        // Start with state tracking and event mirroring
-        log_info("Widget integration layer initialized (background mode with event mirroring)");
+    // Initialize core UI systems
+    event_system = event_system_create();
+    if (!event_system) {
+        log_error("Failed to create event system");
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
     }
+    
+    state_store = state_store_create();
+    if (!state_store) {
+        log_error("Failed to create state store");
+        event_system_destroy(event_system);
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    widget_manager = widget_manager_create(renderer, event_system, state_store);
+    if (!widget_manager) {
+        log_error("Failed to create widget manager");
+        state_store_destroy(state_store);
+        event_system_destroy(event_system);
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Initialize UI with hardcoded layout
+    PkError ui_err = ui_init(widget_manager, event_system, state_store,
+                            actual_width, actual_height,
+                            font, large_font, small_font);
+    if (ui_err != PK_OK) {
+        log_error("Failed to initialize UI: %s", pk_error_string(ui_err));
+        widget_manager_destroy(widget_manager);
+        state_store_destroy(state_store);
+        event_system_destroy(event_system);
+        TTF_CloseFont(font);
+        TTF_CloseFont(large_font);
+        TTF_CloseFont(small_font);
+        TTF_Quit();
+        display_backend_destroy(display_backend);
+        logger_shutdown();
+        return 1;
+    }
+    
+    // Subscribe to system events
+    event_subscribe(event_system, "system.page_transition", on_system_page_transition, NULL);
+    event_subscribe(event_system, "system.api_refresh", on_system_api_refresh, NULL);
+    log_info("UI system initialized");
     
     // Force initial API fetch immediately
     api_manager_fetch_user_async(api_manager);
@@ -503,84 +540,75 @@ int main(int argc, char* argv[]) {
         while (SDL_PollEvent(&e)) {
             event_count++;
             if (e.type == SDL_QUIT) {
-                // Set quit through widget state store
-                if (widget_integration) {
-                    widget_integration_set_quit(widget_integration, true);
-                }
-                quit = true; // Will be synced from widget state
+                // Set quit through state store
+                bool quit_flag = true;
+                state_store_set(state_store, "app", "quit", &quit_flag, sizeof(bool));
+                quit = true;
             }
             
             // Forward SDL events to widget manager
-            if (widget_integration && widget_integration->widget_manager) {
-                widget_manager_handle_event(widget_integration->widget_manager, &e);
+            if (widget_manager) {
+                widget_manager_handle_event(widget_manager, &e);
             }
         }
         
-        // Always use widget rendering
-        if (widget_integration && widget_integration->page_manager) {
-            // === WIDGET MODE: Completely independent rendering path ===
-            
-            // Update API manager (still needed for data)
-            api_manager_update(api_manager, current_time);
-            
-            // Get ALL state from widget system
-            SDL_Color widget_bg_color = {33, 33, 33, 255}; // Default
-            if (widget_integration && widget_integration->state_store) {
-                size_t size;
-                time_t timestamp;
-                SDL_Color* stored_color = (SDL_Color*)state_store_get(widget_integration->state_store, 
-                                                                      "app", "bg_color", &size, &timestamp);
-                if (stored_color && size == sizeof(SDL_Color)) {
-                    widget_bg_color = *stored_color;
-                    free(stored_color);
-                }
-                
-                // Check quit flag from widget state
-                bool* stored_quit = (bool*)state_store_get(widget_integration->state_store, 
-                                                          "app", "quit", &size, &timestamp);
-                if (stored_quit && size == sizeof(bool)) {
-                    quit = *stored_quit;
-                    free(stored_quit);
-                }
-            }
-            
-            // Clear screen with widget background color
-            SDL_SetRenderDrawColor(renderer, widget_bg_color.r, widget_bg_color.g, 
-                                 widget_bg_color.b, widget_bg_color.a);
-            SDL_RenderClear(renderer);
-            
-        }
+        // Update API manager (still needed for data)
+        api_manager_update(api_manager, current_time);
         
-        if (widget_integration && widget_integration->page_manager) {
-            // === WIDGET MODE RENDERING ===
-            
-            // Update widget rendering based on current state
-            widget_integration_update_rendering(widget_integration);
-            
-            // Update page manager
-            if (widget_integration->page_manager->update) {
-                widget_integration->page_manager->update(widget_integration->page_manager, 
-                                                       (double)(current_time - last_time) / 1000.0);
+        // Get background color from state store
+        SDL_Color widget_bg_color = {33, 33, 33, 255}; // Default
+        if (state_store) {
+            size_t size;
+            time_t timestamp;
+            SDL_Color* stored_color = (SDL_Color*)state_store_get(state_store, 
+                                                                  "app", "bg_color", &size, &timestamp);
+            if (stored_color && size == sizeof(SDL_Color)) {
+                widget_bg_color = *stored_color;
+                free(stored_color);
             }
             
-            // Use widget-based rendering
-            if (widget_integration->page_manager->render) {
-                widget_integration->page_manager->render(widget_integration->page_manager, renderer);
+            // Check quit flag from state store
+            bool* stored_quit = (bool*)state_store_get(state_store, 
+                                                      "app", "quit", &size, &timestamp);
+            if (stored_quit && size == sizeof(bool)) {
+                quit = *stored_quit;
+                free(stored_quit);
             }
         }
         
-        // Draw debug overlay if enabled (at bottom of screen - two lines)
-        bool should_show_debug = widget_integration ? 
-            widget_integration_get_show_debug(widget_integration) : false;
+        // Clear screen with background color
+        SDL_SetRenderDrawColor(renderer, widget_bg_color.r, widget_bg_color.g, 
+                             widget_bg_color.b, widget_bg_color.a);
+        SDL_RenderClear(renderer);
         
-        if (should_show_debug) {
-            // Simple FPS display for now
-            // TODO: Implement full widget-based debug overlay
+        // Widget-based rendering
+        Widget* page_manager = ui_get_page_manager();
+        if (page_manager) {
+            // Update UI rendering state
+            ui_update_rendering();
+            
+            // Update widgets
+            widget_manager_update(widget_manager);
+            
+            // Render widgets
+            widget_manager_render(widget_manager);
+        }
+        
+        // Draw debug overlay if enabled
+        if (show_debug) {
+            // Get current page from state store
+            int current_page = 0;
+            size_t size;
+            time_t timestamp;
+            int* stored_page = (int*)state_store_get(state_store, "app", "current_page", &size, &timestamp);
+            if (stored_page) {
+                current_page = *stored_page;
+                free(stored_page);
+            }
+            
             char debug_line1[256];
-            int widget_current_page = widget_integration ? 
-                widget_integration_get_current_page(widget_integration) : 0;
             snprintf(debug_line1, sizeof(debug_line1), "Page: %d | FPS: %d", 
-                    widget_current_page + 1, fps);
+                    current_page + 1, fps);
             draw_text_left(debug_line1, 10, actual_height - 55, (SDL_Color){255, 255, 255, 128});
         }
         
@@ -592,10 +620,7 @@ int main(int argc, char* argv[]) {
             frame_count = 0;
             fps_timer = current_time;
             
-            // Update FPS in widget integration
-            if (widget_integration) {
-                widget_integration_update_fps(widget_integration, fps);
-            }
+            // FPS is now just displayed in debug overlay
         }
         
         // Update screen
@@ -621,8 +646,16 @@ int main(int argc, char* argv[]) {
     if (config_manager) {
         config_manager_destroy(config_manager);
     }
-    if (widget_integration) {
-        widget_integration_destroy(widget_integration);
+    // Cleanup UI systems
+    ui_cleanup();
+    if (widget_manager) {
+        widget_manager_destroy(widget_manager);
+    }
+    if (state_store) {
+        state_store_destroy(state_store);
+    }
+    if (event_system) {
+        event_system_destroy(event_system);
     }
     TTF_CloseFont(font);
     TTF_CloseFont(large_font);
@@ -647,9 +680,14 @@ void on_api_data_received(const UserData* data, void* context) {
         current_user_data = *data;
         log_info("API data received: %s", current_user_data.name);
         
-        // Mirror API data to widget integration layer
-        if (widget_integration) {
-            widget_integration_mirror_user_data(widget_integration, data, sizeof(*data));
+        // Store API data in state store and publish event
+        if (state_store) {
+            state_store_set(state_store, "api", "user_data", data, sizeof(*data));
+            
+            // Publish event for widgets
+            if (event_system) {
+                event_publish(event_system, "api.user_data_updated", data, sizeof(*data));
+            }
         }
     }
 }

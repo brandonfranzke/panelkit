@@ -1,5 +1,16 @@
 # Widget System Technical Debt
 
+## Recently Completed
+
+### Widget Integration Layer Removal (2025-01-27)
+- **What was removed**: The "shadow widget" transitional system (widget_integration_*.c/h files)
+- **Current state**: All UI setup temporarily consolidated in `ui_init.c`
+- **Why temporary**: This hardcoded UI setup will be replaced by proper layout/theme systems
+- **Known issues**: 
+  - Button color changes not working (event propagation issue)
+  - All UI positioning still hardcoded
+- **Next steps**: Implement layout management and theme systems to replace ui_init.c
+
 ## Active Issues
 
 ### Architecture & Design

@@ -11,6 +11,7 @@
 
 #include "widget.h"
 #include <SDL.h>
+#include <SDL_ttf.h>
 
 // Forward declarations
 typedef struct EventSystem EventSystem;
@@ -40,6 +41,11 @@ typedef struct WidgetManager {
     
     // Timing
     uint32_t last_update_time;
+    
+    // Temporary font storage until theme system
+    TTF_Font* font_regular;
+    TTF_Font* font_large;
+    TTF_Font* font_small;
 } WidgetManager;
 
 /* Lifecycle */
@@ -179,5 +185,33 @@ Widget* widget_manager_get_focus(WidgetManager* manager);
  * @param manager Widget manager (required)
  */
 void widget_manager_clear_focus(WidgetManager* manager);
+
+/* Temporary font storage until theme system is implemented */
+
+/**
+ * Set fonts for widgets to use (temporary).
+ * 
+ * @param manager Widget manager (required)
+ * @param font_regular Regular font (borrowed reference)
+ * @param font_large Large font (borrowed reference)
+ * @param font_small Small font (borrowed reference)
+ */
+void widget_manager_set_fonts(WidgetManager* manager, 
+                             TTF_Font* font_regular,
+                             TTF_Font* font_large, 
+                             TTF_Font* font_small);
+
+/**
+ * Get stored fonts (temporary).
+ * 
+ * @param manager Widget manager (required)
+ * @param font_regular Output for regular font (optional)
+ * @param font_large Output for large font (optional)
+ * @param font_small Output for small font (optional)
+ */
+void widget_manager_get_fonts(WidgetManager* manager,
+                             TTF_Font** font_regular,
+                             TTF_Font** font_large,
+                             TTF_Font** font_small);
 
 #endif // WIDGET_MANAGER_H

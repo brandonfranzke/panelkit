@@ -253,6 +253,7 @@ WidgetFactory* widget_factory_create_default(void) {
     widget_factory_register(factory, "weather", widget_factory_create_weather);
     widget_factory_register(factory, "label", widget_factory_create_label);
     widget_factory_register(factory, "container", widget_factory_create_container);
+    widget_factory_register(factory, "page_manager", widget_factory_create_page_manager);
     
     log_info("Created default widget factory with built-in types");
     return factory;

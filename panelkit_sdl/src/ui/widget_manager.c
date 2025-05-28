@@ -392,3 +392,37 @@ Widget* widget_manager_get_focus(WidgetManager* manager) {
 void widget_manager_clear_focus(WidgetManager* manager) {
     widget_manager_set_focus(manager, NULL);
 }
+
+// Temporary font storage functions
+void widget_manager_set_fonts(WidgetManager* manager, 
+                             TTF_Font* font_regular,
+                             TTF_Font* font_large, 
+                             TTF_Font* font_small) {
+    if (!manager) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "manager is NULL in widget_manager_set_fonts");
+        return;
+    }
+    
+    manager->font_regular = font_regular;
+    manager->font_large = font_large;
+    manager->font_small = font_small;
+    
+    log_debug("Set widget manager fonts: regular=%p, large=%p, small=%p",
+              font_regular, font_large, font_small);
+}
+
+void widget_manager_get_fonts(WidgetManager* manager,
+                             TTF_Font** font_regular,
+                             TTF_Font** font_large,
+                             TTF_Font** font_small) {
+    if (!manager) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "manager is NULL in widget_manager_get_fonts");
+        return;
+    }
+    
+    if (font_regular) *font_regular = manager->font_regular;
+    if (font_large) *font_large = manager->font_large;
+    if (font_small) *font_small = manager->font_small;
+}
