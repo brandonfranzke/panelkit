@@ -1,10 +1,10 @@
 # PanelKit Design Patterns and Methodology Guide for AI Assistants
 
-This document captures specific, opinionated design patterns and implementation requirements for PanelKit. It is written for AI assistants to understand the precise engineering standards required.
+This document captures specific, opinionated design patterns and implementation requirements for PanelKit. It is written for AI assistants to understand the precise engineering standards required. It should be modified as needed and you should prompt the user to update it with new patterns (or identification of existing patterns) as the emerge.
 
 ## Core Philosophy
 
-**Priority**: Engineering excellence over quick implementation. The user explicitly values "comprehensive and systematic changes" over simpler approaches. Never take shortcuts.
+**Priority**: Engineering excellence over quick implementation. The user explicitly values "comprehensive and systematic changes" over simpler approaches. Never take shortcuts. Do not implement in a subset of files and then report -- needs to be applied to rest of codebase.
 
 ## Critical Design Patterns
 
@@ -100,7 +100,7 @@ typedef struct {
 } LayoutSpec;
 ```
 
-**Rationale**: User has "went through a substantial effort to minimize/eliminate void*"
+**Rationale**: User has "went through a substantial effort to minimize/eliminate void*". Those that remain are generally allowed for speciifc cases where type safety is not practical or would require excessive complexity to revise.
 
 ### 4. Logging
 
@@ -288,5 +288,6 @@ The user values "strong engineering and design principles" above getting things 
 - Choose simple rules over complex validation
 - Choose clear ownership over shared state
 - Choose comprehensive tests over quick implementation
+- Ask for clarification if amiguous or uncertain
 
 Remember: "My highest priority is adherence to strong engineering and design principles. That supersedes efforts to just 'get it done'"
