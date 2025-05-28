@@ -68,6 +68,7 @@ help:
 	@echo "  make font DEFAULT_FONT=font-sans-dejavu.ttf"
 	@echo "  make target TARGET_HOST=192.168.1.100"
 	@echo "  make deploy TARGET_USER=brandon"
+	@echo "  make test                                   # Run unit tests"
 
 # Create font generation directory
 $(FONT_GEN_DIR):
@@ -107,8 +108,22 @@ deploy: target
 		--target-dir $(TARGET_PATH)
 
 
+# Test targets
+.PHONY: test
+test:
+	@echo "Running unit tests..."
+	@$(MAKE) -C test test
+	@echo "Tests complete!"
+
+test-clean:
+	@$(MAKE) -C test clean
+
+# Clean targets
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(BUILD_DIR)/
 	@rm -rf $(FONT_GEN_DIR)/
 	@echo "Build artifacts cleaned"
+
+clean-all: clean test-clean
+	@echo "All clean!"

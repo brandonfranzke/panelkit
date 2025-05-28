@@ -15,18 +15,21 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 ## In Progress
 
 ### Testing Infrastructure
-- [ ] Unity framework integration
-- [ ] Test directory structure
-- [ ] Test runner setup
-- [ ] Makefile for tests
-- [ ] First example test
+- [x] Unity framework integration
+- [x] Test directory structure
+- [x] Test runner setup
+- [x] Makefile for tests
+- [x] First example test
 
 ### Layout System Implementation
-- [ ] Core layout engine
+- [x] Core layout data structures (LayoutRect, DisplayTransform)
+- [x] Layout utility functions (contains_point, intersect, to_pixels)
+- [x] Display transformation functions
+- [ ] Layout specification system
+- [ ] Layout calculation engine
 - [ ] Absolute positioning mode
 - [ ] Flexbox layout
 - [ ] Grid layout
-- [ ] Display transformation matrix
 - [ ] Layout invalidation system
 
 ### Style System Implementation  
