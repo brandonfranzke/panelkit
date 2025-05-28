@@ -3,6 +3,7 @@
 #include "../state/state_store.h"
 #include "style/style_core.h"
 #include "style/style_constants.h"
+#include "style/style_validation.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -727,6 +728,17 @@ void widget_set_style_ref(Widget* widget, Style* style) {
         return;
     }
     
+    // Validate style before use
+    StyleValidation validation = style_validate(style, widget);
+    if (validation == STYLE_ERROR_MISSING_FONT || validation == STYLE_ERROR_INVALID_FONT_SIZE) {
+        log_error("Style validation failed for widget '%s': %s", 
+                  widget->id, style_validation_message(validation));
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "Style validation failed: %s",
+                                       style_validation_message(validation));
+        return;
+    }
+    
     // Clean up old style if owned
     if (widget->style_owned && widget->style) {
         style_destroy(widget->style);
@@ -742,6 +754,21 @@ void widget_set_style_owned(Widget* widget, Style* style) {
     if (!widget) {
         pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
                                        "widget is NULL in widget_set_style_owned");
+        return;
+    }
+    
+    // Validate style before use
+    StyleValidation validation = style_validate(style, widget);
+    if (validation == STYLE_ERROR_MISSING_FONT || validation == STYLE_ERROR_INVALID_FONT_SIZE) {
+        log_error("Style validation failed for widget '%s': %s", 
+                  widget->id, style_validation_message(validation));
+        pk_set_last_error_with_context(PK_ERROR_INVALID_PARAM,
+                                       "Style validation failed: %s",
+                                       style_validation_message(validation));
+        // Clean up the invalid style since we own it
+        if (style) {
+            style_destroy(style);
+        }
         return;
     }
     

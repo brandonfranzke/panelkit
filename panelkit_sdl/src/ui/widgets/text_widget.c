@@ -7,7 +7,7 @@
 // Forward declarations
 static PkError text_widget_render(Widget* widget, SDL_Renderer* renderer);
 static void text_widget_destroy(Widget* widget);
-static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* renderer);
+static PkError text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* renderer);
 
 Widget* text_widget_create(const char* id, const char* text, TTF_Font* font) {
     if (!id) {
@@ -123,8 +123,16 @@ void text_widget_set_font(Widget* widget, TTF_Font* font) {
     widget->state_flags |= WIDGET_STATE_DIRTY;
 }
 
-static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* renderer) {
-    if (!text_widget->needs_update || !text_widget->font || !renderer) return;
+static PkError text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* renderer) {
+    if (!text_widget->needs_update || !renderer) return PK_OK;
+    
+    if (!text_widget->font) {
+        log_error("Text widget '%s' has no font set", text_widget->base.id);
+        pk_set_last_error_with_context(PK_ERROR_INVALID_STATE,
+                                       "Text widget '%s' has no font",
+                                       text_widget->base.id);
+        return PK_ERROR_INVALID_STATE;
+    }
     
     // Destroy old texture
     if (text_widget->texture) {
@@ -136,7 +144,13 @@ static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* re
     SDL_Surface* surface = TTF_RenderText_Blended(text_widget->font, 
                                                   text_widget->text, 
                                                   text_widget->color);
-    if (!surface) return;
+    if (!surface) {
+        log_error("Failed to render text '%s': %s", text_widget->text, TTF_GetError());
+        pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
+                                       "TTF_RenderText_Blended failed: %s",
+                                       TTF_GetError());
+        return PK_ERROR_RENDER_FAILED;
+    }
     
     // Create texture from surface
     text_widget->texture = SDL_CreateTextureFromSurface(renderer, surface);
@@ -145,6 +159,7 @@ static void text_widget_update_texture(TextWidget* text_widget, SDL_Renderer* re
     
     SDL_FreeSurface(surface);
     text_widget->needs_update = false;
+    return PK_OK;
 }
 
 static PkError text_widget_render(Widget* widget, SDL_Renderer* renderer) {
@@ -155,7 +170,11 @@ static PkError text_widget_render(Widget* widget, SDL_Renderer* renderer) {
     TextWidget* text_widget = (TextWidget*)widget;
     
     // Update texture if needed
-    text_widget_update_texture(text_widget, renderer);
+    PkError update_err = text_widget_update_texture(text_widget, renderer);
+    if (update_err != PK_OK) {
+        // Log but don't fail - widget can still render without text
+        log_warn("Text widget '%s' texture update failed", widget->id);
+    }
     
     if (!text_widget->texture) return PK_OK;  // No text to render
     

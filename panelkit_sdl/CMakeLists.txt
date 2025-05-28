@@ -119,6 +119,8 @@ set(SOURCES
     src/ui/style/style_core.c
     src/ui/style/color_utils.c
     src/ui/style/font_manager.c
+    src/ui/style/style_validation.c
+    src/ui/style/style_system.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c
