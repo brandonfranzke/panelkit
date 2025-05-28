@@ -1,4 +1,6 @@
 #include "weather_widget.h"
+#include "../style/style_core.h"
+#include "../style/style_constants.h"
 #include "../../events/event_system.h"
 #include "../../events/event_system_typed.h"
 #include "../../state/state_store.h"
@@ -59,12 +61,17 @@ WeatherWidget* weather_widget_create(const char* id, const char* location) {
         return NULL;
     }
     
-    // Set default colors
-    base->background_color = (SDL_Color){250, 250, 250, 255};
-    base->foreground_color = (SDL_Color){0, 0, 0, 255};
-    base->border_color = (SDL_Color){200, 200, 200, 255};
-    base->border_width = 1;
-    base->padding = 10;
+    // Create weather widget style (light panel style)
+    Style* weather_style = style_create_text();
+    if (weather_style) {
+        // Make it a light panel
+        weather_style->base.background = (PkColor){250, 250, 250, 255};
+        weather_style->base.foreground = (PkColor){0, 0, 0, 255};
+        weather_style->base.border.color = (PkColor){200, 200, 200, 255};
+        weather_style->base.border.width = 1;
+        weather_style->base.padding = (Spacing){10, 10, 10, 10};
+        widget_set_style_owned(base, weather_style);
+    }
     
     // Set default size
     base->bounds.w = 200;
@@ -179,10 +186,10 @@ static PkError weather_widget_render(Widget* widget, SDL_Renderer* renderer) {
     
     // Draw content area
     SDL_Rect content = {
-        widget->bounds.x + widget->padding,
-        widget->bounds.y + widget->padding,
-        widget->bounds.w - widget->padding * 2,
-        widget->bounds.h - widget->padding * 2
+        widget->bounds.x + 10,  // TODO: Get padding from style
+        widget->bounds.y + 10,
+        widget->bounds.w - 20,
+        widget->bounds.h - 20
     };
     
     if (!weather->has_data) {

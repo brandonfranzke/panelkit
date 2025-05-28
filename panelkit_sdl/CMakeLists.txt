@@ -115,6 +115,10 @@ set(SOURCES
     src/ui/page_widget.c
     src/ui/debug_overlay.c
     src/ui/error_notification.c
+    # Style system
+    src/ui/style/style_core.c
+    src/ui/style/color_utils.c
+    src/ui/style/font_manager.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c

@@ -4,6 +4,8 @@
 #include "widgets/weather_widget.h"
 #include "widgets/page_manager_widget.h"
 #include "widgets/text_widget.h"
+#include "style/style_core.h"
+#include "style/style_constants.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -207,9 +209,11 @@ Widget* widget_factory_create_label(const char* id, void* params) {
         label->bounds.h = 30;
     }
     
-    // Labels are typically non-interactive
-    label->background_color = (SDL_Color){255, 255, 255, 0};  // Transparent
-    label->border_width = 0;
+    // Labels use text style
+    Style* text_style = style_create_text();
+    if (text_style) {
+        widget_set_style_owned(label, text_style);
+    }
     
     return label;
 }
@@ -233,10 +237,13 @@ Widget* widget_factory_create_container(const char* id, void* params) {
         container->bounds.h = container_params->rows * 100;
     }
     
-    // Containers typically have minimal styling
-    container->background_color = (SDL_Color){240, 240, 240, 255};
-    container->border_width = 0;
-    container->padding = 10;
+    // Containers use panel style
+    Style* panel_style = style_create_text();
+    if (panel_style) {
+        // Make background slightly transparent
+        panel_style->base.background.a = 240;
+        widget_set_style_owned(container, panel_style);
+    }
     
     return container;
 }

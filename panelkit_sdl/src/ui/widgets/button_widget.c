@@ -1,4 +1,6 @@
 #include "button_widget.h"
+#include "../style/style_core.h"
+#include "../style/style_constants.h"
 #include "../../events/event_system.h"
 #include "../../events/event_types.h"
 #include <stdlib.h>
@@ -58,16 +60,17 @@ ButtonWidget* button_widget_create(const char* id) {
         return NULL;
     }
     
-    // Set default colors
+    // Set default colors for compatibility
     button->normal_color = (SDL_Color){100, 100, 100, 255};
     button->hover_color = (SDL_Color){120, 120, 120, 255};
     button->pressed_color = (SDL_Color){80, 80, 80, 255};
     button->disabled_color = (SDL_Color){180, 180, 180, 255};
     
-    base->background_color = button->normal_color;
-    base->border_color = (SDL_Color){50, 50, 50, 255};
-    base->border_width = 2;
-    base->padding = 10;
+    // Create default button style
+    Style* button_style = style_create_button_primary();
+    if (button_style) {
+        widget_set_style_owned(base, button_style);
+    }
     
     // Set default size
     base->bounds.w = 120;
@@ -91,16 +94,24 @@ void button_widget_set_colors(ButtonWidget* button,
     button->pressed_color = pressed;
     button->disabled_color = disabled;
     
-    // Update current background color based on state
+    // Update the style colors if we have one
     Widget* base = &button->base;
-    if (widget_has_state(base, WIDGET_STATE_DISABLED)) {
-        base->background_color = disabled;
-    } else if (widget_has_state(base, WIDGET_STATE_PRESSED)) {
-        base->background_color = pressed;
-    } else if (widget_has_state(base, WIDGET_STATE_HOVERED)) {
-        base->background_color = hover;
-    } else {
-        base->background_color = normal;
+    if (base->style && base->style_owned) {
+        // Update base colors
+        base->style->base.background = pk_color_from_sdl(normal);
+        
+        // Update state colors if they exist
+        if (base->style->hover) {
+            base->style->hover->background = pk_color_from_sdl(hover);
+        }
+        if (base->style->pressed) {
+            base->style->pressed->background = pk_color_from_sdl(pressed);
+        }
+        if (base->style->disabled) {
+            base->style->disabled->background = pk_color_from_sdl(disabled);
+        }
+        
+        widget_update_active_style(base);
     }
     
     widget_invalidate(base);
@@ -199,11 +210,20 @@ static PkError button_widget_render(Widget* widget, SDL_Renderer* renderer) {
     PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
                                "renderer is NULL in button_widget_render");
     
-    log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d color (%d,%d,%d) children=%zu", 
-              button->base.id, widget->bounds.x, widget->bounds.y, 
-              widget->bounds.w, widget->bounds.h,
-              widget->background_color.r, widget->background_color.g, widget->background_color.b,
-              widget->child_count);
+    // Get active style for logging
+    const StyleBase* active_style = widget_get_active_style(widget);
+    if (active_style) {
+        log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d color (%d,%d,%d) children=%zu", 
+                  button->base.id, widget->bounds.x, widget->bounds.y, 
+                  widget->bounds.w, widget->bounds.h,
+                  active_style->background.r, active_style->background.g, active_style->background.b,
+                  widget->child_count);
+    } else {
+        log_debug("BUTTON RENDER: %s at (%d,%d) size %dx%d (no style) children=%zu", 
+                  button->base.id, widget->bounds.x, widget->bounds.y, 
+                  widget->bounds.w, widget->bounds.h,
+                  widget->child_count);
+    }
     
     // Debug: print child positions
     for (size_t i = 0; i < widget->child_count; i++) {
@@ -215,18 +235,7 @@ static PkError button_widget_render(Widget* widget, SDL_Renderer* renderer) {
         }
     }
     
-    // Update background color based on state
-    if (widget_has_state(widget, WIDGET_STATE_DISABLED)) {
-        widget->background_color = button->disabled_color;
-    } else if (widget_has_state(widget, WIDGET_STATE_PRESSED)) {
-        widget->background_color = button->pressed_color;
-    } else if (widget_has_state(widget, WIDGET_STATE_HOVERED)) {
-        widget->background_color = button->hover_color;
-    } else {
-        widget->background_color = button->normal_color;
-    }
-    
-    // Call base render for background and border
+    // Call base render for background and border - it will use the active style
     PkError err = widget_default_render(widget, renderer);
     if (err != PK_OK) {
         return err;

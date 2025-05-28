@@ -19,11 +19,11 @@ typedef enum {
 
 // Text alignment
 typedef enum {
-    TEXT_ALIGN_LEFT = 0,
-    TEXT_ALIGN_CENTER,
-    TEXT_ALIGN_RIGHT,
-    TEXT_ALIGN_JUSTIFY
-} TextAlign;
+    STYLE_TEXT_ALIGN_LEFT = 0,
+    STYLE_TEXT_ALIGN_CENTER,
+    STYLE_TEXT_ALIGN_RIGHT,
+    STYLE_TEXT_ALIGN_JUSTIFY
+} StyleTextAlign;
 
 // Text decoration
 typedef enum {
@@ -74,7 +74,7 @@ typedef struct StyleBase {
     char font_family[64];  // Font name reference
     uint16_t font_size;
     uint16_t font_weight;  // 100-900
-    TextAlign text_align;
+    StyleTextAlign text_align;
     TextDecoration text_decoration;
     float line_height;     // Multiplier of font size
     

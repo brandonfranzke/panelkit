@@ -1,4 +1,6 @@
 #include "page_widget.h"
+#include "style/style_core.h"
+#include "style/style_constants.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -57,9 +59,16 @@ PageWidget* page_widget_create(const char* id, const char* title) {
     page->background_color = (SDL_Color){33, 33, 33, 255};
     page->title_color = (SDL_Color){255, 255, 255, 255};
     
-    base->background_color = page->background_color;
-    base->border_width = 0;
-    base->padding = 0;
+    // Create page style
+    Style* page_style = style_create_text();
+    if (page_style) {
+        // Dark background for pages
+        page_style->base.background = (PkColor){33, 33, 33, 255};
+        page_style->base.foreground = (PkColor){255, 255, 255, 255};
+        page_style->base.border.width = 0;
+        page_style->base.padding = (Spacing){0, 0, 0, 0};
+        widget_set_style_owned(base, page_style);
+    }
     
     // Initialize page properties
     strncpy(page->title, title, sizeof(page->title) - 1);
@@ -91,7 +100,14 @@ void page_widget_set_colors(PageWidget* page, SDL_Color background, SDL_Color ti
     
     page->background_color = background;
     page->title_color = title_color;
-    page->base.background_color = background;
+    
+    // Update style if present
+    if (page->base.style && page->base.style_owned) {
+        page->base.style->base.background = pk_color_from_sdl(background);
+        page->base.style->base.foreground = pk_color_from_sdl(title_color);
+        widget_update_active_style(&page->base);
+    }
+    
     widget_invalidate(&page->base);
 }
 
@@ -162,7 +178,13 @@ void page_widget_update_content_height(PageWidget* page) {
         }
     }
     
-    page->content_height = max_bottom + base->padding;
+    // Get padding from style if available
+    int padding = 0;
+    const StyleBase* active_style = widget_get_active_style(base);
+    if (active_style) {
+        padding = active_style->padding.bottom;
+    }
+    page->content_height = max_bottom + padding;
     
     // Update max scroll
     int visible_height = base->bounds.h;
@@ -243,8 +265,12 @@ Widget* page_widget_create_content_container(PageWidget* page) {
                              page->base.bounds.h - title_height);
     
     // Make container transparent
-    container->background_color = (SDL_Color){0, 0, 0, 0};
-    container->border_width = 0;
+    Style* transparent_style = style_create();
+    if (transparent_style) {
+        transparent_style->base.background = (PkColor){0, 0, 0, 0};
+        transparent_style->base.border.width = 0;
+        widget_set_style_owned(container, transparent_style);
+    }
     
     widget_add_child(&page->base, container);
     

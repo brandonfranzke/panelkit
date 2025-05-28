@@ -18,6 +18,8 @@
 typedef struct EventSystem EventSystem;
 typedef struct StateStore StateStore;
 typedef struct Widget Widget;
+typedef struct Style Style;
+typedef struct StyleBase StyleBase;
 
 // Widget types enumeration
 typedef enum {
@@ -73,12 +75,10 @@ struct Widget {
     size_t event_count;
     size_t event_capacity;
     
-    // Style properties
-    SDL_Color background_color;
-    SDL_Color foreground_color;
-    SDL_Color border_color;
-    int border_width;
-    int padding;
+    // Style system
+    Style* style;                  // Widget's style (owned or referenced)
+    bool style_owned;              // true if widget owns the style
+    const StyleBase* active_style; // Currently active style (resolved from state)
     
     // References (not owned)
     EventSystem* event_system;
@@ -249,6 +249,42 @@ void widget_set_enabled(Widget* widget, bool enabled);
  * @return true if enabled, false if disabled or NULL
  */
 bool widget_is_enabled(Widget* widget);
+
+/* Style management */
+
+/**
+ * Set widget style (referenced, not owned).
+ * 
+ * @param widget Widget to style
+ * @param style Style to apply (widget references, doesn't own)
+ * @note Previous owned style is freed if style_owned was true
+ */
+void widget_set_style_ref(Widget* widget, Style* style);
+
+/**
+ * Set widget style (owned).
+ * 
+ * @param widget Widget to style
+ * @param style Style to apply (widget takes ownership)
+ * @note Previous owned style is freed if style_owned was true
+ */
+void widget_set_style_owned(Widget* widget, Style* style);
+
+/**
+ * Update active style based on current widget state.
+ * 
+ * @param widget Widget to update
+ * @note Sets active_style to appropriate state variant
+ */
+void widget_update_active_style(Widget* widget);
+
+/**
+ * Get the current active style.
+ * 
+ * @param widget Widget to query
+ * @return Active style or NULL (borrowed reference)
+ */
+const StyleBase* widget_get_active_style(Widget* widget);
 
 /* Layout and positioning */
 

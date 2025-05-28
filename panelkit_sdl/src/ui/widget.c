@@ -1,6 +1,8 @@
 #include "widget.h"
 #include "../events/event_system.h"
 #include "../state/state_store.h"
+#include "style/style_core.h"
+#include "style/style_constants.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -65,12 +67,10 @@ Widget* widget_create(const char* id, WidgetType type) {
         return NULL;
     }
     
-    // Default colors
-    widget->background_color = (SDL_Color){33, 33, 33, 255};  // Dark like app
-    widget->foreground_color = (SDL_Color){255, 255, 255, 255};  // White text
-    widget->border_color = (SDL_Color){100, 100, 100, 255};  // Gray border
-    widget->border_width = 1;
-    widget->padding = 5;
+    // Style system initialization
+    widget->style = NULL;
+    widget->style_owned = false;
+    widget->active_style = NULL;
     
     // Set default virtual functions
     widget->render = widget_default_render;
@@ -85,6 +85,11 @@ Widget* widget_create(const char* id, WidgetType type) {
 void widget_destroy(Widget* widget) {
     if (!widget) {
         return;
+    }
+    
+    // Clean up style if owned
+    if (widget->style_owned && widget->style) {
+        style_destroy(widget->style);
     }
     
     // Unsubscribe from all events
@@ -395,6 +400,7 @@ void widget_set_state(Widget* widget, WidgetState state, bool enabled) {
     }
     
     if (old_flags != widget->state_flags) {
+        widget_update_active_style(widget);
         widget_invalidate(widget);
     }
 }
@@ -712,6 +718,70 @@ void widget_update(Widget* widget, double delta_time) {
     }
 }
 
+// Style management functions
+
+void widget_set_style_ref(Widget* widget, Style* style) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_set_style_ref");
+        return;
+    }
+    
+    // Clean up old style if owned
+    if (widget->style_owned && widget->style) {
+        style_destroy(widget->style);
+    }
+    
+    widget->style = style;
+    widget->style_owned = false;
+    widget_update_active_style(widget);
+    widget_invalidate(widget);
+}
+
+void widget_set_style_owned(Widget* widget, Style* style) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_set_style_owned");
+        return;
+    }
+    
+    // Clean up old style if owned
+    if (widget->style_owned && widget->style) {
+        style_destroy(widget->style);
+    }
+    
+    widget->style = style;
+    widget->style_owned = true;
+    widget_update_active_style(widget);
+    widget_invalidate(widget);
+}
+
+void widget_update_active_style(Widget* widget) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_update_active_style");
+        return;
+    }
+    
+    if (!widget->style) {
+        widget->active_style = NULL;
+        return;
+    }
+    
+    // Resolve style based on current state
+    widget->active_style = style_resolve_state(widget->style, widget->state_flags);
+}
+
+const StyleBase* widget_get_active_style(Widget* widget) {
+    if (!widget) {
+        pk_set_last_error_with_context(PK_ERROR_NULL_PARAM,
+                                       "widget is NULL in widget_get_active_style");
+        return NULL;
+    }
+    
+    return widget->active_style;
+}
+
 // Default implementations
 
 PkError widget_default_render(Widget* widget, SDL_Renderer* renderer) {
@@ -720,17 +790,41 @@ PkError widget_default_render(Widget* widget, SDL_Renderer* renderer) {
     PK_CHECK_ERROR_WITH_CONTEXT(renderer != NULL, PK_ERROR_NULL_PARAM,
                                "renderer is NULL in widget_default_render");
     
+    // Get active style or use default
+    const StyleBase* style = widget->active_style;
+    if (!style) {
+        // Use a default style if none set
+        static StyleBase default_style;
+        static bool default_initialized = false;
+        if (!default_initialized) {
+            Style* panel_style = style_create_text();
+            if (panel_style) {
+                default_style = panel_style->base;
+                style_destroy(panel_style);
+            } else {
+                // Fallback to hardcoded defaults
+                default_style.background = (PkColor){33, 33, 33, 255};
+                default_style.foreground = (PkColor){255, 255, 255, 255};
+                default_style.border.color = (PkColor){100, 100, 100, 255};
+                default_style.border.width = 1;
+                default_style.padding = (Spacing){5, 5, 5, 5};
+            }
+            default_initialized = true;
+        }
+        style = &default_style;
+    }
+    
     log_debug("DEFAULT RENDER: %s at (%d,%d,%dx%d) bg(%d,%d,%d)", 
               widget->id, widget->bounds.x, widget->bounds.y,
               widget->bounds.w, widget->bounds.h,
-              widget->background_color.r, widget->background_color.g, widget->background_color.b);
+              style->background.r, style->background.g, style->background.b);
     
     // Draw background
     if (SDL_SetRenderDrawColor(renderer, 
-                              widget->background_color.r,
-                              widget->background_color.g,
-                              widget->background_color.b,
-                              widget->background_color.a) < 0) {
+                              style->background.r,
+                              style->background.g,
+                              style->background.b,
+                              style->background.a) < 0) {
         pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
                                        "SDL_SetRenderDrawColor failed: %s",
                                        SDL_GetError());
@@ -745,19 +839,19 @@ PkError widget_default_render(Widget* widget, SDL_Renderer* renderer) {
     }
     
     // Draw border
-    if (widget->border_width > 0) {
+    if (style->border.width > 0) {
         if (SDL_SetRenderDrawColor(renderer,
-                                  widget->border_color.r,
-                                  widget->border_color.g,
-                                  widget->border_color.b,
-                                  widget->border_color.a) < 0) {
+                                  style->border.color.r,
+                                  style->border.color.g,
+                                  style->border.color.b,
+                                  style->border.color.a) < 0) {
             pk_set_last_error_with_context(PK_ERROR_RENDER_FAILED,
                                            "SDL_SetRenderDrawColor failed for border: %s",
                                            SDL_GetError());
             return PK_ERROR_RENDER_FAILED;
         }
         
-        for (int i = 0; i < widget->border_width; i++) {
+        for (int i = 0; i < style->border.width; i++) {
             SDL_Rect border_rect = {
                 widget->bounds.x + i,
                 widget->bounds.y + i,
@@ -826,8 +920,15 @@ void widget_default_layout(Widget* widget) {
         return;
     }
     
+    // Get active style for padding
+    const StyleBase* style = widget->active_style;
+    int padding = 5; // Default padding
+    if (style) {
+        padding = style->padding.top; // Use top padding as general padding
+    }
+    
     // Simple vertical stack layout for children
-    int y_offset = widget->padding;
+    int y_offset = padding;
     
     for (size_t i = 0; i < widget->child_count; i++) {
         Widget* child = widget->children[i];
@@ -837,12 +938,12 @@ void widget_default_layout(Widget* widget) {
         
         // Position child
         widget_set_relative_bounds(child,
-                                 widget->padding,
+                                 padding,
                                  y_offset,
-                                 widget->bounds.w - widget->padding * 2,
+                                 widget->bounds.w - padding * 2,
                                  child->relative_bounds.h);
         
-        y_offset += child->bounds.h + widget->padding;
+        y_offset += child->bounds.h + padding;
     }
 }
 

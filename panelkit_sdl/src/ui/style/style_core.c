@@ -21,7 +21,7 @@ static const StyleBase DEFAULT_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 400,
-    .text_align = TEXT_ALIGN_LEFT,
+    .text_align = STYLE_TEXT_ALIGN_LEFT,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.2f,
     .opacity = 255,
@@ -300,9 +300,9 @@ void style_base_print(const StyleBase* base) {
     printf("    Font: %s %dpx weight:%d\n", 
            base->font_family, base->font_size, base->font_weight);
     printf("    Text align: %s\n",
-           base->text_align == TEXT_ALIGN_LEFT ? "left" :
-           base->text_align == TEXT_ALIGN_CENTER ? "center" :
-           base->text_align == TEXT_ALIGN_RIGHT ? "right" : "justify");
+           base->text_align == STYLE_TEXT_ALIGN_LEFT ? "left" :
+           base->text_align == STYLE_TEXT_ALIGN_CENTER ? "center" :
+           base->text_align == STYLE_TEXT_ALIGN_RIGHT ? "right" : "justify");
     printf("    Line height: %.2f\n", base->line_height);
     printf("    Opacity: %d\n", base->opacity);
     if (base->shadow.blur_radius > 0 || base->shadow.offset_x != 0 || base->shadow.offset_y != 0) {

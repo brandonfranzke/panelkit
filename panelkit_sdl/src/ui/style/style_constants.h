@@ -118,7 +118,7 @@ static const StyleBase BUTTON_BASE_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 500,
-    .text_align = TEXT_ALIGN_CENTER,
+    .text_align = STYLE_TEXT_ALIGN_CENTER,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.2f,
     .opacity = 255,
@@ -137,7 +137,7 @@ static const StyleBase BUTTON_HOVER_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 500,
-    .text_align = TEXT_ALIGN_CENTER,
+    .text_align = STYLE_TEXT_ALIGN_CENTER,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.2f,
     .opacity = 255,
@@ -156,7 +156,7 @@ static const StyleBase BUTTON_PRESSED_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 500,
-    .text_align = TEXT_ALIGN_CENTER,
+    .text_align = STYLE_TEXT_ALIGN_CENTER,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.2f,
     .opacity = 255,
@@ -175,7 +175,7 @@ static const StyleBase BUTTON_DISABLED_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 500,
-    .text_align = TEXT_ALIGN_CENTER,
+    .text_align = STYLE_TEXT_ALIGN_CENTER,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.2f,
     .opacity = 255,
@@ -194,7 +194,7 @@ static const StyleBase TEXT_BASE_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 400,
-    .text_align = TEXT_ALIGN_LEFT,
+    .text_align = STYLE_TEXT_ALIGN_LEFT,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.5f,
     .opacity = 255,
@@ -213,7 +213,7 @@ static const StyleBase PANEL_BASE_STYLE = {
     .font_family = "default",
     .font_size = 16,
     .font_weight = 400,
-    .text_align = TEXT_ALIGN_LEFT,
+    .text_align = STYLE_TEXT_ALIGN_LEFT,
     .text_decoration = TEXT_DECORATION_NONE,
     .line_height = 1.5f,
     .opacity = 255,
@@ -262,6 +262,117 @@ static inline void setup_button_style_states(Style* style, PkColor base_color) {
     }
     
     style->states_owned = true;
+}
+
+// ============================================================================
+// Style Creation Functions
+// ============================================================================
+
+// Create a text style
+static inline Style* style_create_text(void) {
+    Style* style = style_create();
+    if (style) {
+        style->base = TEXT_BASE_STYLE;
+    }
+    return style;
+}
+
+// Create button styles with predefined colors
+static inline Style* style_create_button_primary(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_PRIMARY);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_success(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_GREEN);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_error(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_RED);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_warning(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_ORANGE);
+    }
+    return style;
+}
+
+// Create button styles for each of the 8 required colors
+static inline Style* style_create_button_red(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_RED);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_green(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_GREEN);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_blue(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_BLUE);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_yellow(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_YELLOW);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_purple(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_PURPLE);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_orange(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_ORANGE);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_teal(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_TEAL);
+    }
+    return style;
+}
+
+static inline Style* style_create_button_pink(void) {
+    Style* style = style_create();
+    if (style) {
+        setup_button_style_states(style, COLOR_BUTTON_PINK);
+    }
+    return style;
 }
 
 #endif // PK_STYLE_CONSTANTS_H
