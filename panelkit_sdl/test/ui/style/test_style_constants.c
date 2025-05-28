@@ -58,12 +58,12 @@ void test_shadow_constants(void) {
 void test_style_templates(void) {
     // Test button base style
     TEST_ASSERT_EQUAL(4, BUTTON_BASE_STYLE.border_radius);
-    TEST_ASSERT_EQUAL(TEXT_ALIGN_CENTER, BUTTON_BASE_STYLE.text_align);
+    TEST_ASSERT_EQUAL(STYLE_TEXT_ALIGN_CENTER, BUTTON_BASE_STYLE.text_align);
     TEST_ASSERT_EQUAL(500, BUTTON_BASE_STYLE.font_weight);
     
     // Test text base style
     TEST_ASSERT_EQUAL(0, TEXT_BASE_STYLE.background.a); // Transparent
-    TEST_ASSERT_EQUAL(TEXT_ALIGN_LEFT, TEXT_BASE_STYLE.text_align);
+    TEST_ASSERT_EQUAL(STYLE_TEXT_ALIGN_LEFT, TEXT_BASE_STYLE.text_align);
     TEST_ASSERT_EQUAL(400, TEXT_BASE_STYLE.font_weight);
     
     // Test panel base style

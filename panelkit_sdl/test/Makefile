@@ -31,6 +31,11 @@ TEST_OBJS = \
     $(BUILD_DIR)/test_color_utils.o \
     $(BUILD_DIR)/test_style_core.o \
     $(BUILD_DIR)/test_style_constants.o \
+    $(BUILD_DIR)/test_style_validation.o \
+    $(BUILD_DIR)/test_style_templates.o \
+    $(BUILD_DIR)/test_style_observer.o \
+    $(BUILD_DIR)/test_style_system.o \
+    $(BUILD_DIR)/test_widget_style_integration.o \
     $(BUILD_DIR)/error.o \
     $(BUILD_DIR)/test_logger.o \
     $(BUILD_DIR)/layout_core.o \
@@ -39,7 +44,12 @@ TEST_OBJS = \
     $(BUILD_DIR)/widget_layout_adapter.o \
     $(BUILD_DIR)/font_manager.o \
     $(BUILD_DIR)/color_utils.o \
-    $(BUILD_DIR)/style_core.o
+    $(BUILD_DIR)/style_core.o \
+    $(BUILD_DIR)/style_validation.o \
+    $(BUILD_DIR)/style_templates.o \
+    $(BUILD_DIR)/style_observer.o \
+    $(BUILD_DIR)/style_system.o \
+    $(BUILD_DIR)/widget.o
 
 # Default target
 .PHONY: all
@@ -92,6 +102,26 @@ $(BUILD_DIR)/test_style_constants.o: ui/style/test_style_constants.c | $(BUILD_D
 	@echo "Building $<..."
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/test_style_validation.o: ui/style/test_style_validation.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/test_style_templates.o: ui/style/test_style_templates.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/test_style_observer.o: ui/style/test_style_observer.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/test_style_system.o: ui/style/test_style_system.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/test_widget_style_integration.o: ui/style/test_widget_style_integration.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
 # Build project source files
 $(BUILD_DIR)/error.o: ../src/core/error.c | $(BUILD_DIR)
 	@echo "Building $<..."
@@ -126,6 +156,26 @@ $(BUILD_DIR)/color_utils.o: ../src/ui/style/color_utils.c | $(BUILD_DIR)
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/style_core.o: ../src/ui/style/style_core.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/style_validation.o: ../src/ui/style/style_validation.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/style_templates.o: ../src/ui/style/style_templates.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/style_observer.o: ../src/ui/style/style_observer.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/style_system.o: ../src/ui/style/style_system.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/widget.o: ../src/ui/widget.c | $(BUILD_DIR)
 	@echo "Building $<..."
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 

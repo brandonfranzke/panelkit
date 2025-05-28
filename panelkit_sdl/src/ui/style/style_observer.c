@@ -264,19 +264,20 @@ bool style_observer_is_batching(void) {
 // ============================================================================
 
 // Helper to find widgets using a template
-static void find_template_users(Widget* root, const char* template_name, 
-                               Widget*** users, size_t* count, size_t* capacity) {
-    if (!root) return;
-    
-    // Check if this widget uses the template
-    // Note: This would require widgets to store their template name
-    // For now, this is a placeholder implementation
-    
-    // Recurse to children
-    for (size_t i = 0; i < root->child_count; i++) {
-        find_template_users(root->children[i], template_name, users, count, capacity);
-    }
-}
+// TODO: Implement when widgets store their template name
+// static void find_template_users(Widget* root, const char* template_name, 
+//                                Widget*** users, size_t* count, size_t* capacity) {
+//     if (!root) return;
+//     
+//     // Check if this widget uses the template
+//     // Note: This would require widgets to store their template name
+//     // For now, this is a placeholder implementation
+//     
+//     // Recurse to children
+//     for (size_t i = 0; i < root->child_count; i++) {
+//         find_template_users(root->children[i], template_name, users, count, capacity);
+//     }
+// }
 
 void style_observer_update_template_users(const char* template_name, const Style* new_template) {
     if (!template_name || !new_template) return;
