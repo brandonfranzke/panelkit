@@ -30,6 +30,7 @@ TEST_OBJS = \
     $(BUILD_DIR)/test_font_manager_simple.o \
     $(BUILD_DIR)/test_color_utils.o \
     $(BUILD_DIR)/test_style_core.o \
+    $(BUILD_DIR)/test_style_constants.o \
     $(BUILD_DIR)/error.o \
     $(BUILD_DIR)/test_logger.o \
     $(BUILD_DIR)/layout_core.o \
@@ -84,6 +85,10 @@ $(BUILD_DIR)/test_color_utils.o: ui/style/test_color_utils.c | $(BUILD_DIR)
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/test_style_core.o: ui/style/test_style_core.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/test_style_constants.o: ui/style/test_style_constants.c | $(BUILD_DIR)
 	@echo "Building $<..."
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 

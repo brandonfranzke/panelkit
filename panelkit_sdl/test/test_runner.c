@@ -15,6 +15,7 @@ extern void test_style_resolution_register(void);
 extern void test_font_manager_simple_register(void);
 extern void test_color_utils_register(void);
 extern void test_style_core_register(void);
+extern void test_style_constants_register(void);
 
 // Global test setup/teardown
 void setUp(void) {
@@ -60,6 +61,7 @@ int main(int argc, char* argv[]) {
         // test_font_manager_simple_register();
         test_color_utils_register();
         test_style_core_register();
+        test_style_constants_register();
     }
     
     // Get results
