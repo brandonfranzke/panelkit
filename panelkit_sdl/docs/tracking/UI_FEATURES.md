@@ -14,6 +14,13 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 
 ## In Progress
 
+### Testing Infrastructure
+- [ ] Unity framework integration
+- [ ] Test directory structure
+- [ ] Test runner setup
+- [ ] Makefile for tests
+- [ ] First example test
+
 ### Layout System Implementation
 - [ ] Core layout engine
 - [ ] Absolute positioning mode
@@ -23,6 +30,7 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 - [ ] Layout invalidation system
 
 ### Style System Implementation  
+- [ ] Compile-time theme constants
 - [ ] Immutable style objects
 - [ ] Basic property support (colors, padding)
 - [ ] Style resolution hierarchy

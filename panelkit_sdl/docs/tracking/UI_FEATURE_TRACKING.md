@@ -29,6 +29,12 @@ Widget
         └── Render properties
 ```
 
+### File Organization
+
+- Layout system: `src/ui/layout/`
+- Style system: `src/ui/style/`
+- Test structure mirrors source structure
+
 ### Key Design Choices
 
 1. **Layout and Style are separate systems**
@@ -71,9 +77,30 @@ Widget
    - Batch recalculations until next frame
    - Explicit freeze/thaw for multiple changes
 
+8. **Layout Constraint Handling**
+   - No complex constraint solving or circular dependency detection
+   - Parents cannot reference children sizes (prevents circular deps)
+   - Children can reference parent (e.g., 50% width)
+   - Overflow: truncate/crop by default
+   - No validation of totals (e.g., 110% is allowed)
+
+9. **Compile-Time Style System**
+   - Styles defined in header files, not config files
+   - No runtime theme loading - recompile to change themes
+   - Organized constants with no magic numbers
+   - Example: `#define THEME_BG_PRIMARY ((SDL_Color){33, 33, 33, 255})`
+
 ## Implementation Plan
 
-### Phase 1: Layout System (High Priority)
+### Phase 1: Testing Infrastructure
+
+1. **Unity Test Framework Setup**
+   - Add Unity to project
+   - Create test runner and Makefile
+   - Establish test directory structure
+   - Focus on logic testing, not UI harness testing
+
+### Phase 2: Layout System (High Priority)
 
 1. **Core Layout Engine**
    - Layout specification system
@@ -95,7 +122,7 @@ Widget
    } DisplayTransform;
    ```
 
-### Phase 2: Minimal Style System
+### Phase 3: Minimal Style System
 
 1. **Core Properties**
    - Colors (background, text, border)
@@ -107,10 +134,10 @@ Widget
    - Style sharing/caching
    - State-based styles (normal, pressed, disabled)
 
-### Phase 3: Integration
+### Phase 4: Integration
 
 1. Replace hardcoded UI in `ui_init.c`
-2. Migrate existing widgets to new system
+2. Migrate existing widgets to new system (all at once, no transitional period)
 3. Remove temporary code
 
 ## Technical Specifications
