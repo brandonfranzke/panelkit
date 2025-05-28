@@ -15,6 +15,9 @@
 
 // Forward declarations
 typedef struct Widget Widget;
+typedef struct AbsoluteLayoutData AbsoluteLayoutData;
+typedef struct FlexLayoutData FlexLayoutData;
+typedef struct GridLayoutData GridLayoutData;
 
 /**
  * Layout rectangle using floating point coordinates.
@@ -61,7 +64,13 @@ typedef struct DisplayTransform {
  */
 typedef struct LayoutSpec {
     LayoutType type;           /**< Type of layout */
-    void* type_data;           /**< Type-specific configuration */
+    
+    // Type-specific data using union for type safety
+    union {
+        AbsoluteLayoutData* absolute;  /**< Absolute layout configuration */
+        FlexLayoutData* flex;          /**< Flexbox layout configuration */
+        GridLayoutData* grid;          /**< Grid layout configuration */
+    } data;
     
     // Common properties
     float padding_top;         /**< Padding inside container */
@@ -72,7 +81,7 @@ typedef struct LayoutSpec {
     float gap;                 /**< Gap between children */
     
     // Overflow handling
-    bool clip_overflow;        /**< Clip children that exceed bounds */
+    bool clip_overflow;        /**< Clip children that exceed bounds (default: true) */
 } LayoutSpec;
 
 /**

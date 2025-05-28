@@ -231,9 +231,35 @@ void layout_spec_set_gap(LayoutSpec* spec, float gap) {
 void layout_spec_destroy(LayoutSpec* spec) {
     if (!spec) return;
     
-    // Free type-specific data if allocated
-    if (spec->type_data) {
-        free(spec->type_data);
+    // Free type-specific data based on type
+    switch (spec->type) {
+        case LAYOUT_TYPE_ABSOLUTE:
+            if (spec->data.absolute) {
+                // Will be implemented in layout_absolute.c
+                extern void layout_absolute_data_destroy(AbsoluteLayoutData* data);
+                layout_absolute_data_destroy(spec->data.absolute);
+            }
+            break;
+            
+        case LAYOUT_TYPE_FLEX:
+            if (spec->data.flex) {
+                // Will be implemented in layout_flex.c
+                extern void layout_flex_data_destroy(FlexLayoutData* data);
+                layout_flex_data_destroy(spec->data.flex);
+            }
+            break;
+            
+        case LAYOUT_TYPE_GRID:
+            if (spec->data.grid) {
+                // Grid layout not yet implemented
+                // TODO: Implement layout_grid_data_destroy when grid layout is added
+            }
+            break;
+            
+        case LAYOUT_TYPE_NONE:
+        default:
+            // No type-specific data to free
+            break;
     }
     
     free(spec);

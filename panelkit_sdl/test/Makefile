@@ -29,7 +29,10 @@ TEST_OBJS = \
     $(BUILD_DIR)/test_style_resolution.o \
     $(BUILD_DIR)/error.o \
     $(BUILD_DIR)/test_logger.o \
-    $(BUILD_DIR)/layout_core.o
+    $(BUILD_DIR)/layout_core.o \
+    $(BUILD_DIR)/layout_absolute.o \
+    $(BUILD_DIR)/layout_flex.o \
+    $(BUILD_DIR)/widget_layout_adapter.o
 
 # Default target
 .PHONY: all
@@ -52,15 +55,15 @@ $(BUILD_DIR)/unity.o: unity/unity.c unity/unity.h | $(BUILD_DIR)
 # Build test files
 $(BUILD_DIR)/test_layout_core.o: ui/layout/test_layout_core.c | $(BUILD_DIR)
 	@echo "Building $<..."
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/test_absolute_layout.o: ui/layout/test_absolute_layout.c | $(BUILD_DIR)
 	@echo "Building $<..."
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/test_flex_layout.o: ui/layout/test_flex_layout.c | $(BUILD_DIR)
 	@echo "Building $<..."
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/test_style_resolution.o: ui/style/test_style_resolution.c | $(BUILD_DIR)
 	@echo "Building $<..."
@@ -76,6 +79,18 @@ $(BUILD_DIR)/test_logger.o: test_logger.c | $(BUILD_DIR)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/layout_core.o: ../src/ui/layout/layout_core.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/layout_absolute.o: ../src/ui/layout/layout_absolute.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/layout_flex.o: ../src/ui/layout/layout_flex.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/widget_layout_adapter.o: ../src/ui/layout/widget_layout_adapter.c | $(BUILD_DIR)
 	@echo "Building $<..."
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
