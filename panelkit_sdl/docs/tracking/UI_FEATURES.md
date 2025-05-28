@@ -83,10 +83,18 @@ This document tracks UI feature implementation progress, ideas, and enhancements
 - No debug visualization
 
 ### Next Steps
-1. Implement core layout engine
-2. Add basic style system
+1. Implement core layout engine with union-based type safety
+2. Add basic style system with compile-time constants
 3. Migrate existing UI to new system
 4. Remove `ui_init.c`
+
+### Design Patterns (2025-01-27)
+- **Type-safe unions** instead of void* for layout data
+- **Explicit ownership** - LayoutSpec owns child properties
+- **No global state** - Everything passed through context
+- **Error patterns** - pk_set_last_error_with_context() + return error code
+- **Logging** - Use PK_LOG_* macros, never printf
+- **Memory** - Clear create/destroy lifecycle functions
 
 ## Testing Ideas
 

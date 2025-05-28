@@ -154,7 +154,49 @@ typedef enum {
     LAYOUT_FLEX,
     LAYOUT_GRID
 } LayoutType;
+
+// Type-safe layout specification using union (no void*)
+typedef struct LayoutSpec {
+    LayoutType type;
+    union {
+        AbsoluteLayoutData absolute;
+        FlexLayoutData flex;
+        GridLayoutData grid;
+    } data;
+    
+    // Common fields
+    float padding_top, padding_right, padding_bottom, padding_left;
+    float gap;
+    bool clip_overflow;  // Default true, set false to allow spillover
+} LayoutSpec;
+
+// Flex-specific data with child properties
+typedef struct FlexLayoutData {
+    // Container properties
+    FlexDirection direction;
+    FlexJustify justify;
+    FlexAlign align_items;
+    
+    // Child properties - owned by this struct
+    struct {
+        Widget* widget;
+        float grow;
+        float shrink; 
+        float basis;
+    } *child_props;
+    size_t child_count;
+    size_t child_capacity;
+} FlexLayoutData;
 ```
+
+### Layout Design Decisions (2025-01-27)
+
+1. **Union over void*** - Type safety using tagged unions, following EventData pattern
+2. **Child properties in LayoutSpec** - Clear ownership, no global state needed
+3. **No property cascade** - Simple direct storage, no complex resolution
+4. **Overflow handling** - Default clip/crop, opt-in spillover via clip_overflow flag
+5. **No circular dependencies** - Parents cannot reference child sizes
+6. **Layout context pattern** - Pass context through calculation, no hidden state
 
 ### Style Ownership
 
