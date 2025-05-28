@@ -4,6 +4,7 @@
 #include "style/style_core.h"
 #include "style/style_constants.h"
 #include "style/style_validation.h"
+#include "style/style_observer.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -739,15 +740,22 @@ void widget_set_style_ref(Widget* widget, Style* style) {
         return;
     }
     
+    // Store old style for notification
+    Style* old_style = widget->style;
+    
     // Clean up old style if owned
     if (widget->style_owned && widget->style) {
         style_destroy(widget->style);
+        old_style = NULL; // Don't notify with destroyed style
     }
     
     widget->style = style;
     widget->style_owned = false;
     widget_update_active_style(widget);
     widget_invalidate(widget);
+    
+    // Notify observers
+    style_observer_notify_widget(widget, old_style, style);
 }
 
 void widget_set_style_owned(Widget* widget, Style* style) {
@@ -772,15 +780,22 @@ void widget_set_style_owned(Widget* widget, Style* style) {
         return;
     }
     
+    // Store old style for notification
+    Style* old_style = widget->style;
+    
     // Clean up old style if owned
     if (widget->style_owned && widget->style) {
         style_destroy(widget->style);
+        old_style = NULL; // Don't notify with destroyed style
     }
     
     widget->style = style;
     widget->style_owned = true;
     widget_update_active_style(widget);
     widget_invalidate(widget);
+    
+    // Notify observers
+    style_observer_notify_widget(widget, old_style, style);
 }
 
 void widget_update_active_style(Widget* widget) {

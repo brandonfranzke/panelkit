@@ -122,6 +122,7 @@ set(SOURCES
     src/ui/style/style_validation.c
     src/ui/style/style_system.c
     src/ui/style/style_templates.c
+    src/ui/style/style_observer.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c
