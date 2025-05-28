@@ -14,6 +14,7 @@ extern void test_flex_layout_register(void);
 extern void test_style_resolution_register(void);
 extern void test_font_manager_simple_register(void);
 extern void test_color_utils_register(void);
+extern void test_style_core_register(void);
 
 // Global test setup/teardown
 void setUp(void) {
@@ -58,6 +59,7 @@ int main(int argc, char* argv[]) {
         // TODO: Fix font manager tests
         // test_font_manager_simple_register();
         test_color_utils_register();
+        test_style_core_register();
     }
     
     // Get results
