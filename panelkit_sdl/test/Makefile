@@ -28,13 +28,15 @@ TEST_OBJS = \
     $(BUILD_DIR)/test_flex_layout.o \
     $(BUILD_DIR)/test_style_resolution.o \
     $(BUILD_DIR)/test_font_manager_simple.o \
+    $(BUILD_DIR)/test_color_utils.o \
     $(BUILD_DIR)/error.o \
     $(BUILD_DIR)/test_logger.o \
     $(BUILD_DIR)/layout_core.o \
     $(BUILD_DIR)/layout_absolute.o \
     $(BUILD_DIR)/layout_flex.o \
     $(BUILD_DIR)/widget_layout_adapter.o \
-    $(BUILD_DIR)/font_manager.o
+    $(BUILD_DIR)/font_manager.o \
+    $(BUILD_DIR)/color_utils.o
 
 # Default target
 .PHONY: all
@@ -75,6 +77,10 @@ $(BUILD_DIR)/test_font_manager_simple.o: ui/style/test_font_manager_simple.c | $
 	@echo "Building $<..."
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/test_color_utils.o: ui/style/test_color_utils.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
 # Build project source files
 $(BUILD_DIR)/error.o: ../src/core/error.c | $(BUILD_DIR)
 	@echo "Building $<..."
@@ -101,6 +107,10 @@ $(BUILD_DIR)/widget_layout_adapter.o: ../src/ui/layout/widget_layout_adapter.c |
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/font_manager.o: ../src/ui/style/font_manager.c | $(BUILD_DIR)
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/color_utils.o: ../src/ui/style/color_utils.c | $(BUILD_DIR)
 	@echo "Building $<..."
 	@$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $< -o $@
 
