@@ -121,6 +121,7 @@ set(SOURCES
     src/ui/style/font_manager.c
     src/ui/style/style_validation.c
     src/ui/style/style_system.c
+    src/ui/style/style_templates.c
     # YAML library (vendored)
     src/yaml/api.c
     src/yaml/dumper.c

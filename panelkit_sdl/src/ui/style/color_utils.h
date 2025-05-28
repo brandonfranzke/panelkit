@@ -37,6 +37,7 @@ PkColor pk_color_saturate(PkColor color, float factor);
 PkColor pk_color_desaturate(PkColor color, float factor);
 PkColor pk_color_fade(PkColor color, float alpha);
 PkColor pk_color_blend(PkColor fg, PkColor bg, float alpha);
+PkColor pk_color_with_alpha(PkColor color, uint8_t alpha);
 
 // Color comparison
 bool pk_color_equals(PkColor a, PkColor b);

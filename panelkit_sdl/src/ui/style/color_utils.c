@@ -345,3 +345,8 @@ SDL_Color pk_color_to_sdl(PkColor color) {
 PkColor pk_color_from_sdl(SDL_Color sdl_color) {
     return pk_color_create(sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a);
 }
+
+PkColor pk_color_with_alpha(PkColor color, uint8_t alpha) {
+    color.a = alpha;
+    return color;
+}
